@@ -18,5 +18,11 @@ class DatabaseSeeder extends Seeder
         //     'name' => 'Test User',
         //     'email' => 'test@example.com',
         // ]);
+        $this->call([
+            UserSeeder::class,
+            CustomerSeeder::class, // CustomerSeeder before OrderSeeder if it uses factories that need users
+            ServiceSeeder::class,
+            OrderSeeder::class,
+        ]);
     }
 }

@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+// use Illuminate\Database\Eloquent\SoftDeletes; // Optional: If users can be soft-deleted
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
+    // use SoftDeletes; // Uncomment if using soft deletes for users
 
     /**
      * The attributes that are mass assignable.
@@ -21,6 +22,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role', // Example: if you have roles like 'admin', 'staff'
+        'avatar_url', // Example: if users have avatars
     ];
 
     /**
@@ -40,8 +43,34 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'password' => 'hashed', // Automatically hashes password when set
     ];
-    public function ordersProcessed() { return $this->hasMany(Order::class); } // Orders processed by staff
-// public function customerProfile() { return $this->hasOne(Customer::class); } // If user is a customer
+
+    /**
+     * Orders processed by this user (staff member).
+     */
+    public function ordersProcessed()
+    {
+        return $this->hasMany(Order::class, 'user_id');
+    }
+
+    /**
+     * Customers managed or created by this user (staff member).
+     * This assumes a 'user_id' foreign key on the 'customers' table.
+     */
+    public function managedCustomers()
+    {
+        return $this->hasMany(Customer::class, 'user_id');
+    }
+
+    // Example role check (simple)
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->role === 'staff' || $this->isAdmin(); // Admins are also staff
+    }
 }
