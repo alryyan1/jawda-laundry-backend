@@ -21,10 +21,10 @@ class ProductTypeResource extends JsonResource
             'base_measurement_unit' => $this->base_measurement_unit,
             'product_category_id' => $this->product_category_id,
             'category' => new ProductCategoryResource($this->whenLoaded('category')),
-            'is_active' => (bool) $this->is_active, // Assuming you add this field to the model & table
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
-            'service_offerings_count' => $this->whenCounted('serviceOfferings'), // If you count offerings
+            'is_active' => (bool) $this->is_active, // Assuming you added 'is_active' field
+            'service_offerings_count' => $this->whenCounted('serviceOfferings'),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];
     }
 }

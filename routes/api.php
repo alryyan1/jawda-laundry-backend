@@ -10,8 +10,11 @@ use App\Http\Controllers\Api\ProductTypeController;
 use App\Http\Controllers\Api\ServiceActionController;
 use App\Http\Controllers\Api\ServiceOfferingController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\UserController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -51,5 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Application Settings (Admin only - ensure proper authorization)
     Route::get('/settings', [SettingController::class, 'index'])->middleware('can:view_app_settings'); // Example middleware
     Route::put('/settings', [SettingController::class, 'update'])->middleware('can:update_app_settings'); // Example middleware
-
+// Inside Route::middleware('auth:sanctum')->group(function () { ...
+Route::get('/product-types/{productType}/available-service-actions', [App\Http\Controllers\Api\ProductTypeController::class, 'availableServiceActions']);
+Route::apiResource('admin/users', UserController::class); // Note the 'admin/' prefix
+Route::apiResource('admin/roles', RoleController::class);
+Route::get('admin/permissions', [PermissionController::class, 'index']); // Usually only 
+// });
 });

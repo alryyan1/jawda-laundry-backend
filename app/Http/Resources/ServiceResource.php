@@ -16,8 +16,8 @@ class ServiceResource extends JsonResource
             'description' => $this->description,
             'price' => (float) $this->price,
             'category' => $this->category,
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];
     }
 }

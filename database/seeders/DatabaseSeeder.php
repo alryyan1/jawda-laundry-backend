@@ -20,9 +20,16 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             UserSeeder::class,
-            CustomerSeeder::class, // CustomerSeeder before OrderSeeder if it uses factories that need users
-            ServiceSeeder::class,
+            CustomerTypeSeeder::class,      // Before CustomerSeeder
+            CustomerSeeder::class,
+            ProductCategorySeeder::class,   // Before ProductTypeSeeder
+            ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
+            ServiceActionSeeder::class,     // Before ServiceOfferingSeeder
+            ServiceOfferingSeeder::class,   // Before OrderSeeder
             OrderSeeder::class,
+            PermissionSeeder::class, // Add this
+
+            // Add PricingRuleSeeder if you create one
         ]);
     }
 }

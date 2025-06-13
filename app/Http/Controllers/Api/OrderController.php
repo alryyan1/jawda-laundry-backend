@@ -76,8 +76,8 @@ class OrderController extends Controller
             'items.*.service_offering_id' => 'required|exists:service_offerings,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.product_description_custom' => 'nullable|string|max:255',
-            'items.*.length_meters' => 'nullable|numeric|min:0|required_if:items.*.width_meters,!=,null', // required if width is present
-            'items.*.width_meters' => 'nullable|numeric|min:0|required_if:items.*.length_meters,!=,null', // required if length is present
+            'items.*.length_meters' => 'nullable|numeric|min:0', // required if width is present
+            'items.*.width_meters' => 'nullable|numeric|min:0', // required if length is present
             'items.*.notes' => 'nullable|string|max:1000',
         ]);
 
@@ -118,7 +118,7 @@ class OrderController extends Controller
                 'status' => 'pending', // Default status
                 'total_amount' => $orderTotalAmount,
                 'paid_amount' => 0, // Default paid amount
-                'payment_status' => 'pending', // Default payment status
+                'status' => 'pending', // Default payment status
                 'notes' => $validatedOrderData['notes'] ?? null,
                 'due_date' => $validatedOrderData['due_date'] ?? null,
                 'order_date' => now(),

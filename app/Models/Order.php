@@ -18,19 +18,19 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
-        'user_id', // Staff member who created/processed the order
-        'status',  // e.g., 'pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'
+        'user_id',
+        'status',
         'total_amount',
         'paid_amount',
-        'payment_method', // e.g., 'cash', 'card', 'online'
-        'payment_status', // e.g., 'pending', 'paid', 'partially_paid', 'refunded'
+        'payment_method',       // Ensure this is here
+        'payment_status',       // Ensure this is here
         'notes',
         'order_date',
         'due_date',
         'pickup_date',
-        'delivery_address', // If you offer delivery
+        'delivery_address',     // Ensure this is here if used
     ];
-
+    
     /**
      * The attributes that should be cast.
      *
@@ -49,7 +49,7 @@ class Order extends Model
      */
     public function customer()
     {
-        return $this->belongsTo(Customer::class)->withTrashed(); // Include soft-deleted customers if needed
+        return $this->belongsTo(Customer::class);
     }
 
     /**
@@ -96,4 +96,5 @@ class Order extends Model
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
     }
+ 
 }

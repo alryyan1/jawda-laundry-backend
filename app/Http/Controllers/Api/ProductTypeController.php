@@ -7,6 +7,9 @@ use App\Models\ProductType;
 use App\Models\ProductCategory; // For validation if needed
 use Illuminate\Http\Request;
 use App\Http\Resources\ProductTypeResource; // Ensure you create this
+use App\Http\Resources\ServiceActionResource;
+use App\Models\ServiceAction;
+use App\Models\ServiceOffering;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -149,5 +152,23 @@ class ProductTypeController extends Controller
             Log::error("Error deleting product type {$productType->id}: " . $e->getMessage());
             return response()->json(['message' => 'Failed to delete product type.'], 500);
         }
+    }
+    public function availableServiceActions(ProductType $productType)
+    {
+        // Find ServiceAction IDs that have a ServiceOffering with the given ProductType
+        $serviceActionIds = ServiceOffering::where('product_type_id', $productType->id)
+                                           ->where('is_active', true) // Only active offerings
+                                           ->pluck('service_action_id')
+                                           ->unique();
+
+        $serviceActions = ServiceAction::whereIn('id', $serviceActionIds)
+                                      // ->where('is_active', true) // If ServiceAction itself has an active flag
+                                      ->orderBy('name')
+                                      ->get();
+
+        return ServiceActionResource::collection($serviceActions);
+        // Alternatively, you could return partial ServiceOffering data here if that's more useful
+        // e.g., return ServiceOffering::where('product_type_id', $productType->id)->with('serviceAction')->get();
+        // then the frontend would get ServiceOffering ID directly. For now, returning ServiceActions.
     }
 }

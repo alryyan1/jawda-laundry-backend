@@ -22,8 +22,8 @@ class CustomerTypeResource extends JsonResource
             // 'discount_percentage' => $this->discount_percentage,
             'customers_count' => $this->whenCounted('customers'),
             'pricing_rules_count' => $this->whenCounted('pricingRules'),
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];
     }
 }

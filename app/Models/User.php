@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
+
 // use Illuminate\Database\Eloquent\SoftDeletes; // Optional: If users can be soft-deleted
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable,HasRoles;
     // use SoftDeletes; // Uncomment if using soft deletes for users
 
     /**
@@ -24,6 +26,7 @@ class User extends Authenticatable
         'password',
         'role', // Example: if you have roles like 'admin', 'staff'
         'avatar_url', // Example: if users have avatars
+        'role'
     ];
 
     /**
@@ -72,5 +75,12 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->role === 'staff' || $this->isAdmin(); // Admins are also staff
+    }
+    
+    // Spatie provides methods like $user->hasRole('admin'), $user->can('edit articles'), etc.
+    // So, our custom isAdmin(), isReceptionist() might become:
+    public function isAdminSpatie(): bool
+    {
+        return $this->hasRole('admin'); // Assuming 'admin' is a role name in Spatie
     }
 }
