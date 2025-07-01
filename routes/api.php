@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ExpenseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
@@ -12,8 +13,10 @@ use App\Http\Controllers\Api\ServiceOfferingController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SettingController;
+use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UserController;
 
 // Public authentication routes
@@ -61,6 +64,12 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('admin/permissions', [PermissionController::class, 'index']); // Usually only 
   Route::post('/product-types/{productType}/create-all-service-offerings', [App\Http\Controllers\Api\ProductTypeController::class, 'createAllOfferings']);
   Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
+  Route::get('/expenses/categories', [ExpenseController::class, 'getCategories']);
+    Route::apiResource('expenses', ExpenseController::class);
+    Route::apiResource('suppliers', SupplierController::class);
+    Route::apiResource('purchases', PurchaseController::class);
+    // Add a route for getting all suppliers for a dropdown
+    Route::get('/suppliers-list', [SupplierController::class, 'all']);
   // });
 });
 
