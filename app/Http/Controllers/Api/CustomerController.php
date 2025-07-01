@@ -51,14 +51,14 @@ class CustomerController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'nullable|string|email|max:255|unique:customers,email',
-            'phone' => 'nullable|string|max:30', // Max length for phone
+            'phone' => 'required|string|max:30', // Max length for phone
             'address' => 'nullable|string|max:1000', // Max length for address
+            'customer_type_id' => 'sometimes|nullable|exists:customer_types,id',
         ]);
 
         try {
             // Assign the currently authenticated user (staff) as the creator if your model supports it
-            // $validatedData['user_id'] = Auth::id(); // Assuming 'user_id' links to staff
+            $validatedData['user_id'] = Auth::id(); // Assuming 'user_id' links to staff
 
             $customer = Customer::create($validatedData);
 
@@ -93,16 +93,10 @@ class CustomerController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => [
-                'sometimes', // Field is optional in the request
-                'nullable',  // Value can be null
-                'string',
-                'email',
-                'max:255',
-                Rule::unique('customers')->ignore($customer->id), // Email must be unique, ignoring the current customer
-            ],
-            'phone' => 'sometimes|nullable|string|max:30',
+      
+            'phone' => 'required|nullable|string|max:30',
             'address' => 'sometimes|nullable|string|max:1000',
+            'customer_type_id' => 'sometimes|nullable|exists:customer_types,id',
         ]);
 
         try {

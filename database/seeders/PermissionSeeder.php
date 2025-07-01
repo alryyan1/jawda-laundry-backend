@@ -1,80 +1,124 @@
 <?php
+
 namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
-use App\Models\User; // For assigning roles to existing users
+use App\Models\User; // To assign roles to existing users
 
 class PermissionSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
         // Reset cached roles and permissions
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Define Permissions
+        // ----------------- DEFINE PERMISSIONS -----------------
+        // Permissions are typically structured as {domain}_{action}, e.g., 'order_create'
         $permissions = [
             // User Management
-            'user_view_any', 'user_view', 'user_create', 'user_update', 'user_delete', 'user_assign_roles',
-            // Role Management
-            'role_view_any', 'role_view', 'role_create', 'role_update', 'role_delete', 'role_assign_permissions',
-            // Permission Management (usually admin only)
-            'permission_view_any',
-            // Order Management
-            'order_view_any', 'order_view', 'order_create', 'order_update', 'order_update_status', 'order_record_payment', 'order_cancel', 'order_delete',
+            'user:list', 'user:view', 'user:create', 'user:update', 'user:delete', 'user:assign-roles',
+            // Role & Permission Management
+            'role:list', 'role:view', 'role:create', 'role:update', 'role:delete', 'permission:list',
             // Customer Management
-            'customer_view_any', 'customer_view', 'customer_create', 'customer_update', 'customer_delete',
-            // Service Offerings & Components (ProductCategory, ProductType, ServiceAction, ServiceOffering)
-            'service_offering_manage', // A general permission for all service setup CRUD
-            'product_category_manage',
-            'product_type_manage',
-            'service_action_manage',
+            'customer:list', 'customer:view', 'customer:create', 'customer:update', 'customer:delete',
+            // Order Management
+            'order:list', 'order:view', 'order:create', 'order:update', 'order:update-status', 'order:record-payment', 'order:cancel', 'order:delete',
+            // Service Management (a single permission for all service components for simplicity, can be broken down further)
+            'service-admin:manage',
+            // Dashboard
+            'dashboard:view',
             // Settings
-            'app_settings_manage',
-            // Reports
-            'report_view_financial', 'report_view_operational',
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password', 'settings:manage-application',
+
+            // Product Type Management
+            'product-type:list', 'product-type:view', 'product-type:create', 'product-type:update', 'product-type:delete',
+            // Service Offering Management
+            'service-offering:list', 'service-offering:view', 'service-offering:create', 'service-offering:update', 'service-offering:delete',
+            // Service Action Management
+            'service-action:list', 'service-action:view', 'service-action:create', 'service-action:update', 'service-action:delete',
+            // Service Category Management
+            // Reports (Future)
+            // 'report:view-financial', 'report:view-operational',
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
+        $this->command->info('Permissions created.');
 
-        // Define Roles and Assign Permissions
+
+        // ----------------- DEFINE ROLES and ASSIGN PERMISSIONS -----------------
+
+        // ---- Admin Role (Super User) ----
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
-        // Admin gets all permissions (Spatie's Gate `before` method can also handle this)
+        // The `before` method in AuthServiceProvider is the best way to give admins all access,
+        // but assigning all permissions explicitly also works and is clear.
         $adminRole->givePermissionTo(Permission::all());
+        $this->command->info('Admin role created and assigned all permissions.');
 
+        // ---- Receptionist Role ----
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist']);
-        $receptionistRole->givePermissionTo([
-            'order_view_any', 'order_view', 'order_create', 'order_update', // May need finer grain for update
-            'order_update_status', 'order_record_payment', 'order_cancel',
-            'customer_view_any', 'customer_view', 'customer_create', 'customer_update',
+        $receptionistRole->syncPermissions([
+            'dashboard:view',
+            'customer:list', 'customer:view', 'customer:create', 'customer:update',
+            'order:list', 'order:view', 'order:create', 'order:update', 'order:update-status', 'order:record-payment', 'order:cancel',
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
+        $this->command->info('Receptionist role created and permissions assigned.');
 
-        $processorRole = Role::firstOrCreate(['name' => 'processor']); // Washer/Ironer
-        $processorRole->givePermissionTo([
-            'order_view_any', // To see assigned or relevant orders
-            'order_view',
-            'order_update_status', // Likely restricted to certain status transitions
+        // ---- Processor Role (Washer/Ironer) ----
+        $processorRole = Role::firstOrCreate(['name' => 'processor']);
+        $processorRole->syncPermissions([
+            'dashboard:view', // Can view a simplified dashboard
+            'order:list',     // Can see the list of orders to know what's in the queue
+            'order:view',     // Can view order details (e.g., items, notes)
+            'order:update-status', // Crucial permission
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
+        $this->command->info('Processor role created and permissions assigned.');
 
+        // ---- Delivery Role ----
         $deliveryRole = Role::firstOrCreate(['name' => 'delivery']);
-        $deliveryRole->givePermissionTo([
-            'order_view_any', // To see delivery schedule
-            'order_view',
-            'order_update_status', // e.g., to mark as 'out_for_delivery', 'delivered'
+        $deliveryRole->syncPermissions([
+            'dashboard:view', // Can view a simplified dashboard
+            'order:list',     // To see orders ready for delivery
+            'order:view',     // To see delivery address and customer contact
+            'order:update-status', // To mark as 'out_for_delivery' or 'delivered'
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
+        $this->command->info('Delivery role created and permissions assigned.');
 
-        // Assign roles to existing users (example)
+
+        // ---- Customer Role (Optional, for a customer portal) ----
+        // $customerRole = Role::firstOrCreate(['name' => 'customer']);
+        // $customerRole->syncPermissions([
+        //     'order:view', // A customer can only view their OWN orders (this is enforced in the Policy)
+        //     'order:create', // A customer can create a pickup request/order
+        //     'settings:view-profile', 'settings:update-profile', 'settings:change-password',
+        // ]);
+        // $this->command->info('Customer role created and permissions assigned.');
+
+
+        // ----------------- ASSIGN ROLES TO DEFAULT USERS -----------------
         $adminUser = User::where('email', 'admin@laundry.com')->first();
-        if ($adminUser && !$adminUser->hasRole('admin')) {
+        if ($adminUser) {
             $adminUser->assignRole('admin');
+            $this->command->info('Assigned "admin" role to admin@laundry.com');
         }
 
         $staffUser = User::where('email', 'staff@laundry.com')->first();
-        if ($staffUser && !$staffUser->hasRole('receptionist')) { // Assign a default role
+        if ($staffUser) {
+            // Assign a default role, e.g., 'receptionist'
             $staffUser->assignRole('receptionist');
+            $this->command->info('Assigned "receptionist" role to staff@laundry.com');
         }
+
+        $this->command->info('Role and Permission seeding completed.');
     }
 }

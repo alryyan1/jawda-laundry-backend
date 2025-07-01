@@ -7,8 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 class ProductType extends Model
 {
     use HasFactory;
-    protected $fillable = ['product_category_id', 'name', 'description', 'base_measurement_unit'];
-    public function category()
+    protected $fillable = [
+        'product_category_id',
+        'name',
+        'description',
+        'is_dimension_based', // Changed from base_measurement_unit
+        'is_active',
+        'image_url',
+    ];
+
+    protected $casts = [
+        'is_dimension_based' => 'boolean', // Add this cast
+        'is_active' => 'boolean',
+    ];
+        public function category()
     {
         return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }

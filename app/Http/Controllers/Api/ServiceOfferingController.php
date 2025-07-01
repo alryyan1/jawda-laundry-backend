@@ -62,31 +62,9 @@ class ServiceOfferingController extends Controller
         return ServiceOfferingResource::collection($offerings);
     }
 
-    /**
-     * Fetch all active service offerings for select dropdowns (non-paginated).
-     */
-    public function allForSelect(Request $request)
-    {
-        $query = ServiceOffering::with(['productType:id,name,product_category_id', 'productType.category:id,name', 'serviceAction:id,name'])
-                                 ->where('is_active', true)
-                                 ->orderBy('name_override'); // Or by productType.name then serviceAction.name
-
-        if ($request->filled('product_type_id')) {
-            $query->where('product_type_id', $request->product_type_id);
-        }
-
-        // You might want to order these in a way that makes sense for dropdowns
-        // e.g., by productType.name then by serviceAction.name
-        // This requires joining or more complex ordering if 'name_override' is not consistently used.
-        // For now, a simple order by name_override or product type name.
-        $offerings = $query->get()->sortBy(function($offering) { // Client-side sort for display_name after get()
-            return $offering->display_name;
-        });
 
 
-        return ServiceOfferingResource::collection($offerings);
-    }
-
+    // Remove validation rules for pricing_strategy in store() and update() methods.
 
     /**
      * Store a newly created resource in storage.
@@ -99,7 +77,6 @@ class ServiceOfferingController extends Controller
             'name_override' => 'nullable|string|max:255',
             'description_override' => 'nullable|string|max:1000',
             'default_price' => 'nullable|numeric|min:0',
-            'pricing_strategy' => ['required', Rule::in(['fixed', 'per_unit_product', 'dimension_based', 'customer_specific'])],
             'default_price_per_sq_meter' => 'nullable|numeric|min:0|required_if:pricing_strategy,dimension_based',
             'applicable_unit' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
@@ -147,7 +124,7 @@ class ServiceOfferingController extends Controller
             'name_override' => 'nullable|string|max:255',
             'description_override' => 'nullable|string|max:1000',
             'default_price' => 'nullable|numeric|min:0',
-            'pricing_strategy' => ['sometimes', 'required', Rule::in(['fixed', 'per_unit_product', 'dimension_based', 'customer_specific'])],
+            // 'pricing_strategy' => ['sometimes', 'required', Rule::in(['fixed', 'per_unit_product', 'dimension_based', 'customer_specific'])],
             'default_price_per_sq_meter' => 'nullable|numeric|min:0|required_if:pricing_strategy,dimension_based',
             'applicable_unit' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
@@ -201,5 +178,23 @@ class ServiceOfferingController extends Controller
             Log::error("Error deleting service offering {$serviceOffering->id}: " . $e->getMessage());
             return response()->json(['message' => 'Failed to delete service offering.'], 500);
         }
+    }
+
+    /**
+     * Fetch all active service offerings for select dropdowns (non-paginated).
+     */
+    public function allForSelect(Request $request)
+    {
+        $query = ServiceOffering::with([
+            // Eager load only what's needed for client-side logic and display
+            'productType:id,name,is_dimension_based,product_category_id',
+            'serviceAction:id,name'
+        ])->where('is_active', true);
+
+        $offerings = $query->get()->sortBy(function($offering) {
+            return $offering->display_name; // Use accessor for sorting
+        });
+
+        return ServiceOfferingResource::collection($offerings);
     }
 }

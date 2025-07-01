@@ -11,7 +11,7 @@ class CustomerSeeder extends Seeder
 {
     public function run(): void
     {
-        $staffUser = User::where('role', 'staff')->first();
+        $staffUser = User::first();
         $individualType = CustomerType::where('name', 'Individual')->first();
         $corporateType = CustomerType::where('name', 'Corporate')->first();
 

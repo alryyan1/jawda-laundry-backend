@@ -8,9 +8,11 @@ use App\Models\ProductCategory; // For validation if needed
 use Illuminate\Http\Request;
 use App\Http\Resources\ProductTypeResource; // Ensure you create this
 use App\Http\Resources\ServiceActionResource;
+use App\Http\Resources\ServiceOfferingResource;
 use App\Models\ServiceAction;
 use App\Models\ServiceOffering;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProductTypeController extends Controller
@@ -74,17 +76,32 @@ class ProductTypeController extends Controller
             ],
             'product_category_id' => 'required|integer|exists:product_categories,id',
             'description' => 'nullable|string|max:1000',
-            'base_measurement_unit' => ['nullable', 'string', Rule::in(['item', 'kg', 'sq_meter', 'set', 'piece', 'other'])],
+            'is_dimension_based' => 'sometimes|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             // 'is_active' => 'sometimes|boolean', // If you add an is_active field
         ], [
             'name.unique' => 'This product type name already exists within the selected category.'
         ]);
+        $imageUrl = null;
+        if ($request->hasFile('image')) {
+            // Store the file in 'storage/app/public/product_types' and get its path
+            $path = $request->file('image')->store('product_types', 'public');
+            // Get the public URL for the stored file
+            $imageUrl = asset('storage/' . $path);
+        }
+        // Add the image URL to the data to be created
+        $validatedData['image_url'] = $imageUrl;
+
 
         try {
             $productType = ProductType::create($validatedData);
-            $productType->load('category'); // Eager load for response
+            $productType->load('category');
             return new ProductTypeResource($productType);
         } catch (\Exception $e) {
+            // If creation fails, delete the uploaded image if it exists
+            if ($imageUrl) {
+                Storage::disk('public')->delete($path);
+            }
             Log::error("Error creating product type: " . $e->getMessage());
             return response()->json(['message' => 'Failed to create product type.'], 500);
         }
@@ -118,19 +135,43 @@ class ProductTypeController extends Controller
             ],
             'product_category_id' => 'sometimes|required|integer|exists:product_categories,id',
             'description' => 'sometimes|nullable|string|max:1000',
-            'base_measurement_unit' => ['sometimes', 'nullable', 'string', Rule::in(['item', 'kg', 'sq_meter', 'set', 'piece', 'other'])],
+            'is_dimension_based' => 'sometimes|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             // 'is_active' => 'sometimes|boolean',
         ], [
             'name.unique' => 'This product type name already exists within the selected category.'
         ]);
+        $imageUrl = $productType->image_url; // Keep old image by default
+        $newPath = null;
+
+        if ($request->hasFile('image')) {
+            // Delete the old image if it exists
+            if ($productType->image_url) {
+                // Extract path from URL to delete from storage
+                $oldPath = str_replace(asset('storage/'), '', $productType->image_url);
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            // Store the new file
+            $newPath = $request->file('image')->store('product_types', 'public');
+            $imageUrl = asset('storage/' . $newPath);
+        }
+        // Update the validatedData with the new image URL if an image was uploaded
+        if ($newPath) {
+            $validatedData['image_url'] = $imageUrl;
+        }
 
         try {
             $productType->update($validatedData);
             $productType->load('category');
             return new ProductTypeResource($productType);
         } catch (\Exception $e) {
+            // If update fails and we uploaded a new image, delete it
+            if ($newPath) {
+                Storage::disk('public')->delete($newPath);
+            }
             Log::error("Error updating product type {$productType->id}: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to update product type.'], 500);
+            return response()->json(['message' => 'Failed to update product type.', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -153,22 +194,58 @@ class ProductTypeController extends Controller
             return response()->json(['message' => 'Failed to delete product type.'], 500);
         }
     }
+ 
+    public function createAllOfferings(ProductType $productType)
+    {
+        $this->authorize('update', $productType); // Or a more specific permission like 'service_offering_manage'
+
+        // Find which Service Actions already have an offering for this Product Type
+        $existingActionIds = ServiceOffering::where('product_type_id', $productType->id)
+                                            ->pluck('service_action_id');
+
+        // Find all Service Actions that DON'T have an offering yet
+        $missingActions = ServiceAction::whereNotIn('id', $existingActionIds)->get();
+
+        if ($missingActions->isEmpty()) {
+            return response()->json(['message' => 'All available service actions already have offerings for this product type.'], 200);
+        }
+
+        $newOfferingsData = [];
+        foreach ($missingActions as $action) {
+            $newOfferingsData[] = [
+                'product_type_id' => $productType->id,
+                'service_action_id' => $action->id,
+                // Set defaults. Price is 0 so admin is forced to set it.
+                'default_price' => 0.00,
+                'default_price_per_sq_meter' => 0.00,
+                'is_active' => true, // Default to active, admin can deactivate
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        ServiceOffering::insert($newOfferingsData); // Bulk insert for efficiency
+
+        // Fetch all offerings for this product type to return the complete, updated list
+        $allOfferings = ServiceOffering::where('product_type_id', $productType->id)
+                                       ->with(['serviceAction', 'productType'])
+                                       ->get();
+
+        return ServiceOfferingResource::collection($allOfferings);
+    }
+
     public function availableServiceActions(ProductType $productType)
     {
-        // Find ServiceAction IDs that have a ServiceOffering with the given ProductType
+        // Find ServiceAction IDs that have an active ServiceOffering for the given ProductType
         $serviceActionIds = ServiceOffering::where('product_type_id', $productType->id)
-                                           ->where('is_active', true) // Only active offerings
+                                           ->where('is_active', true)
                                            ->pluck('service_action_id')
                                            ->unique();
 
         $serviceActions = ServiceAction::whereIn('id', $serviceActionIds)
-                                      // ->where('is_active', true) // If ServiceAction itself has an active flag
                                       ->orderBy('name')
                                       ->get();
 
         return ServiceActionResource::collection($serviceActions);
-        // Alternatively, you could return partial ServiceOffering data here if that's more useful
-        // e.g., return ServiceOffering::where('product_type_id', $productType->id)->with('serviceAction')->get();
-        // then the frontend would get ServiceOffering ID directly. For now, returning ServiceActions.
     }
 }
