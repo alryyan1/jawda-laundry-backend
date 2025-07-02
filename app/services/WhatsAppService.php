@@ -5,35 +5,34 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Service class for interacting with the waapi.app WhatsApp API.
+ */
 class WhatsAppService
 {
     protected string $apiUrl;
     protected string $apiToken;
-    protected string $instanceId;
+    protected bool $isEnabled;
 
     /**
      * Create a new service instance.
-     * It fetches the necessary credentials from the SettingsService upon instantiation.
-     *
-     * @param  \App\Services\SettingsService  $settings
+     * Fetches configuration directly from Laravel's config helper.
      */
-    public function __construct(SettingsService $settings)
+    public function __construct()
     {
-        // Get credentials from our settings database via the SettingsService.
-        // The database keys are "group_key".
-        $this->apiUrl = $settings->get('whatsapp_api_url', 'https://waapi.app/api/v1/instances');
-        $this->apiToken = $settings->get('whatsapp_api_token');
-        $this->instanceId = $settings->get('whatsapp_instance_id');
+        $this->isEnabled = config('whatsapp.enabled', false);
+        $this->apiUrl = config('whatsapp.api_url', '');
+        $this->apiToken = config('whatsapp.api_token', '');
     }
 
     /**
-     * Checks if the service is fully configured with the necessary credentials.
+     * Checks if the service is fully configured and enabled.
      *
      * @return bool
      */
     public function isConfigured(): bool
     {
-        return !empty($this->apiToken) && !empty($this->instanceId) && !empty($this->apiUrl);
+        return $this->isEnabled && !empty($this->apiToken) && !empty($this->apiUrl);
     }
 
     /**
@@ -46,17 +45,13 @@ class WhatsAppService
     public function sendMessage(string $phoneNumber, string $message): array
     {
         if (!$this->isConfigured()) {
-            Log::warning('WhatsAppService: Attempted to send message but service is not configured.');
-            return ['status' => 'error', 'message' => 'WhatsApp service not configured in settings.'];
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured or enabled in settings.'];
         }
 
-        return $this->sendRequest(
-            "{$this->apiUrl}/{$this->instanceId}/client/action/send-message",
-            [
-                'chatId' => $this->formatChatId($phoneNumber),
-                'message' => $message,
-            ]
-        );
+        return $this->sendRequest('/client/action/send-message', [
+            'chatId' => $this->formatChatId($phoneNumber),
+            'message' => $message,
+        ]);
     }
 
     /**
@@ -71,8 +66,7 @@ class WhatsAppService
     public function sendMediaBase64(string $phoneNumber, string $base64Data, string $fileName, ?string $caption = null): array
     {
         if (!$this->isConfigured()) {
-            Log::warning('WhatsAppService: Attempted to send media but service is not configured.');
-            return ['status' => 'error', 'message' => 'WhatsApp service not configured in settings.'];
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured or enabled in settings.'];
         }
 
         $payload = [
@@ -80,22 +74,13 @@ class WhatsAppService
             'mediaBase64' => $base64Data,
             'mediaName' => $fileName,
         ];
+        if ($caption) $payload['mediaCaption'] = $caption;
 
-        if ($caption) {
-            $payload['mediaCaption'] = $caption;
-        }
-
-        return $this->sendRequest(
-            "{$this->apiUrl}/{$this->instanceId}/client/action/send-media",
-            $payload
-        );
+        return $this->sendRequest('/client/action/send-media', $payload);
     }
 
     /**
-     * Sends a test message to the configured test number.
-     *
-     * @param string $testPhoneNumber
-     * @return array
+     * Sends a test message to the specified phone number.
      */
     public function sendTestMessage(string $testPhoneNumber): array
     {
@@ -103,54 +88,39 @@ class WhatsAppService
     }
 
     /**
-     * A centralized method to handle making requests to the WhatsApp API.
-     *
-     * @param string $url The full endpoint URL.
-     * @param array $payload The data to be sent in the request body.
-     * @return array
+     * Centralized method for making API requests.
      */
-    private function sendRequest(string $url, array $payload): array
+    private function sendRequest(string $endpoint, array $payload): array
     {
+        $fullUrl = rtrim($this->apiUrl, '/') . $endpoint;
+
         try {
             $response = Http::withToken($this->apiToken)
                 ->acceptJson()
-                ->asJson() // Ensure the content-type header is set to application/json
-                ->post($url, $payload);
+                ->asJson()
+                ->post($fullUrl, $payload);
 
             if ($response->successful()) {
-                Log::info("WhatsApp API request successful.", ['url' => $url, 'response' => $response->json()]);
+                Log::info("WhatsApp API request to {$endpoint} was successful.", ['phone' => $payload['chatId']]);
                 return ['status' => 'success', 'data' => $response->json()];
             } else {
+                $errorMessage = $response->json('message', 'API request failed with status ' . $response->status());
                 Log::error("WhatsApp API request failed.", [
-                    'url' => $url,
-                    'status' => $response->status(),
-                    'response' => $response->json() ?? $response->body()
+                    'endpoint' => $endpoint, 'status' => $response->status(), 'response' => $response->json() ?? $response->body()
                 ]);
-                $errorMessage = $response->json('data.message', 'API request failed with status ' . $response->status());
                 return ['status' => 'error', 'message' => $errorMessage, 'data' => $response->json()];
             }
-
         } catch (\Exception $e) {
-            Log::critical("Exception occurred while communicating with WhatsApp API.", [
-                'url' => $url,
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return ['status' => 'error', 'message' => 'A critical error occurred while sending the message. Check logs.'];
+            Log::critical("Exception while communicating with WhatsApp API.", ['endpoint' => $endpoint, 'message' => $e->getMessage()]);
+            return ['status' => 'error', 'message' => 'A critical communication error occurred. Check server logs.'];
         }
     }
 
     /**
      * Formats a raw phone number into the required "chatId" format.
-     *
-     * @param string $phoneNumber
-     * @return string
      */
     private function formatChatId(string $phoneNumber): string
     {
-        // Sanitize the number to remove anything that isn't a digit
-        $digitsOnly = preg_replace('/[^0-9]/', '', $phoneNumber);
-        // Append the required suffix for a personal chat
-        return $digitsOnly . '@c.us';
+        return preg_replace('/[^0-9]/', '', $phoneNumber) . '@c.us';
     }
 }

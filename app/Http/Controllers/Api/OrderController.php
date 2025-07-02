@@ -179,37 +179,22 @@ class OrderController extends Controller
     }
 
     /**
-     * Update only the status of the specified order.
+     * Update only the status of the specified order and trigger notifications.
      */
-    public function updateStatus(Request $request, Order $order)
+    public function updateStatus(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
-        $validated = $request->validate([
-            'status' => ['required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
-        ]);
-        
+        $this->authorize('updateStatus', $order);
+        $validated = $request->validate(['status' => ['required', Rule::in(config('app.order_statuses'))]]); // Assuming you have this config
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
-        
-        $order->status = $newStatus;
-        if ($newStatus === 'completed' && !$order->pickup_date) {
-            $order->pickup_date = now();
-        }
-        $order->save();
-        
-        // Notify customer about status change (if status actually changed)
+
         if ($oldStatus !== $newStatus) {
-            try {
-                $notifyAction = app(NotifyCustomerForOrderStatus::class);
-                $notifyAction->execute($order, $oldStatus, $newStatus);
-            } catch (\Exception $e) {
-                Log::warning("Failed to send order status notification", [
-                    'order_id' => $order->id,
-                    'error' => $e->getMessage()
-                ]);
-                // Don't fail the request if notification fails
-            }
+            $order->status = $newStatus;
+            if ($newStatus === 'completed' && !$order->pickup_date) $order->pickup_date = now();
+            $order->save();
+            $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
+            $notifier->execute($order); // Call the action to handle notification logic
         }
-        
         return new OrderResource($order);
     }
 

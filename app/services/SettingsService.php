@@ -1,57 +1,55 @@
 <?php
-namespace App\Services;
-use App\Models\Setting;
-use Illuminate\Support\Facades\Cache;
 
+namespace App\Services;
+
+use Jackiedo\DotenvEditor\Facades\DotenvEditor;
+use Illuminate\Support\Facades\Config;
+
+/**
+ * Service class for managing application settings stored in .env and config files.
+ */
 class SettingsService
 {
     /**
-     * Get a setting value by its key.
+     * Get a setting value by its dot-notation config key.
+     * The config file itself handles the fallback to .env and default values.
      *
-     * @param string $key
-     * @param mixed $default
+     * @param string $key e.g., 'app_settings.company_name' or 'whatsapp.api_token'
+     * @param mixed $default A fallback default if the config key doesn't exist at all.
      * @return mixed
      */
     public function get(string $key, $default = null)
     {
-        return Cache::rememberForever('setting_' . $key, function () use ($key, $default) {
-            return Setting::where('key', $key)->first()?->value ?? $default;
-        });
+        return Config::get($key, $default);
     }
 
     /**
-     * Set a setting value.
+     * Get all settings from a specific config file as an associative array.
      *
-     * @param string $key
-     * @param mixed $value
-     * @param string $group
-     * @return Setting
+     * @param string $file e.g., 'app_settings' or 'whatsapp'
+     * @return array
      */
-    public function set(string $key, $value, string $group = 'general'): Setting
+    public function getAll(string $file): array
     {
-        $setting = Setting::updateOrCreate(
-            ['key' => $key],
-            ['value' => $value, 'group' => $group]
-        );
-        
-        // Forget the old cache value so it can be refreshed on next get()
-        Cache::forget('setting_' . $key);
-
-        return $setting;
+        return Config::get($file, []);
     }
 
     /**
-     * Get all settings, optionally filtered by group.
+     * Set and save multiple key-value pairs to the .env file.
      *
-     * @param string|null $group
-     * @return \Illuminate\Support\Collection
+     * @param array $data An associative array where keys are the .env variable names.
+     *                    e.g., ['APP_SETTINGS_COMPANY_NAME' => 'New Laundry Name', 'WHATSAPP_API_ENABLED' => 'true']
+     * @return void
      */
-    public function getAll(string $group = null)
+    public function setAndSave(array $data): void
     {
-        $query = Setting::query();
-        if ($group) {
-            $query->where('group', $group);
+        if (empty($data)) {
+            return;
         }
-        return $query->pluck('value', 'key');
+        
+        // Use the DotenvEditor package to safely update keys.
+        // This preserves comments and formatting in your .env file.
+        DotenvEditor::setKeys($data);
+        DotenvEditor::save();
     }
 }

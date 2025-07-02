@@ -57,27 +57,39 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('service-offerings', ServiceOfferingController::class);
   // Add other service-related resources if needed (e.g., PricingRules)
 
-  // Application Settings (Admin only - ensure proper authorization)
-  Route::get('/settings', [SettingController::class, 'index'])->middleware('can:view_app_settings'); // Example middleware
-  Route::put('/settings', [SettingController::class, 'update'])->middleware('can:update_app_settings'); // Example middleware
-// Inside Route::middleware('auth:sanctum')->group(function () { ...
-  Route::get('/product-types/{productType}/available-service-actions', [App\Http\Controllers\Api\ProductTypeController::class, 'availableServiceActions']);
-  Route::apiResource('admin/users', UserController::class); // Note the 'admin/' prefix
+  // Admin Management
+  Route::apiResource('admin/users', UserController::class);
   Route::apiResource('admin/roles', RoleController::class);
-  Route::get('admin/permissions', [PermissionController::class, 'index']); // Usually only 
-  Route::post('/product-types/{productType}/create-all-service-offerings', [App\Http\Controllers\Api\ProductTypeController::class, 'createAllOfferings']);
+  Route::get('admin/permissions', [PermissionController::class, 'index']);
+  
+  // Product Type Management
+  Route::get('/product-types/{productType}/available-service-actions', [ProductTypeController::class, 'availableServiceActions']);
+  Route::post('/product-types/{productType}/create-all-service-offerings', [ProductTypeController::class, 'createAllOfferings']);
+  
+  // Order Management
   Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
+  
+  // Expense Management
   Route::get('/expenses/categories', [ExpenseController::class, 'getCategories']);
-    Route::apiResource('expenses', ExpenseController::class);
-    Route::apiResource('suppliers', SupplierController::class);
-    Route::apiResource('purchases', PurchaseController::class);
-    // Add a route for getting all suppliers for a dropdown
-    Route::get('/suppliers-list', [SupplierController::class, 'all']);
-    Route::apiResource('expense-categories', ExpenseCategoryController::class);
-    Route::apiResource('orders.payments', PaymentController::class)->except(['show', 'update']);
-    Route::get('/settings', [SettingController::class, 'index']);
-    Route::put('/settings', [SettingController::class, 'update']);
-    Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
+  Route::apiResource('expenses', ExpenseController::class);
+  
+  // Supplier Management
+  Route::apiResource('suppliers', SupplierController::class);
+  Route::get('/suppliers-list', [SupplierController::class, 'all']);
+  
+  // Purchase Management
+  Route::apiResource('purchases', PurchaseController::class);
+  
+  // Expense Categories
+  Route::apiResource('expense-categories', ExpenseCategoryController::class);
+  
+  // Payment Management
+  Route::apiResource('orders.payments', PaymentController::class)->except(['show', 'update']);
+  
+  // Application Settings
+  Route::get('/settings', [SettingController::class, 'index']);
+  Route::put('/settings', [SettingController::class, 'update']);
+  Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
     Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
     ->name('orders.invoice.whatsapp');
     Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
