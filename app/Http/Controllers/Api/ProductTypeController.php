@@ -23,7 +23,7 @@ class ProductTypeController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ProductType::with('category')->orderBy('name'); // Eager load category
+        $query = ProductType::with('category'); // Eager load category
 
         if ($request->filled('product_category_id')) {
             $query->where('product_category_id', $request->product_category_id);
@@ -39,7 +39,22 @@ class ProductTypeController extends Controller
             });
         }
 
-        $productTypes = $query->paginate($request->get('per_page', 15));
+        // Handle sorting
+        $sortBy = $request->get('sort_by', 'id');
+        $sortOrder = $request->get('sort_order', 'desc');
+        
+        // Validate sort_by to prevent SQL injection
+        $allowedSortFields = ['id', 'name', 'created_at', 'updated_at'];
+        if (!in_array($sortBy, $allowedSortFields)) {
+            $sortBy = 'id';
+        }
+        
+        // Validate sort_order
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $productTypes = $query->orderBy($sortBy, $sortOrder)->paginate($request->get('per_page', 15));
         return ProductTypeResource::collection($productTypes);
     }
 

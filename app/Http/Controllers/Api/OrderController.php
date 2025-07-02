@@ -9,7 +9,11 @@ use App\Models\ServiceOffering;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
+use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
+use App\Services\SettingsService;
+use App\Services\WhatsAppService;
+use App\Actions\NotifyCustomerForOrderStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -67,18 +71,9 @@ class OrderController extends Controller
         }
 
         // Sorting
-        if ($request->filled('sort_by')) {
-            $sortDirection = $request->get('sort_direction', 'asc');
-            if (in_array($sortDirection, ['asc', 'desc'])) {
-                // Add column to whitelist to prevent arbitrary column sorting
-                $allowedSorts = ['order_date', 'total_amount', 'status', 'created_at'];
-                if (in_array($request->sort_by, $allowedSorts)) {
-                    $query->orderBy($request->sort_by, $sortDirection);
-                }
-            }
-        }
 
-        $orders = $query->paginate($request->get('per_page', 10));
+
+        $orders = $query->orderBy('id', 'desc')->paginate($request->get('per_page', 10));
         return OrderResource::collection($orders);
     }
 
@@ -191,11 +186,30 @@ class OrderController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
         ]);
-        $order->status = $validated['status'];
-        if ($validated['status'] === 'completed' && !$order->pickup_date) {
+        
+        $oldStatus = $order->status;
+        $newStatus = $validated['status'];
+        
+        $order->status = $newStatus;
+        if ($newStatus === 'completed' && !$order->pickup_date) {
             $order->pickup_date = now();
         }
         $order->save();
+        
+        // Notify customer about status change (if status actually changed)
+        if ($oldStatus !== $newStatus) {
+            try {
+                $notifyAction = app(NotifyCustomerForOrderStatus::class);
+                $notifyAction->execute($order, $oldStatus, $newStatus);
+            } catch (\Exception $e) {
+                Log::warning("Failed to send order status notification", [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage()
+                ]);
+                // Don't fail the request if notification fails
+            }
+        }
+        
         return new OrderResource($order);
     }
 
@@ -313,5 +327,108 @@ class OrderController extends Controller
         // 'I' for inline browser display, 'D' for download
         $pdf->Output('invoice-'.$order->order_number.'.pdf', 'I');
         exit; // TCPDF's output can sometimes interfere with Laravel's response cycle. exit() is a safeguard.
+    }
+     /**
+     * Generate and download a PDF invoice formatted for a POS thermal printer.
+     */
+    public function downloadPosInvoice(Order $order, SettingsService $settingsService)
+    {
+        // $this->authorize('view', $order);
+
+        // Eager load all necessary data for the invoice
+        $order->load(['customer', 'user', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
+
+        // --- PDF Generation ---
+        // Page format arguments: orientation, unit, format (array(width, height) in mm for custom roll)
+        // 80mm is a common POS paper width
+        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
+
+        // Pass data to the PDF class
+        $pdf->setOrder($order);
+        $settings = [
+            'general_company_name' => $settingsService->get('general_company_name', config('app.name')),
+            'general_company_address' => $settingsService->get('general_company_address'),
+            'general_company_phone' => $settingsService->get('general_company_phone'),
+            'general_default_currency_symbol' => '$', // Get from settings later
+        ];
+        $pdf->setSettings($settings);
+
+        // Set document information
+        $pdf->SetTitle('Receipt ' . $order->order_number);
+        $pdf->SetAuthor(config('app.name'));
+        $pdf->setPrintHeader(false); // We can control header in generate()
+        $pdf->setPrintFooter(true);  // Use our custom footer
+
+        // Set margins: left, top, right
+        $pdf->SetMargins(4, 5, 4);
+        $pdf->SetFooterMargin(10);
+        $pdf->SetAutoPageBreak(TRUE, 15); // Margin from bottom
+
+        // Call your custom generate method which builds the PDF with Cell()
+        $pdf->generate();
+
+        // Close and output PDF document
+        // 'I' for inline browser display. This is best for POS printing.
+        // The browser's PDF viewer will handle the print dialog.
+        $pdf->Output('receipt-'.$order->order_number.'.pdf', 'I');
+        exit;
+    }
+    
+    /**
+     * Generates an invoice PDF and sends it via WhatsApp.
+     */
+    public function sendWhatsappInvoice(Order $order, SettingsService $settingsService, WhatsAppService $whatsAppService)
+    {
+        $this->authorize('view', $order); // Or a specific 'order:send-invoice' permission
+
+        if (!$whatsAppService->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp API is not configured.'], 400);
+        }
+
+        $customer = $order->customer;
+        if (!$customer || !$customer->phone) {
+            return response()->json(['message' => 'Customer phone number is missing.'], 400);
+        }
+
+        // --- 1. Generate the PDF in memory ---
+        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
+        $order->load(['customer', 'user', 'items.serviceOffering']); // Eager load necessary data
+        
+        $settings = [
+            'general_company_name' => $settingsService->get('general_company_name', config('app.name')),
+            // ... fetch other settings needed for the PDF
+        ];
+        $pdf->setOrder($order);
+        $pdf->setSettings($settings);
+        $pdf->generate(); // This builds the PDF content
+
+        // Get the raw PDF content as a string
+        // 'S' tells TCPDF to output as a string instead of to the browser
+        $pdfContent = $pdf->Output('invoice.pdf', 'S');
+
+        // --- 2. Base64 Encode the PDF Content ---
+        $base64Pdf = base64_encode($pdfContent);
+
+        // --- 3. Send via WhatsApp Service ---
+        $fileName = 'Invoice-' . $order->order_number . '.pdf';
+        $caption = "Hello {$customer->name}, here is the invoice for your order #{$order->order_number}. Thank you!";
+        
+        // Sanitize phone number - remove '+', spaces, dashes
+        $phoneNumber = preg_replace('/[^0-9]/', '', $customer->phone);
+
+        $result = $whatsAppService->sendMediaBase64($phoneNumber, $base64Pdf, $fileName, $caption);
+
+        // --- 4. Return Response to Frontend ---
+        if ($result['status'] === 'success') {
+            // Optionally log this action
+            $order->logActivity("Invoice sent to customer via WhatsApp.");
+            return response()->json(['message' => 'Invoice sent successfully via WhatsApp!']);
+        } else {
+            return response()->json([
+                'message' => 'Failed to send WhatsApp invoice.',
+                'details' => $result['message'] ?? 'Unknown API error.',
+                'api_response' => $result['data'] ?? null
+            ], 500);
+        }
     }
 }

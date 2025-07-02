@@ -23,3 +23,5 @@ Route::get('/', function () {
 
     Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice'])
          ->name('orders.invoice.download');
+         Route::get('/orders/{order}/pos-invoice-pdf', [OrderController::class, 'downloadPosInvoice'])
+         ->name('orders.invoice.pos.pdf');

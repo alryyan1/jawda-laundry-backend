@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ServiceActionController;
 use App\Http\Controllers\Api\ServiceOfferingController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WhatsappTemplateController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -72,7 +74,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Add a route for getting all suppliers for a dropdown
     Route::get('/suppliers-list', [SupplierController::class, 'all']);
     Route::apiResource('expense-categories', ExpenseCategoryController::class);
-
+    Route::apiResource('orders.payments', PaymentController::class)->except(['show', 'update']);
+    Route::get('/settings', [SettingController::class, 'index']);
+    Route::put('/settings', [SettingController::class, 'update']);
+    Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
+    Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
+    ->name('orders.invoice.whatsapp');
+    Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
+    Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
+    Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
   // });
 });
 
@@ -87,3 +97,4 @@ Route::get('/dashboard/revenue-breakdown', [App\Http\Controllers\Api\DashboardCo
 
 // Data Endpoints for Form Dropdowns and Logic
 Route::get('/service-offerings/all-for-select', [ServiceOfferingController::class, 'allForSelect']);
+

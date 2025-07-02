@@ -20,10 +20,10 @@ class ExpenseResource extends JsonResource
             'category' => $this->category,
             'description' => $this->description,
             'amount' => (float) $this->amount, // Ensure it's a float in the JSON
-            'expense_date' => $this->expense_date->format('Y-m-d'), // Consistent date format
+            'expense_date' => $this->expense_date ? $this->expense_date->format('Y-m-d') : null, // Consistent date format
             'user_id' => $this->user_id,
             'user' => new UserResource($this->whenLoaded('user')), // Include user details if loaded
-            'created_at' => $this->created_at->toIso8601String(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
         ];
     }
 }

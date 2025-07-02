@@ -86,7 +86,7 @@ class InvoicePdf extends TCPDF
         $this->SetY($this->GetY() - $blockHeight);
 
         $this->MultiCell(95, 5, 'Invoice #: ' . $this->order->order_number, 0, 'R');
-        $this->MultiCell(95, 5, 'Order Date: ' . $this->order->order_date->format('M d, Y'), 0, 'R');
+        $this->MultiCell(95, 5, 'Order Date: ' . ($this->order->order_date ? $this->order->order_date->format('M d, Y') : 'N/A'), 0, 'R');
         $this->MultiCell(95, 5, 'Due Date: ' . ($this->order->due_date ? $this->order->due_date->format('M d, Y') : 'N/A'), 0, 'R');
 
         $this->Ln(10); // Add some space

@@ -21,13 +21,13 @@ class PurchaseResource extends JsonResource
             'reference_number' => $this->reference_number,
             'total_amount' => (float) $this->total_amount,
             'status' => $this->status,
-            'purchase_date' => $this->purchase_date->format('Y-m-d'),
+            'purchase_date' => $this->purchase_date ? $this->purchase_date->format('Y-m-d') : null,
             'notes' => $this->notes,
             'user_id' => $this->user_id,
             'user' => new UserResource($this->whenLoaded('user')),
             'items' => PurchaseItemResource::collection($this->whenLoaded('items')),
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];
     }
 }

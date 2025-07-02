@@ -33,6 +33,7 @@ class OrderResource extends JsonResource
             'pickup_date' => $this->pickup_date ? $this->pickup_date->toIso8601String() : null,
             'delivery_address' => $this->delivery_address,
             'items' => OrderItemResource::collection($this->whenLoaded('items')), // Collection of OrderItemResource
+            'payments' => PaymentResource::collection($this->whenLoaded('payments')), // Collection of PaymentResource
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];

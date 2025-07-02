@@ -96,5 +96,10 @@ class Order extends Model
     {
         return (float) $this->total_amount - (float) $this->paid_amount;
     }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
  
 }

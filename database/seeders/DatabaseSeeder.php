@@ -28,7 +28,7 @@ class DatabaseSeeder extends Seeder
             ServiceOfferingSeeder::class,   // Before OrderSeeder
             OrderSeeder::class,
             PermissionSeeder::class, // Add this
-
+            SupplierSeeder::class,
             // Add PricingRuleSeeder if you create one
         ]);
     }
