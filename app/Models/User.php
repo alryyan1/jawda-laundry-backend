@@ -24,9 +24,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role', // Example: if you have roles like 'admin', 'staff'
         'avatar_url', // Example: if users have avatars
-        'role'
+      
     ];
 
     /**
@@ -69,12 +68,12 @@ class User extends Authenticatable
     // Example role check (simple)
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
-    }
+            return $this->hasRole('admin');
+        }
 
     public function isStaff(): bool
     {
-        return $this->role === 'staff' || $this->isAdmin(); // Admins are also staff
+        return $this->hasRole('staff') || $this->isAdmin(); // Admins are also staff
     }
     
     // Spatie provides methods like $user->hasRole('admin'), $user->can('edit articles'), etc.

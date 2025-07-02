@@ -15,7 +15,6 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Admin User',
                 'password' => Hash::make('password'), // Change in production!
-                // Add any other necessary fields, e.g., role
             ]
         );
 

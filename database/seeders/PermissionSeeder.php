@@ -20,10 +20,11 @@ class PermissionSeeder extends Seeder
 
         // ----------------- DEFINE PERMISSIONS -----------------
         $permissions = [
-            // Dashboard
+            // General
             'dashboard:view',
+            'admin:view-menu', // To see the main "Administration" menu
 
-            // User Management (Admin Only)
+            // User & Role Management
             'user:list', 'user:create', 'user:update', 'user:delete', 'user:assign-roles',
             'role:list', 'role:create', 'role:update', 'role:delete', 'permission:list',
 
@@ -36,35 +37,34 @@ class PermissionSeeder extends Seeder
 
             // Expense Management
             'expense:list', 'expense:create', 'expense:update', 'expense:delete',
+            'expense-category:manage', // Single permission for simple category CRUD
 
             // Purchase & Supplier Management
-            'supplier:list', 'supplier:create', 'supplier:update', 'supplier:delete',
-            'purchase:list', 'purchase:create', 'purchase:update', 'purchase:delete',
+            'supplier:list', 'supplier:view', 'supplier:create', 'supplier:update', 'supplier:delete',
+            'purchase:list', 'purchase:view', 'purchase:create', 'purchase:update', 'purchase:delete',
 
-            // Service Admin (Categories, Types, Actions, Offerings)
-            'service-admin:manage',
+            // Service Admin
+            'service-admin:manage', // General permission for all service setup CRUD
 
             // Settings
-            'settings:view-profile', 'settings:update-profile', 'settings:change-password', 'settings:manage-application',
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password',
+            'settings:manage-application', // For app-wide settings
 
             // Reports
             'report:view-financial', 'report:view-operational',
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']); // Specify guard_name for API
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
         $this->command->info('Permissions created or verified.');
 
         // ----------------- DEFINE ROLES and ASSIGN PERMISSIONS -----------------
 
         // ---- Admin Role (Super User) ----
-        // Has all permissions implicitly via Gate::before() in AuthServiceProvider.
-        // We still create the role itself.
         $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $this->command->info('Admin role created.');
-        // Note: For clarity, you can still assign all permissions if you prefer not to use Gate::before()
-        // $adminRole->givePermissionTo(Permission::all());
+        $adminRole->givePermissionTo(Permission::all()); // Admin gets all permissions
+        $this->command->info('Admin role created and assigned all permissions.');
 
         // ---- Receptionist Role ----
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'web']);
@@ -74,7 +74,7 @@ class PermissionSeeder extends Seeder
             'order:list', 'order:view', 'order:create', 'order:update', 'order:update-status', 'order:record-payment',
             'expense:list', 'expense:create',
             'supplier:list', 'supplier:view',
-            'purchase:list', 'purchase:view',
+            'purchase:list', 'purchase:view', 'purchase:create',
             'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
         $this->command->info('Receptionist role created and permissions assigned.');
@@ -84,7 +84,7 @@ class PermissionSeeder extends Seeder
         $processorRole->syncPermissions([
             'order:list',
             'order:view',
-            'order:update-status', // Logic in controller should restrict which statuses they can set
+            'order:update-status',
             'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
         $this->command->info('Processor role created and permissions assigned.');
@@ -94,16 +94,22 @@ class PermissionSeeder extends Seeder
         $deliveryRole->syncPermissions([
             'order:list',
             'order:view',
-            'order:update-status', // To mark as delivered
+            'order:update-status',
             'settings:view-profile', 'settings:update-profile', 'settings:change-password',
         ]);
         $this->command->info('Delivery role created and permissions assigned.');
 
-        // ----------------- ASSIGN ADMIN ROLE TO ADMIN USER -----------------
+        // ----------------- ASSIGN ROLES TO DEFAULT USERS -----------------
         $adminUser = User::where('email', 'admin@laundry.com')->first();
         if ($adminUser) {
-            $adminUser->syncRoles(['admin']); // syncRoles is safer than assignRole in a seeder
+            $adminUser->syncRoles(['admin']);
             $this->command->info('Assigned "admin" role to admin@laundry.com.');
+        }
+
+        $staffUser = User::where('email', 'staff@laundry.com')->first();
+        if ($staffUser) {
+            $staffUser->syncRoles(['receptionist']);
+            $this->command->info('Assigned "receptionist" role to staff@laundry.com.');
         }
     }
 }

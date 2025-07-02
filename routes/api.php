@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ProductTypeController;
 use App\Http\Controllers\Api\ServiceActionController;
 use App\Http\Controllers\Api\ServiceOfferingController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
@@ -70,6 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('purchases', PurchaseController::class);
     // Add a route for getting all suppliers for a dropdown
     Route::get('/suppliers-list', [SupplierController::class, 'all']);
+    Route::apiResource('expense-categories', ExpenseCategoryController::class);
+
   // });
 });
 

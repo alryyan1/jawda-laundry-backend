@@ -22,8 +22,8 @@ class UserResource extends JsonResource
             'avatar_url' => $this->avatar_url,
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            'roles' => RoleResource::collection($this->whenLoaded('roles')), // Spatie roles
-            'permissions' => PermissionResource::collection($this->whenLoaded('permissions')), // Direct permissions
+            'roles' => $this->getRoleNames(), // Get roles from Spatie, e.g., ["admin", "receptionist"]
+            'permissions' => $this->getAllPermissions()->pluck('name'), // Get all 
         ];
     }
 }
