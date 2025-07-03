@@ -11,7 +11,6 @@ use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
-use App\Services\SettingsService;
 use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
 use Illuminate\Support\Facades\Auth;
@@ -156,28 +155,55 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
+        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
         return new OrderResource($order);
     }
-
-    /**
+  /**
      * Update the specified resource in storage.
+     * This now handles updates for notes, due_date, status, and pickup_date.
      */
-    public function update(Request $request, Order $order)
+    public function update(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
-        // This is a complex endpoint. The logic from a previous step would go here.
-        // For brevity, we assume the 'updateStatus' and 'recordPayment' are the primary update actions.
-        // A full update would look very similar to the 'store' method but start with an existing $order.
-        // For now, let's just update order-level details.
-        $validatedData = $request->validate([
-            'notes' => 'nullable|string|max:2000',
-            'due_date' => 'nullable|date_format:Y-m-d',
-        ]);
-        $order->update($validatedData);
-        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
-        return new OrderResource($order);
-    }
+        $this->authorize('update', $order);
 
+        $validatedData = $request->validate([
+            'notes' => 'sometimes|nullable|string|max:2000',
+            'due_date' => 'sometimes|nullable|date_format:Y-m-d',
+            'status' => ['sometimes', 'required', Rule::in(config('app.order_statuses'))],
+            'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
+        ]);
+        
+        $oldStatus = $order->status;
+        $order->fill($validatedData); // Fill all validated data
+        $newStatus = $order->status;
+
+        // If status changed to 'completed' and no pickup date was explicitly provided, set it to now.
+        if ($oldStatus !== 'completed' && $newStatus === 'completed' && !$request->has('pickup_date')) {
+            $order->pickup_date = now();
+        }
+        
+        // If status changed to something else, clear the pickup date unless it was explicitly sent.
+        if ($newStatus !== 'completed' && !$request->has('pickup_date')) {
+             $order->pickup_date = null;
+        }
+
+
+        // Save all changes
+        $order->save();
+
+        // If status changed, log it and send notification
+        if ($oldStatus !== $newStatus) {
+            $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
+            $notifier->execute($order);
+        }
+
+        if ($request->has('pickup_date')) {
+             $order->logActivity("Pickup date was updated.");
+        }
+
+        // Return the fresh resource with all relations
+        return new OrderResource($order->fresh(['customer', 'user', 'items']));
+    }
     /**
      * Update only the status of the specified order and trigger notifications.
      */
@@ -280,8 +306,8 @@ class OrderController extends Controller
         // Pass data to the PDF class
         $pdf->setOrder($order);
         $pdf->setCompanyDetails(
-            config('app.name', 'LaundryPro'),
-            "123 Laundry Lane, Clean City, ST 12345\nPhone: (555) 123-4567" // Get from config
+            config('app_settings.company_name', config('app.name')),
+            config('app_settings.company_address') . "\nPhone: " . config('app_settings.company_phone')
         );
 
         // Set document information
@@ -316,7 +342,7 @@ class OrderController extends Controller
      /**
      * Generate and download a PDF invoice formatted for a POS thermal printer.
      */
-    public function downloadPosInvoice(Order $order, SettingsService $settingsService)
+    public function downloadPosInvoice(Order $order)
     {
         // $this->authorize('view', $order);
 
@@ -331,10 +357,10 @@ class OrderController extends Controller
         // Pass data to the PDF class
         $pdf->setOrder($order);
         $settings = [
-            'general_company_name' => $settingsService->get('general_company_name', config('app.name')),
-            'general_company_address' => $settingsService->get('general_company_address'),
-            'general_company_phone' => $settingsService->get('general_company_phone'),
-            'general_default_currency_symbol' => '$', // Get from settings later
+            'general_company_name' => config('app_settings.company_name', config('app.name')),
+            'general_company_address' => config('app_settings.company_address'),
+            'general_company_phone' => config('app_settings.company_phone'),
+            'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
         ];
         $pdf->setSettings($settings);
 
@@ -362,7 +388,7 @@ class OrderController extends Controller
     /**
      * Generates an invoice PDF and sends it via WhatsApp.
      */
-    public function sendWhatsappInvoice(Order $order, SettingsService $settingsService, WhatsAppService $whatsAppService)
+    public function sendWhatsappInvoice(Order $order, WhatsAppService $whatsAppService)
     {
         $this->authorize('view', $order); // Or a specific 'order:send-invoice' permission
 
@@ -380,8 +406,10 @@ class OrderController extends Controller
         $order->load(['customer', 'user', 'items.serviceOffering']); // Eager load necessary data
         
         $settings = [
-            'general_company_name' => $settingsService->get('general_company_name', config('app.name')),
-            // ... fetch other settings needed for the PDF
+            'general_company_name' => config('app_settings.company_name', config('app.name')),
+            'general_company_address' => config('app_settings.company_address'),
+            'general_company_phone' => config('app_settings.company_phone'),
+            'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
         ];
         $pdf->setOrder($order);
         $pdf->setSettings($settings);

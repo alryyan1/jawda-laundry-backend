@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerTypeController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductTypeController;
@@ -90,23 +91,20 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/settings', [SettingController::class, 'index']);
   Route::put('/settings', [SettingController::class, 'update']);
   Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
-    Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
+  
+  Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
     ->name('orders.invoice.whatsapp');
     Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
     Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
     Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
-  // });
-});
+    Route::apiResource('customer-types', CustomerTypeController::class);
 
-
-Route::delete('/product-types/{productType}/image', [ProductTypeController::class, 'deleteImage']);
-Route::apiResource('product-types', ProductTypeController::class);
-
-Route::get('/dashboard/orders-trend', [App\Http\Controllers\Api\DashboardController::class, 'ordersTrend']);
-Route::get('/dashboard/revenue-breakdown', [App\Http\Controllers\Api\DashboardController::class, 'revenueBreakdown']);
-
-// Order Creation Related Endpoints
-
-// Data Endpoints for Form Dropdowns and Logic
-Route::get('/service-offerings/all-for-select', [ServiceOfferingController::class, 'allForSelect']);
-
+    // Product Type Management
+    Route::delete('/product-types/{productType}/image', [ProductTypeController::class, 'deleteImage']);
+    
+    // Dashboard endpoints
+    Route::get('/dashboard/orders-trend', [DashboardController::class, 'ordersTrend']);
+    Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
+    Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+  });

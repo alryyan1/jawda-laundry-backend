@@ -57,18 +57,28 @@ class ProductTypeController extends Controller
         $productTypes = $query->orderBy($sortBy, $sortOrder)->paginate($request->get('per_page', 15));
         return ProductTypeResource::collection($productTypes);
     }
-
-    /**
-     * Fetch all active product types, optionally filtered by category, for select dropdowns (non-paginated).
+   /**
+     * Fetch all active product types, optionally filtered by category and search term,
+     * for select dropdowns or selection panels.
      */
     public function allForSelect(Request $request)
     {
-        $query = ProductType::with('category:id,name') // Select only necessary columns for category
+        $query = ProductType::with('category:id,name')
                               ->orderBy('name');
-                            //   ->where('is_active', true); // Add if ProductType has an 'is_active' flag
 
+        // Filter by category if provided
         if ($request->filled('product_category_id')) {
             $query->where('product_category_id', $request->product_category_id);
+        }
+
+        // --- ADD SEARCH LOGIC HERE ---
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                // Search by name OR by ID
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('id', $searchTerm); // Allows searching by exact ID
+            });
         }
 
         $productTypes = $query->get();

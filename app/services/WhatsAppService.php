@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -10,21 +13,20 @@ use Illuminate\Support\Facades\Log;
  */
 class WhatsAppService
 {
-    protected string $apiUrl;
-    protected string $apiToken;
+    protected GuzzleClient $client;
+    protected ?string $apiUrl;
+    protected ?string $apiToken;
     protected bool $isEnabled;
 
-    /**
-     * Create a new service instance.
-     * Fetches configuration directly from Laravel's config helper.
-     */
     public function __construct()
     {
-        $this->isEnabled = config('whatsapp.enabled', false);
-        $this->apiUrl = config('whatsapp.api_url', '');
-        $this->apiToken = config('whatsapp.api_token', '');
+        $this->client = new GuzzleClient([
+            'timeout' => 10.0, // Set a timeout for requests
+        ]);
+        $this->isEnabled = Config::get('whatsapp.enabled', false);
+        $this->apiUrl = Config::get('whatsapp.api_url');
+        $this->apiToken = Config::get('whatsapp.api_token');
     }
-
     /**
      * Checks if the service is fully configured and enabled.
      *
@@ -35,23 +37,91 @@ class WhatsAppService
         return $this->isEnabled && !empty($this->apiToken) && !empty($this->apiUrl);
     }
 
-    /**
-     * Sends a simple text message via WhatsApp.
+ /**
+     * Send a WhatsApp message.
      *
-     * @param string $phoneNumber The recipient's phone number (without '+').
-     * @param string $message The text message content.
-     * @return array An array containing the status and API response data.
+     * @param string $chatId The recipient's WhatsApp ID (e.g., "249991961111@c.us")
+     * @param string $message The message content.
      */
-    public function sendMessage(string $phoneNumber, string $message): array
+    public function sendMessage(string $chatId, string $message)
     {
-        if (!$this->isConfigured()) {
-            return ['status' => 'error', 'message' => 'WhatsApp service is not configured or enabled in settings.'];
+        if (!$this->isEnabled) {
+            Log::info("WhatsAppService: Sending disabled. Message not sent to {$chatId}: {$message}");
+            return true; // Or false if you want to indicate a "failure" due to being disabled
         }
 
-        return $this->sendRequest('/client/action/send-message', [
-            'chatId' => $this->formatChatId($phoneNumber),
-            'message' => $message,
-        ]);
+        if (empty($this->apiUrl) || empty($this->apiToken)) {
+            Log::error("WhatsAppService: API URL or Token is not configured.");
+            return false;
+        }
+
+        if (empty($chatId)) {
+            Log::error("WhatsAppService: Chat ID is empty. Cannot send message.");
+            return false;
+        }
+
+        // Construct the proper API endpoint for sending messages
+        $apiEndpoint = rtrim($this->apiUrl, '/') . '/client/action/send-message';
+        
+        try {
+            Log::info("WhatsAppService: Attempting to send message to {$chatId}", [
+                'endpoint' => $apiEndpoint,
+                'chatId' => $chatId,
+                'message' => $message
+            ]);
+            
+            $response = $this->client->request('POST', $apiEndpoint, [
+                'json' => [
+                    'chatId' => $chatId,
+                    'message' => $message,
+                ],
+                'headers' => [
+                    'accept' => 'application/json',
+                    'authorization' => 'Bearer '.$this->apiToken,
+                ],
+                'http_errors' => false, // Don't throw exceptions, handle manually
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+
+            Log::info("WhatsAppService: API Response", [
+                'statusCode' => $statusCode,
+                'responseBody' => $response,
+                'chatId' => $chatId
+            ]);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                Log::info("WhatsAppService: Message sent successfully to {$chatId}. Status: {$statusCode}", ['response' => $responseBody]);
+                return [
+                    'status' => 'success',
+                    'message' => 'Message sent successfully',
+                    'other'=>'ss',
+                    'api_response'=>$responseBody,
+                    'data' => $responseBody
+                ];
+            } else {
+                Log::error("WhatsAppService: Failed to send message to {$chatId}. Status: {$statusCode}", ['response' => $responseBody]);
+                return false;
+            }
+        } catch (RequestException $e) {
+            $errorMessage = $e->getMessage();
+            if ($e->hasResponse()) {
+                $responseBody = $e->getResponse()->getBody()->getContents();
+                $errorMessage .= " | Response: " . $responseBody;
+            }
+            Log::error("WhatsAppService: RequestException sending message to {$chatId}", [
+                'error' => $errorMessage,
+                'endpoint' => $apiEndpoint
+            ]);
+            return false;
+        } catch (\Exception $e) {
+            Log::error("WhatsAppService: Generic Exception sending message to {$chatId}", [
+                'error' => $e->getMessage(),
+                'endpoint' => $apiEndpoint
+            ]);
+            return false;
+        }
     }
 
     /**
@@ -82,9 +152,14 @@ class WhatsAppService
     /**
      * Sends a test message to the specified phone number.
      */
-    public function sendTestMessage(string $testPhoneNumber): array
+    public function sendTestMessage(string $testPhoneNumber)
     {
-        return $this->sendMessage($testPhoneNumber, "This is a test message from your LaundryPro system. WhatsApp integration is working!");
+        $chatId = $this->formatChatId($testPhoneNumber);
+        $message = "This is a test message from your LaundryPro system. WhatsApp integration is working!";
+        
+        $success = $this->sendMessage($chatId, $message);
+        return $success;
+        
     }
 
     /**
@@ -93,6 +168,8 @@ class WhatsAppService
     private function sendRequest(string $endpoint, array $payload): array
     {
         $fullUrl = rtrim($this->apiUrl, '/') . $endpoint;
+        // return ['url' => $fullUrl, 'payload' => $payload,'status' => 'success'];
+        Log::info("WhatsApp API request to {$endpoint} was successful.", ['phone' => $payload['chatId']]);
 
         try {
             $response = Http::withToken($this->apiToken)

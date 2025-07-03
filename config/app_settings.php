@@ -1,4 +1,3 @@
-
 <?php // config/app_settings.php
 
 return [
@@ -27,5 +26,11 @@ return [
         'other' => 'أخرى',
     ],
     'invoice_thermal_footer' => 'شكراً لزيارتكم!زورونا مرة أخرى!',
+    
+    // WhatsApp settings
+    'whatsapp_enabled' => env('WHATSAPP_API_ENABLED', false),
+    'whatsapp_api_url' => env('WHATSAPP_API_URL', ''),
+    'whatsapp_api_token' => env('WHATSAPP_API_TOKEN', ''),
+    'whatsapp_notification_number' => env('WHATSAPP_NOTIFICATION_NUMBER', ''),
 
 ];
