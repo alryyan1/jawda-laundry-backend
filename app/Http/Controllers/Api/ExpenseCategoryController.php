@@ -15,6 +15,12 @@ class ExpenseCategoryController extends Controller
     }
 
     public function index(Request $request) {
+        // If names_only parameter is passed, return just the names
+        if ($request->has('names_only')) {
+            $categories = ExpenseCategory::orderBy('name')->pluck('name');
+            return response()->json($categories);
+        }
+        
         $query = ExpenseCategory::withCount('expenses')->orderBy('name');
         return ExpenseCategoryResource::collection($query->get());
     }

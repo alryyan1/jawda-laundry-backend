@@ -53,4 +53,6 @@ class Customer extends Model
     public function CustomerType(){
         return $this->belongsTo(CustomerType::class);
     }
+   
+   
 }

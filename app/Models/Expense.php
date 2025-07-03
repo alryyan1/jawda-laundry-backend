@@ -20,6 +20,7 @@ class Expense extends Model
         'description',
         'amount',
         'expense_date',
+        'payment_method',
         'user_id', // The user who recorded the expense
     ];
 

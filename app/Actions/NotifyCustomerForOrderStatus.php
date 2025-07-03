@@ -3,14 +3,12 @@ namespace App\Actions;
 use App\Models\Order;
 use App\Models\WhatsappTemplate;
 use App\Services\WhatsAppService;
-use App\Services\SettingsService;
 use App\Pdf\PosInvoicePdf;
 use Illuminate\Support\Facades\Log;
 
 class NotifyCustomerForOrderStatus {
     public function __construct(
-        protected WhatsAppService $whatsAppService,
-        protected SettingsService $settingsService
+        protected WhatsAppService $whatsAppService
     ) {}
 
     public function execute(Order $order): void
@@ -29,7 +27,7 @@ class NotifyCustomerForOrderStatus {
             // Generate PDF in memory
             $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
             $order->load(['customer', 'user', 'items.serviceOffering']);
-            $settings = ['general_company_name' => $this->settingsService->get('general_company_name', config('app.name'))];
+            $settings = ['general_company_name' => config('app_settings.company_name', config('app.name'))];
             $pdf->setOrder($order);
             $pdf->setSettings($settings);
             $pdf->generate();
@@ -53,7 +51,7 @@ class NotifyCustomerForOrderStatus {
             '{order_status}' => ucwords(str_replace('_', ' ', $order->status)),
             '{total_amount}' => number_format($order->total_amount, 2),
             '{amount_due}' => number_format($order->amount_due, 2),
-            '{company_name}' => $this->settingsService->get('general_company_name', config('app.name')),
+            '{company_name}' => config('app_settings.company_name', config('app.name')),
         ];
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);
     }

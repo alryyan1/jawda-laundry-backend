@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\OrderResource;
+use App\Models\Expense;
 use App\Models\Order;
+use App\Models\Purchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -83,5 +86,96 @@ class ReportController extends Controller
                 ]
             ]
         ]);
+    }
+    /**
+     * Generates a cost summary report for a given date range.
+     * This combines data from both Expenses and Purchases.
+     */
+    public function costSummary(Request $request)
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $dateTo = isset($validated['date_to']) ? Carbon::parse($validated['date_to'])->endOfDay() : Carbon::now()->endOfDay();
+        $dateFrom = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : $dateTo->copy()->subDays(29)->startOfDay();
+
+        // --- 1. Get total expenses in the period ---
+        $totalExpenses = Expense::whereBetween('expense_date', [$dateFrom, $dateTo])->sum('amount');
+        
+        // --- 2. Get total purchases in the period ---
+        // We consider purchases 'paid' or 'received' as costs incurred in this period.
+        $totalPurchases = Purchase::whereIn('status', ['received', 'paid', 'partially_paid'])
+                                  ->whereBetween('purchase_date', [$dateFrom, $dateTo])
+                                  ->sum('total_amount');
+
+        // --- 3. Get breakdown of expenses by category ---
+        $expensesByCategory = Expense::whereBetween('expense_date', [$dateFrom, $dateTo])
+            ->leftJoin('expense_categories', 'expenses.expense_category_id', '=', 'expense_categories.id')
+            ->select(DB::raw('COALESCE(expense_categories.name, "بدون فئة") as category'), DB::raw('SUM(expenses.amount) as total_amount'))
+            ->groupBy('expense_categories.id', 'expense_categories.name')
+            ->orderBy('total_amount', 'desc')
+            ->get();
+        
+        // --- 4. Get breakdown of purchases by supplier ---
+        $purchasesBySupplier = Purchase::whereIn('status', ['received', 'paid', 'partially_paid'])
+            ->whereBetween('purchase_date', [$dateFrom, $dateTo])
+            ->with('supplier:id,name') // Eager load supplier name
+            ->select('supplier_id', DB::raw('SUM(total_amount) as total_amount'))
+            ->groupBy('supplier_id')
+            ->orderBy('total_amount', 'desc')
+            ->limit(10) // Top 10 suppliers
+            ->get();
+        
+        // The relationship won't be loaded automatically from the grouped query, so we map it
+        $purchasesBySupplier->transform(fn($item) => [
+            'name' => $item->supplier?->name ?? 'Unknown Supplier',
+            'total_amount' => (float) $item->total_amount
+        ]);
+
+        return response()->json([
+            'data' => [
+                'summary' => [
+                    'total_expenses' => (float) $totalExpenses,
+                    'total_purchases' => (float) $totalPurchases,
+                    'total_cost' => (float) $totalExpenses + (float) $totalPurchases,
+                ],
+                'expenses_by_category' => $expensesByCategory,
+                'purchases_by_supplier' => $purchasesBySupplier,
+                'date_range' => [
+                    'from' => $dateFrom->toDateString(),
+                    'to' => $dateTo->toDateString(),
+                ]
+            ]
+        ]);
+    }
+      /**
+     * Fetches orders that are ready for pickup but have passed their due date.
+     */
+    public function overduePickupOrders(Request $request)
+    {
+        $this->authorize('report:view-operational'); // استخدم صلاحية جديدة للتقارير التشغيلية
+
+        $query = Order::with('customer:id,name,phone')
+            ->where('status', 'ready_for_pickup') // فقط الطلبات الجاهزة
+            ->whereNotNull('due_date') // يجب أن يكون لها تاريخ استحقاق
+            ->whereDate('due_date', '<', Carbon::today()); // تاريخ الاستحقاق في الماضي
+
+        // إضافة فلتر لعدد أيام التأخير
+        if ($request->filled('overdue_days') && is_numeric($request->overdue_days)) {
+            $overdueDays = (int) $request->overdue_days;
+            $cutoffDate = Carbon::today()->subDays($overdueDays);
+            $query->whereDate('due_date', '<=', $cutoffDate);
+        }
+
+        // حساب عدد أيام التأخير مباشرة في الاستعلام
+        $query->select('*', DB::raw('DATEDIFF(NOW(), due_date) as overdue_days'));
+
+        $orders = $query->orderBy('due_date', 'asc')->paginate($request->get('per_page', 20));
+
+        // لا نحتاج إلى Resource هنا لأننا أضفنا حقلًا مخصصًا
+        // لكن استخدامه يضمن التناسق. سنقوم بتعديل OrderResource.
+        return OrderResource::collection($orders);
     }
 }

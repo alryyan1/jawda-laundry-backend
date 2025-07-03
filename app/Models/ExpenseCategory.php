@@ -9,6 +9,6 @@ class ExpenseCategory extends Model {
 
     // Relationship to Expenses
     public function expenses() {
-        return $this->hasMany(Expense::class, 'category', 'name'); // Links on the 'name' string
+        return $this->hasMany(Expense::class);
     }
 }

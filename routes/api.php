@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CustomerLedgerController;
 use App\Http\Controllers\Api\ExpenseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupplierController;
@@ -71,7 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
   
   // Expense Management
-  Route::get('/expenses/categories', [ExpenseController::class, 'getCategories']);
+  Route::get('/expenses/categories', [ExpenseCategoryController::class, 'index']);
   Route::apiResource('expenses', ExpenseController::class);
   
   // Supplier Management
@@ -107,4 +109,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
     Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::get('/reports/cost-summary', [ReportController::class, 'costSummary']);
+    Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);
+    Route::get('/reports/overdue-pickups', [ReportController::class, 'overduePickupOrders']);
+    Route::get('/customers/{customer}/ledger', [CustomerLedgerController::class, 'show']);
+
+
   });

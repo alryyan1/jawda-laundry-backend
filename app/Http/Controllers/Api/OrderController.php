@@ -39,42 +39,13 @@ class OrderController extends Controller
         $this->middleware('can:order:delete')->only('destroy');
     }
 
-    /**
-     * Display a listing of the resource with filtering and sorting.
-     */
-    public function index(Request $request)
-    {
-        $query = Order::with(['customer:id,name', 'user:id,name'])->latest();
-
-        // Filtering
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
-        }
-        if ($request->filled('date_from')) {
-            $query->whereDate('order_date', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('order_date', '<=', $request->date_to);
-        }
-        if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('order_number', 'LIKE', "%{$searchTerm}%")
-                    ->orWhereHas('customer', function ($customerQuery) use ($searchTerm) {
-                        $customerQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                    });
-            });
-        }
-
-        // Sorting
-
-
-        $orders = $query->orderBy('id', 'desc')->paginate($request->get('per_page', 10));
-        return OrderResource::collection($orders);
-    }
+     // Refactor the index method to use the helper
+     public function index(Request $request)
+     {
+         $query = $this->buildOrderQuery($request);
+         $orders = $query->paginate($request->get('per_page', 15));
+         return OrderResource::collection($orders);
+     }
 
     /**
      * Store a newly created resource in storage.
@@ -444,4 +415,85 @@ class OrderController extends Controller
             ], 500);
         }
     }
+     /**
+     * Export a filtered list of orders to a CSV file.
+     */
+    public function exportCsv(Request $request)
+    {
+        $this->authorize('order:list'); // Or a new 'report:export' permission
+
+        // Reuse the same query builder logic from the index method
+        $query = $this->buildOrderQuery($request);
+        
+        // Get all matching orders without pagination for the export
+        $orders = $query->get();
+        
+        $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function() use ($orders) {
+            $file = fopen('php://output', 'w');
+
+            // Add Header Row
+            fputcsv($file, [
+                'ID', 'Order Number', 'Customer Name', 'Customer Phone', 'Status',
+                'Order Date', 'Due Date', 'Pickup Date', 'Total Amount', 'Amount Paid', 'Amount Due'
+            ]);
+
+            // Add Data Rows
+            foreach ($orders as $order) {
+                fputcsv($file, [
+                    $order->id,
+                    $order->order_number,
+                    $order->customer->name,
+                    $order->customer->phone,
+                    $order->status,
+                    $order->order_date->format('Y-m-d H:i:s'),
+                    $order->due_date ? $order->due_date->format('Y-m-d') : '',
+                    $order->pickup_date ? $order->pickup_date->format('Y-m-d H:i:s') : '',
+                    $order->total_amount,
+                    $order->paid_amount,
+                    $order->amount_due,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+    
+    /**
+     * Helper function to build the order query based on request filters.
+     * Reused by both index() and exportCsv().
+     */
+    private function buildOrderQuery(Request $request)
+    {
+        $query = Order::with(['customer:id,name,phone'])->latest('order_date');
+
+        if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
+        if ($request->filled('date_from')) $query->whereDate('order_date', '>=', $request->date_from);
+        if ($request->filled('date_to')) $query->whereDate('order_date', '<=', $request->date_to);
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(fn($q) => $q->where('order_number', 'LIKE', "%{$searchTerm}%")
+                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%")));
+        }
+
+        if ($request->filled('product_type_id')) {
+            $query->whereHas('items.serviceOffering.productType', fn($q) => $q->where('id', 'product_type_id'));
+        }
+        
+        return $query;
+    }
+
+ 
 }

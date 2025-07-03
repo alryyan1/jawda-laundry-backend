@@ -39,8 +39,8 @@ class ExpenseController extends Controller
                   ->orWhere('description', 'LIKE', "%{$searchTerm}%");
             });
         }
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
+        if ($request->filled('expense_category_id')) {
+            $query->where('expense_category_id', $request->expense_category_id);
         }
         if ($request->filled('date_from')) {
             $query->whereDate('expense_date', '>=', $request->date_from);
@@ -60,10 +60,11 @@ class ExpenseController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'required|string|max:255', // Make category required for better reporting
+            'expense_category_id' => 'required|integer|exists:expense_categories,id',
             'description' => 'nullable|string|max:2000',
             'amount' => 'required|numeric|min:0.01',
             'expense_date' => 'required|date_format:Y-m-d',
+            'payment_method' => 'required|string|max:255',
         ]);
 
         try {
@@ -92,10 +93,11 @@ class ExpenseController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'category' => 'sometimes|required|string|max:255',
+            'expense_category_id' => 'sometimes|required|integer|exists:expense_categories,id',
             'description' => 'sometimes|nullable|string|max:2000',
             'amount' => 'sometimes|required|numeric|min:0.01',
             'expense_date' => 'sometimes|required|date_format:Y-m-d',
+            'payment_method' => 'sometimes|required|string|max:255',
         ]);
 
         try {
@@ -122,16 +124,22 @@ class ExpenseController extends Controller
     }
 
     /**
-     * Get a list of unique expense categories for filter dropdowns.
+     * Get a list of expense categories for filter dropdowns.
      */
-    public function getCategories()
+    public function getCategories(Request $request)
     {
-        $categories = Expense::select('category')
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
+        if ($request->has('names_only')) {
+            // Return just category names for backward compatibility
+            $categories = \App\Models\ExpenseCategory::select('name')
+                ->orderBy('name')
+                ->pluck('name');
+            return response()->json($categories);
+        }
+        
+        // Return full category objects with IDs
+        $categories = \App\Models\ExpenseCategory::select('id', 'name', 'description')
+            ->orderBy('name')
+            ->get();
             
         return response()->json($categories);
     }
