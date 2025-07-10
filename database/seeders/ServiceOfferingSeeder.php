@@ -11,61 +11,74 @@ class ServiceOfferingSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     * This seeder connects Product Types with Service Actions to create your service menu.
      */
     public function run(): void
     {
         $this->command->info('Seeding service offerings...');
 
-        // Fetch all relevant actions and types once to be efficient
-        $actions = ServiceAction::pluck('id', 'name');
-        $types = ProductType::pluck('id', 'name');
+        // Fetch all relevant parent models once to be efficient.
+        // We look them up by their English name part for consistency.
+        $types = ProductType::all()->keyBy(function ($item) {
+            return explode(' - ', $item->name)[0];
+        });
 
-        // Define offerings as a structured array
+        $actions = ServiceAction::all()->keyBy('name');
+
+        // Define offerings as a structured array for readability and easy management
         $offeringsData = [
-            // Apparel - T-Shirt
-            ['pt' => 'T-Shirt', 'sa' => 'Standard Wash & Fold', 'price' => 2.50],
-            ['pt' => 'T-Shirt', 'sa' => 'Ironing / Pressing', 'price' => 1.50],
-            ['pt' => 'T-Shirt', 'sa' => 'Quick Wash', 'price' => 3.50, 'is_active' => false], // Example of an inactive service
+            // --- Apparel Offerings ---
+            ['pt' => 'T-Shirt',             'sa' => 'Standard Wash & Fold', 'price' => 2.50],
+            ['pt' => 'T-Shirt',             'sa' => 'Ironing / Pressing', 'price' => 1.50],
+            ['pt' => 'T-Shirt',             'sa' => 'Quick Wash', 'price' => 3.50, 'is_active' => false], // Example of a currently disabled service
+            ['pt' => 'Button-up Shirt',     'sa' => 'Standard Wash & Fold', 'price' => 3.00],
+            ['pt' => 'Button-up Shirt',     'sa' => 'Dry Cleaning', 'price' => 5.00],
+            ['pt' => 'Button-up Shirt',     'sa' => 'Ironing / Pressing', 'price' => 2.00],
+            ['pt' => 'Trousers / Pants',    'sa' => 'Standard Wash & Fold', 'price' => 4.50],
+            ['pt' => 'Trousers / Pants',    'sa' => 'Dry Cleaning', 'price' => 6.50],
+            ['pt' => 'Trousers / Pants',    'sa' => 'Ironing / Pressing', 'price' => 3.50],
+            ['pt' => 'Suit Jacket',         'sa' => 'Dry Cleaning', 'price' => 12.00],
+            ['pt' => 'Suit Jacket',         'sa' => 'Ironing / Pressing', 'price' => 7.00],
 
-            // Apparel - Suit Jacket
-            ['pt' => 'Suit Jacket', 'sa' => 'Dry Cleaning', 'price' => 12.00],
-            ['pt' => 'Suit Jacket', 'sa' => 'Ironing / Pressing', 'price' => 7.00],
+            // --- Household Linens Offerings ---
+            ['pt' => 'Queen Bed Sheet',     'sa' => 'Standard Wash & Fold', 'price' => 8.00],
+            ['pt' => 'Duvet Cover',         'sa' => 'Standard Wash & Fold', 'price' => 18.00],
+            ['pt' => 'Duvet Cover',         'sa' => 'Dry Cleaning', 'price' => 25.00],
+            ['pt' => 'Bath Towel',          'sa' => 'Standard Wash & Fold', 'price' => 2.00],
+            
+            // --- Dimension-Based Offerings ---
+            ['pt' => 'Curtains (per panel)','sa' => 'Dry Cleaning', 'price_sqm' => 4.50],
+            ['pt' => 'Area Rug (Wool)',     'sa' => 'Carpet Deep Clean', 'price_sqm' => 8.50],
+            ['pt' => 'Synthetic Carpet',    'sa' => 'Carpet Deep Clean', 'price_sqm' => 6.00],
 
-            // Apparel - Trousers/Pants
-            ['pt' => 'Trousers/Pants', 'sa' => 'Standard Wash & Fold', 'price' => 4.00],
-            ['pt' => 'Trousers/Pants', 'sa' => 'Dry Cleaning', 'price' => 6.00],
-            ['pt' => 'Trousers/Pants', 'sa' => 'Ironing / Pressing', 'price' => 3.00],
-
-            // Linens
-            ['pt' => 'Duvet Cover (Queen)', 'sa' => 'Standard Wash & Fold', 'price' => 15.00],
-            ['pt' => 'Duvet Cover (Queen)', 'sa' => 'Dry Cleaning', 'price' => 25.00],
-            ['pt' => 'Curtains (per panel)', 'sa' => 'Dry Cleaning', 'price_sqm' => 4.50],
-
-            // Rugs & Carpets
-            ['pt' => 'Area Rug (Wool)', 'sa' => 'Carpet Deep Clean', 'price_sqm' => 8.50],
-            ['pt' => 'Carpet (Synthetic)', 'sa' => 'Carpet Deep Clean', 'price_sqm' => 6.00],
+            // --- A generic offering for bulk washing by weight ---
+            ['pt' => 'Bulk Mixed Load',     'sa' => 'Standard Wash & Fold', 'price' => 5.50], // price per kg
         ];
 
         foreach ($offeringsData as $data) {
-            // Check if both the product type and service action exist
+            // Check if both the product type and service action exist before creating the link
             if (isset($types[$data['pt']]) && isset($actions[$data['sa']])) {
-                $productType = ProductType::find($types[$data['pt']]);
+                
+                $productType = $types[$data['pt']];
+                $serviceAction = $actions[$data['sa']];
 
-                // Create the offering data array
+                // Prepare the data for creation
                 $offering = [
                     'product_type_id' => $productType->id,
-                    'service_action_id' => $actions[$data['sa']],
+                    'service_action_id' => $serviceAction->id,
                     'is_active' => $data['is_active'] ?? true, // Default to active
                 ];
 
-                // Add price based on the product type's pricing model
+                // Add price based on the product type's pricing model (`is_dimension_based` flag)
                 if ($productType->is_dimension_based) {
                     $offering['default_price_per_sq_meter'] = $data['price_sqm'] ?? 0;
+                    $offering['default_price'] = null; // Ensure this is null for dimension-based
                 } else {
                     $offering['default_price'] = $data['price'] ?? 0;
+                    $offering['default_price_per_sq_meter'] = null;
                 }
 
-                // Use firstOrCreate to prevent duplicates
+                // Use firstOrCreate to prevent creating duplicate offerings
                 ServiceOffering::firstOrCreate(
                     [
                         'product_type_id' => $offering['product_type_id'],

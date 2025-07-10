@@ -20,15 +20,20 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             UserSeeder::class,
-            CustomerTypeSeeder::class,      // Before CustomerSeeder
-            CustomerSeeder::class,
-            ProductCategorySeeder::class,   // Before ProductTypeSeeder
-            ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
-            ServiceActionSeeder::class,     // Before ServiceOfferingSeeder
-            ServiceOfferingSeeder::class,   // Before OrderSeeder
-            OrderSeeder::class,
-            PermissionSeeder::class, // Add this
-            SupplierSeeder::class,
+            PermissionSeeder::class,
+            ProductCategorySeeder::class,
+            ProductTypeSeeder::class,
+            ServiceActionSeeder::class,
+            ServiceOfferingSeeder::class,
+            // CustomerTypeSeeder::class,      // Before CustomerSeeder
+            // CustomerSeeder::class,
+            // ProductCategorySeeder::class,   // Before ProductTypeSeeder
+            // ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
+            // ServiceActionSeeder::class,     // Before ServiceOfferingSeeder
+            // ServiceOfferingSeeder::class,   // Before OrderSeeder
+            // OrderSeeder::class,
+            // PermissionSeeder::class, // Add this
+            // SupplierSeeder::class,
             // Add PricingRuleSeeder if you create one
         ]);
     }

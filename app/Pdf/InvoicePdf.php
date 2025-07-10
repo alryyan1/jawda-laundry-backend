@@ -26,13 +26,13 @@ class InvoicePdf extends TCPDF
     public function Header()
     {
         // Set font
-        $this->SetFont('helvetica', 'B', 18);
+        $this->SetFont('arial', 'B', 18);
         // Title
         $this->Cell(0, 15, 'INVOICE', 0, false, 'C', 0, '', 0, false, 'M', 'M');
         $this->Ln(5);
 
         // Company Details
-        $this->SetFont('helvetica', '', 9);
+        $this->SetFont('arial', '', 9);
         $this->Cell(0, 10, $this->companyName, 0, false, 'C');
         $this->Ln(4);
         $this->Cell(0, 10, $this->companyAddress, 0, false, 'C');
@@ -48,7 +48,7 @@ class InvoicePdf extends TCPDF
         // Position at 15 mm from bottom
         $this->SetY(-15);
         // Set font
-        $this->SetFont('helvetica', 'I', 8);
+        $this->SetFont('arial', 'I', 8);
         $this->Cell(0, 10, 'Thank you for your business!', 0, false, 'L', 0, '', 0, false, 'T', 'M');
         // Page number
         $this->Cell(0, 10, 'Page '.$this->getAliasNumPage().'/'.$this->getAliasNbPages(), 0, false, 'R', 0, '', 0, false, 'T', 'M');
@@ -62,10 +62,10 @@ class InvoicePdf extends TCPDF
         $this->AddPage();
 
         // --- Customer and Order Info Section ---
-        $this->SetFont('helvetica', 'B', 11);
+        $this->SetFont('arial', 'B', 11);
         $this->Cell(95, 7, 'Billed To:');
         $this->Cell(95, 7, 'Invoice Details:', 0, 1, 'R'); // 1 means new line
-        $this->SetFont('helvetica', '', 10);
+        $this->SetFont('arial', '', 10);
 
         $customerAddress = $this->order->customer->address ?? '';
         $customerLines = explode("\n", $customerAddress);
@@ -92,7 +92,7 @@ class InvoicePdf extends TCPDF
         $this->Ln(10); // Add some space
 
         // --- Items Table Header ---
-        $this->SetFont('helvetica', 'B', 10);
+        $this->SetFont('arial', 'B', 10);
         $this->SetFillColor(240, 240, 240);
         $this->Cell(90, 7, 'Service / Item', 1, 0, 'L', true);
         $this->Cell(25, 7, 'Quantity', 1, 0, 'C', true);
@@ -100,7 +100,7 @@ class InvoicePdf extends TCPDF
         $this->Cell(35, 7, 'Subtotal', 1, 1, 'R', true);
 
         // --- Items Table Body ---
-        $this->SetFont('helvetica', '', 9);
+        $this->SetFont('arial', '', 9);
         $this->SetFillColor(255, 255, 255);
         $fill = false; // To alternate row colors
         foreach ($this->order->items as $item) {
@@ -125,7 +125,7 @@ class InvoicePdf extends TCPDF
 
         // --- Summary Section ---
         $this->Ln(5);
-        $this->SetFont('helvetica', '', 10);
+        $this->SetFont('arial', '', 10);
         $this->SetX(100); // Move to the right side of the page
         $this->Cell(45, 7, 'Subtotal', 0, 0, 'R');
         $this->Cell(45, 7, number_format($this->order->total_amount, 2), 0, 1, 'R');
@@ -135,17 +135,17 @@ class InvoicePdf extends TCPDF
         // $this->Cell(45, 7, 'Tax (10%)', 0, 0, 'R');
         // $this->Cell(45, 7, '... tax amount ...', 0, 1, 'R');
 
-        $this->SetFont('helvetica', 'B', 11);
+        $this->SetFont('arial', 'B', 11);
         $this->SetX(100);
         $this->Cell(45, 7, 'Total', 0, 0, 'R');
         $this->Cell(45, 7, number_format($this->order->total_amount, 2), 0, 1, 'R');
 
-        $this->SetFont('helvetica', '', 10);
+        $this->SetFont('arial', '', 10);
         $this->SetX(100);
         $this->Cell(45, 7, 'Amount Paid', 0, 0, 'R');
         $this->Cell(45, 7, number_format($this->order->paid_amount, 2), 0, 1, 'R');
 
-        $this->SetFont('helvetica', 'B', 11);
+        $this->SetFont('arial', 'B', 11);
         $this->SetX(100);
         $this->Cell(45, 7, 'Amount Due', 0, 0, 'R');
         $this->Cell(45, 7, number_format($this->order->amount_due, 2), 0, 1, 'R');
@@ -153,9 +153,9 @@ class InvoicePdf extends TCPDF
         // --- Notes Section ---
         if ($this->order->notes) {
             $this->Ln(10);
-            $this->SetFont('helvetica', 'B', 10);
+            $this->SetFont('arial', 'B', 10);
             $this->Cell(0, 7, 'Notes:', 0, 1, 'L');
-            $this->SetFont('helvetica', '', 10);
+            $this->SetFont('arial', '', 10);
             $this->MultiCell(0, 5, $this->order->notes, 0, 'L');
         }
     }

@@ -158,21 +158,20 @@ class ReportController extends Controller
         $this->authorize('report:view-operational'); // استخدم صلاحية جديدة للتقارير التشغيلية
 
         $query = Order::with('customer:id,name,phone')
-            ->where('status', 'ready_for_pickup') // فقط الطلبات الجاهزة
-            ->whereNotNull('due_date') // يجب أن يكون لها تاريخ استحقاق
-            ->whereDate('due_date', '<', Carbon::today()); // تاريخ الاستحقاق في الماضي
+            ->whereNotNull('pickup_date') // يجب أن يكون لها تاريخ استحقاق
+            ->whereRaw('Date(pickup_date) < ?', [Carbon::today()]); // تاريخ الاستحقاق في الماضي
 
         // إضافة فلتر لعدد أيام التأخير
         if ($request->filled('overdue_days') && is_numeric($request->overdue_days)) {
             $overdueDays = (int) $request->overdue_days;
             $cutoffDate = Carbon::today()->subDays($overdueDays);
-            $query->whereDate('due_date', '<=', $cutoffDate);
+            $query->whereRaw('Date(pickup_date) <= ?', [$cutoffDate]);
         }
 
         // حساب عدد أيام التأخير مباشرة في الاستعلام
-        $query->select('*', DB::raw('DATEDIFF(NOW(), due_date) as overdue_days'));
+        $query->select('*', DB::raw('DATEDIFF(NOW(), pickup_date) as overdue_days'));
 
-        $orders = $query->orderBy('due_date', 'asc')->paginate($request->get('per_page', 20));
+        $orders = $query->orderBy('pickup_date', 'asc')->paginate($request->get('per_page', 20));
 
         // لا نحتاج إلى Resource هنا لأننا أضفنا حقلًا مخصصًا
         // لكن استخدامه يضمن التناسق. سنقوم بتعديل OrderResource.

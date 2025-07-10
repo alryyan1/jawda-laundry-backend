@@ -25,14 +25,16 @@ class AuthController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Password::defaults()], // Use Laravel's default strong password rules
+            'username' => 'required|string|max:255|unique:users,username|alpha_dash', // Ensure unique and only alpha-numeric, dashes, underscores
+            'email' => 'nullable|string|email|max:255|unique:users,email', // Email is now optional
+            'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
         try {
             $user = User::create([
                 'name' => $validatedData['name'],
-                'email' => $validatedData['email'],
+                'username' => $validatedData['username'],
+                'email' => $validatedData['email'] ?? null, // Save email if provided
                 'password' => Hash::make($validatedData['password']),
             ]);
 
@@ -47,7 +49,7 @@ class AuthController extends Controller
             }
 
             // Create a token for the new user
-            $token = $user->createToken('api-token-for-' . $user->email)->plainTextToken;
+            $token = $user->createToken('api-token-for-' . $user->username)->plainTextToken;
 
             // Eager load roles and permissions to include them in the response
             $user->load(['roles', 'permissions']);
@@ -65,30 +67,29 @@ class AuthController extends Controller
     }
 
     /**
-     * Authenticate an existing user and return a token.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * Authenticate an existing user with username and password.
      */
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+        $validatedData = $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // Find the user by their username
+        $user = User::where('username', $validatedData['username'])->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        // Check if user exists and password is correct
+        if (! $user || ! Hash::check($validatedData['password'], $user->password)) {
             throw ValidationException::withMessages([
-                'email' => [trans('auth.failed')], // Standard "these credentials do not match" message
+                'username' => [trans('auth.failed')], // The error is now associated with the 'username' field
             ]);
         }
 
-        // Create a new token for the user
-        $token = $user->createToken('api-token-for-' . $user->email)->plainTextToken;
+        // Revoke old tokens and create a new one
+        // $user->tokens()->delete(); // Optional: log out from other devices
+        $token = $user->createToken('api-token-for-' . $user->username)->plainTextToken;
 
-        // Eager load roles and permissions to include them in the response
         $user->load(['roles', 'permissions']);
 
         return response()->json([

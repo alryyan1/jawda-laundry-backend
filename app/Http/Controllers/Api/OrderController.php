@@ -307,7 +307,7 @@ class OrderController extends Controller
 
         // Close and output PDF document
         // 'I' for inline browser display, 'D' for download
-        $pdf->Output('invoice-'.$order->order_number.'.pdf', 'I');
+        $pdf->Output('invoice-'.$order->id.'.pdf', 'I');
         exit; // TCPDF's output can sometimes interfere with Laravel's response cycle. exit() is a safeguard.
     }
      /**
@@ -475,7 +475,7 @@ class OrderController extends Controller
      */
     private function buildOrderQuery(Request $request)
     {
-        $query = Order::with(['customer:id,name,phone'])->latest('order_date');
+        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction'])->latest('order_date');
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
@@ -491,7 +491,9 @@ class OrderController extends Controller
         if ($request->filled('product_type_id')) {
             $query->whereHas('items.serviceOffering.productType', fn($q) => $q->where('id', 'product_type_id'));
         }
-        
+        if ($request->filled('created_date')) {
+            $query->whereDate('created_at', $request->created_date);
+        }
         return $query;
     }
 

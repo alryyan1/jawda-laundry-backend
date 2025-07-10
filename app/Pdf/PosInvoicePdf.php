@@ -9,7 +9,7 @@ class PosInvoicePdf extends TCPDF
 {
     protected Order $order;
     protected array $settings;
-    protected $font = 'helvetica';
+    protected $font = 'arial';
     protected $currencySymbol = '$';
 
     public function setOrder(Order $order)
@@ -53,7 +53,7 @@ class PosInvoicePdf extends TCPDF
         // --- Order Details ---
         $this->SetFont($this->font, '', 9);
         $this->Cell(20, 5, 'Order #:');
-        $this->Cell(0, 5, $this->order->order_number, 0, 1, 'R');
+        $this->Cell(0, 5, $this->order->id, 0, 1, 'R');
         $this->Cell(20, 5, 'Date:');
         $this->Cell(0, 5, $this->order->order_date->format('M d, Y h:i A'), 0, 1, 'R');
         $this->Cell(20, 5, 'Customer:');
@@ -77,16 +77,16 @@ class PosInvoicePdf extends TCPDF
         $this->SetFont($this->font, '', 9);
         foreach ($this->order->items as $item) {
             // Use MultiCell for the item name to allow wrapping
-            $this->MultiCell(38, 4, $item->serviceOffering->display_name, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+            $this->MultiCell(38, 4, $item->serviceOffering->display_name, 1, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
             $currentY = $this->GetY();
             $this->SetY($currentY - 4); // Move back up to align other cells
 
-            $this->SetX(49); // Position for Qty
-            $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
-            $this->SetX(57); // Position for Price
-            $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 0, 0, 'R');
-            $this->SetX(69); // Position for Total
-            $this->Cell(14, 4, number_format($item->sub_total, 2), 0, 1, 'R');
+            $this->SetX(44); // Position for Qty
+            $this->Cell(8, 4, $item->quantity, 1, 0, 'C');
+            $this->SetX(52); // Position for Price
+            $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 1, 0, 'R');
+            $this->SetX(64); // Position for Total
+            $this->Cell(14, 4, number_format($item->sub_total, 2), 1, 1, 'R');
         }
 
         $this->Ln(1);
@@ -127,7 +127,7 @@ class PosInvoicePdf extends TCPDF
             'bgcolor' => false, 'text' => true, 'font' => 'helvetica',
             'fontsize' => 8, 'stretchtext' => 4
         ];
-        $this->write1DBarcode($this->order->order_number, 'C128', '', '', '', 15, 0.4, $style, 'N');
+        // $this->write1DBarcode(strval($this->order->id), 'C128', '', '', '', 15, 0.4, $style, 'N');
     }
     
     private function drawDashedLine()

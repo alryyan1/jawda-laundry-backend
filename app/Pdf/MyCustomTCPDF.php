@@ -18,7 +18,7 @@ class MyCustomTCPDF extends TCPDF
     protected $companyAddress;
     protected $defaultFontFamily = 'arial'; // <-- DEFINE YOUR DEFAULT FONT HERE
     protected $defaultFontSize = 10;
-    protected $defaultFontBold = 'dejavusansb'; // Example if you have a specific bold variant defined
+    protected $defaultFontBold = 'arial'; // Example if you have a specific bold variant defined
 
     public function __construct($orientation = 'P', $unit = 'mm', $format = 'A4', $unicode = true, $encoding = 'UTF-8', $diskcache = false, $pdfa = false)
     {
@@ -35,7 +35,7 @@ class MyCustomTCPDF extends TCPDF
         $this->setHeaderFont([$this->defaultFontFamily, '', ($this->defaultFontSize + 2)]); // Slightly larger for header
         $this->setFooterFont([$this->defaultFontFamily, 'I', ($this->defaultFontSize - 2)]); // Italic, smaller for footer
 
-        $this->SetDefaultMonospacedFont('dejavusansmono'); // A monospaced variant of DejaVu
+        $this->SetDefaultMonospacedFont('arial'); // A monospaced variant of DejaVu
 
         $this->SetMargins(15, 35, 15); // Increased top margin for custom header
         $this->SetHeaderMargin(5);

@@ -27,6 +27,7 @@ class ProductTypeResource extends JsonResource
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
             'image_url' => $this->image_url, // <-- Add this
 
+
         ];
     }
 }

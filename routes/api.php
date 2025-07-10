@@ -113,6 +113,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);
     Route::get('/reports/overdue-pickups', [ReportController::class, 'overduePickupOrders']);
     Route::get('/customers/{customer}/ledger', [CustomerLedgerController::class, 'show']);
+    Route::get('/dashboard/today-summary', [App\Http\Controllers\Api\DashboardController::class, 'todaySummary']);
 
 
   });
