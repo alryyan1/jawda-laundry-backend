@@ -20,12 +20,17 @@ class ProductType extends Model
         'is_dimension_based' => 'boolean', // Add this cast
         'is_active' => 'boolean',
     ];
-        public function category()
+    public function category()
     {
         return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }
     public function serviceOfferings()
     {
         return $this->hasMany(ServiceOffering::class);
+    }
+    // app/Models/ProductType.php
+    public function predefinedSizes()
+    {
+        return $this->hasMany(PredefinedSize::class);
     }
 }

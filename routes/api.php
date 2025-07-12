@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExpenseCategoryController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\PredefinedSizeController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ReportController;
@@ -52,7 +53,16 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('product-types/all-for-select', [ProductTypeController::class, 'allForSelect']); // Add this if needed for dropdowns
 
   Route::apiResource('orders', OrderController::class);
+   // and POST /product-types/{product_type}/predefined-sizes
+   Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)
+   ->only(['index', 'store']);
 
+// This defines DELETE /product-types/{product_type}/predefined-sizes/{predefined_size}
+// Note: Laravel automatically singularizes the resource name for the parameter.
+Route::delete(
+  '/product-types/{product_type}/predefined-sizes/{predefined_size}',
+  [PredefinedSizeController::class, 'destroy']
+)->name('product-types.predefined-sizes.destroy');
   // Service Management Admin Routes
   Route::apiResource('product-categories', ProductCategoryController::class);
   Route::apiResource('product-types', ProductTypeController::class);
@@ -100,7 +110,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
     Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
     Route::apiResource('customer-types', CustomerTypeController::class);
-
+    // This defines GET /product-types/{product_type}/predefined-sizes
+ 
     // Product Type Management
     Route::delete('/product-types/{productType}/image', [ProductTypeController::class, 'deleteImage']);
     
