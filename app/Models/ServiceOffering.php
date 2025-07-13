@@ -41,6 +41,6 @@ class ServiceOffering extends Model
     public function getDisplayNameAttribute(): string
     {
         if ($this->name_override) return $this->name_override;
-        return ($this->productType?->name ?: 'N/A Product') . ' - ' . ($this->serviceAction?->name ?: 'N/A Action');
+        return($this->serviceAction?->name ?: 'N/A Action');
     }
 }

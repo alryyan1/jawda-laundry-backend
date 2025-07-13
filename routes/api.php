@@ -106,6 +106,8 @@ Route::delete(
   
   Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
     ->name('orders.invoice.whatsapp');
+  Route::post('/orders/{order}/send-whatsapp-message', [OrderController::class, 'sendWhatsappMessage'])
+    ->name('orders.whatsapp.message');
     Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
     Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
     Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
@@ -125,6 +127,8 @@ Route::delete(
     Route::get('/reports/overdue-pickups', [ReportController::class, 'overduePickupOrders']);
     Route::get('/customers/{customer}/ledger', [CustomerLedgerController::class, 'show']);
     Route::get('/dashboard/today-summary', [App\Http\Controllers\Api\DashboardController::class, 'todaySummary']);
+    Route::patch('/order-items/{id}/status', [\App\Http\Controllers\Api\OrderItemController::class, 'updateStatus']);
+    Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
 
 
   });

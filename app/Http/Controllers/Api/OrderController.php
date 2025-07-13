@@ -140,7 +140,7 @@ class OrderController extends Controller
         $validatedData = $request->validate([
             'notes' => 'sometimes|nullable|string|max:2000',
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
-            'status' => ['sometimes', 'required', Rule::in(config('app.order_statuses'))],
+            'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
         ]);
         
@@ -181,7 +181,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
         $this->authorize('updateStatus', $order);
-        $validated = $request->validate(['status' => ['required', Rule::in(config('app.order_statuses'))]]); // Assuming you have this config
+        $validated = $request->validate(['status' => ['required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])]]);
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
 
@@ -292,15 +292,13 @@ class OrderController extends Controller
         $pdf->setPrintFooter(true);
 
         // Set margins
-        $pdf->SetMargins(15, 38, 15); // Left, Top, Right
+        $pdf->SetMargins(5, 38, 5); // Left, Top, Right
         $pdf->SetHeaderMargin(5);
         $pdf->SetFooterMargin(10);
 
-        // Set auto page breaks
-        $pdf->SetAutoPageBreak(TRUE, 25);
 
         // Set font
-        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetFont('arial', '', 10);
 
         // Call your custom generate method which builds the PDF
         $pdf->generate();
@@ -323,15 +321,23 @@ class OrderController extends Controller
         // --- PDF Generation ---
         // Page format arguments: orientation, unit, format (array(width, height) in mm for custom roll)
         // 80mm is a common POS paper width
-        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
+        // Calculate dynamic page height based on number of items (10mm per item)
+        $baseHeight = 120;
+        $itemHeight = 10;
+        $pageHeight = $baseHeight + ($order->items->count() * $itemHeight);
+        $pdf = new PosInvoicePdf('P', 'mm', [80, $pageHeight], true, 'UTF-8', false);
 
         // Pass data to the PDF class
         $pdf->setOrder($order);
         $settings = [
             'general_company_name' => config('app_settings.company_name', config('app.name')),
+            'general_company_name_ar' => config('app_settings.company_name_ar', 'لوندرى برو'),
             'general_company_address' => config('app_settings.company_address'),
+            'general_company_address_ar' => config('app_settings.company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة'),
             'general_company_phone' => config('app_settings.company_phone'),
+            'general_company_phone_ar' => config('app_settings.company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧'),
             'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
+            'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setSettings($settings);
 
@@ -378,9 +384,13 @@ class OrderController extends Controller
         
         $settings = [
             'general_company_name' => config('app_settings.company_name', config('app.name')),
+            'general_company_name_ar' => config('app_settings.company_name_ar', 'لوندرى برو'),
             'general_company_address' => config('app_settings.company_address'),
+            'general_company_address_ar' => config('app_settings.company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة'),
             'general_company_phone' => config('app_settings.company_phone'),
+            'general_company_phone_ar' => config('app_settings.company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧'),
             'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
+            'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setOrder($order);
         $pdf->setSettings($settings);
@@ -410,6 +420,44 @@ class OrderController extends Controller
         } else {
             return response()->json([
                 'message' => 'Failed to send WhatsApp invoice.',
+                'details' => $result['message'] ?? 'Unknown API error.',
+                'api_response' => $result['data'] ?? null
+            ], 500);
+        }
+    }
+
+    /**
+     * Sends a custom WhatsApp message to the customer about their order.
+     */
+    public function sendWhatsappMessage(Request $request, Order $order, WhatsAppService $whatsAppService)
+    {
+        $this->authorize('view', $order);
+
+        $validated = $request->validate([
+            'message' => 'required|string|max:1000'
+        ]);
+
+        if (!$whatsAppService->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp API is not configured.'], 400);
+        }
+
+        $customer = $order->customer;
+        if (!$customer || !$customer->phone) {
+            return response()->json(['message' => 'Customer phone number is missing.'], 400);
+        }
+
+        // Sanitize phone number - remove '+', spaces, dashes
+        $phoneNumber = preg_replace('/[^0-9]/', '', $customer->phone);
+
+        $result = $whatsAppService->sendMessage($phoneNumber, $validated['message']);
+
+        if ($result['status'] === 'success') {
+            // Log this action
+            $order->logActivity("Custom WhatsApp message sent to customer: " . substr($validated['message'], 0, 50) . "...");
+            return response()->json(['message' => 'Message sent successfully via WhatsApp!']);
+        } else {
+            return response()->json([
+                'message' => 'Failed to send WhatsApp message.',
                 'details' => $result['message'] ?? 'Unknown API error.',
                 'api_response' => $result['data'] ?? null
             ], 500);
@@ -489,7 +537,7 @@ class OrderController extends Controller
         }
 
         if ($request->filled('product_type_id')) {
-            $query->whereHas('items.serviceOffering.productType', fn($q) => $q->where('id', 'product_type_id'));
+            $query->whereHas('items.serviceOffering.productType', fn($q) => $q->where('id', $request->product_type_id));
         }
         if ($request->filled('created_date')) {
             $query->whereDate('created_at', $request->created_date);

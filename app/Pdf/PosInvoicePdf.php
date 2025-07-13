@@ -11,6 +11,8 @@ class PosInvoicePdf extends TCPDF
     protected array $settings;
     protected $font = 'arial';
     protected $currencySymbol = '$';
+    protected $language = 'en'; // Default language
+    protected $translations = [];
 
     public function setOrder(Order $order)
     {
@@ -21,14 +23,94 @@ class PosInvoicePdf extends TCPDF
     {
         $this->settings = $settings;
         $this->currencySymbol = $settings['general_default_currency_symbol'] ?? '$';
+        $this->language = $settings['language'] ?? 'en';
+        $this->loadTranslations();
+    }
+
+    private function loadTranslations()
+    {
+        $this->translations = [
+            'company_name' => [
+                'en' => $this->settings['general_company_name'] ?? 'LaundryPro',
+                'ar' => $this->settings['general_company_name_ar'] ?? 'لوندرى برو'
+            ],
+            'company_address' => [
+                'en' => $this->settings['general_company_address'] ?? '123 Clean St, Fresh City',
+                'ar' => $this->settings['general_company_address_ar'] ?? '١٢٣ شارع النظافة، المدينة النظيفة'
+            ],
+            'company_phone' => [
+                'en' => $this->settings['general_company_phone'] ?? '555-123-4567',
+                'ar' => $this->settings['general_company_phone_ar'] ?? '٥٥٥-١٢٣-٤٥٦٧'
+            ],
+            'order' => [
+                'en' => 'Order #',
+                'ar' => 'طلب رقم'
+            ],
+            'date' => [
+                'en' => 'Date',
+                'ar' => 'التاريخ'
+            ],
+            'customer' => [
+                'en' => 'Customer',
+                'ar' => 'العميل'
+            ],
+            'cashier' => [
+                'en' => 'Cashier',
+                'ar' => 'الكاشير'
+            ],
+            'item' => [
+                'en' => 'Item',
+                'ar' => 'العنصر'
+            ],
+            'quantity' => [
+                'en' => 'Qty',
+                'ar' => 'الكمية'
+            ],
+            'price' => [
+                'en' => 'Price',
+                'ar' => 'السعر'
+            ],
+            'total' => [
+                'en' => 'Total',
+                'ar' => 'المجموع'
+            ],
+            'subtotal' => [
+                'en' => 'Subtotal',
+                'ar' => 'المجموع الفرعي'
+            ],
+            'amount_paid' => [
+                'en' => 'Amount Paid',
+                'ar' => 'المبلغ المدفوع'
+            ],
+            'amount_due' => [
+                'en' => 'Due',
+                'ar' => ' المستحق'
+            ],
+            'notes' => [
+                'en' => 'Notes',
+                'ar' => 'ملاحظات'
+            ],
+            'thank_you' => [
+                'en' => 'Thank you for your business!',
+                'ar' => 'شكراً لتعاملكم معنا!'
+            ]
+        ];
+    }
+
+    private function getBilingualText($key)
+    {
+        $en = $this->translations[$key]['en'] ?? $key;
+        $ar = $this->translations[$key]['ar'] ?? $key;
+        return $en . ' / ' . $ar;
     }
 
     // We can define a very simple or no header/footer for POS receipts
     public function Header() {}
+    
     public function Footer() {
         $this->SetY(-15);
-        $this->SetFont($this->font, 'I', 8);
-        $this->Cell(0, 10, 'Thank you for your business!', 0, false, 'C');
+        $this->SetFont($this->font, '', 8);
+        $this->Cell(0, 10, $this->getBilingualText('thank_you'), 0, false, 'C');
     }
 
     /**
@@ -38,85 +120,97 @@ class PosInvoicePdf extends TCPDF
     {
         $this->AddPage();
         $this->SetFont($this->font, '', 10);
+        
+        // Define padding variables
+        $leftPadding = 0;
+        $rightPadding = 0;
 
         // --- Company Header ---
         $this->SetFont($this->font, 'B', 14);
-        $this->Cell(0, 6, $this->settings['general_company_name'] ?? 'LaundryPro', 0, 1, 'C');
+        $this->Cell(0, 6, $this->getBilingualText('company_name'), 0, 1, 'C');
         $this->SetFont($this->font, '', 8);
-        $this->MultiCell(0, 4, $this->settings['general_company_address'] ?? '123 Clean St, Fresh City', 0, 'C');
-        $this->Cell(0, 4, $this->settings['general_company_phone'] ?? '555-123-4567', 0, 1, 'C');
+        $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');
+        $this->Cell(0, 4, $this->getBilingualText('company_phone'), 0, 1, 'C');
         $this->Ln(4);
 
         // --- Divider ---
-        $this->drawDashedLine();
+        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+        $this->Ln(1);
 
         // --- Order Details ---
         $this->SetFont($this->font, '', 9);
-        $this->Cell(20, 5, 'Order #:');
+        $this->Cell(20, 5, $this->getBilingualText('order'));
         $this->Cell(0, 5, $this->order->id, 0, 1, 'R');
-        $this->Cell(20, 5, 'Date:');
+        $this->Cell(20, 5, $this->getBilingualText('date'));
         $this->Cell(0, 5, $this->order->order_date->format('M d, Y h:i A'), 0, 1, 'R');
-        $this->Cell(20, 5, 'Customer:');
+        $this->Cell(20, 5, $this->getBilingualText('customer'));
         $this->Cell(0, 5, $this->order->customer->name, 0, 1, 'R');
-        $this->Cell(20, 5, 'Cashier:');
+        $this->Cell(20, 5, $this->getBilingualText('cashier'));
         $this->Cell(0, 5, $this->order->user->name ?? 'N/A', 0, 1, 'R');
         $this->Ln(2);
 
-        $this->drawDashedLine();
+        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+        $this->Ln(1);
 
         // --- Items Table Header ---
         $this->SetFont($this->font, 'B', 9);
-        $this->Cell(38, 6, 'Item');
-        $this->Cell(8, 6, 'Qty', 0, 0, 'C');
+        $this->Cell(35, 6, 'item', 0, 0, 'L');
+        $this->Cell(8, 6, 'Qty', 0, 0, 'C'); // Only English
         $this->Cell(12, 6, 'Price', 0, 0, 'R');
-        $this->Cell(14, 6, 'Total', 0, 1, 'R');
-        $this->drawDashedLine();
+        $this->Cell(14, 6, 'Total', 0, 1, 'R'); // Only English
+        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
         $this->Ln(1);
 
         // --- Items Table Body ---
         $this->SetFont($this->font, '', 9);
         foreach ($this->order->items as $item) {
             // Use MultiCell for the item name to allow wrapping
-            $this->MultiCell(38, 4, $item->serviceOffering->display_name, 1, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+            $this->MultiCell(35, 4, $item->serviceOffering->display_name, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
             $currentY = $this->GetY();
             $this->SetY($currentY - 4); // Move back up to align other cells
 
-            $this->SetX(44); // Position for Qty
-            $this->Cell(8, 4, $item->quantity, 1, 0, 'C');
-            $this->SetX(52); // Position for Price
-            $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 1, 0, 'R');
-            $this->SetX(64); // Position for Total
-            $this->Cell(14, 4, number_format($item->sub_total, 2), 1, 1, 'R');
+            $this->SetX(39); // Position for Qty
+            $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
+            $this->SetX(47); // Position for Price
+            $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 0, 0, 'R');
+            $this->SetX(59); // Position for Total
+            $this->Cell(14, 4, number_format($item->sub_total, 2), 0, 1, 'R');
+            // $this->Line(5, $this->GetY(), 64, $this->GetY());
         }
 
         $this->Ln(1);
-        $this->drawDashedLine();
+        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+        $this->Ln(1);
 
         // --- Summary Section ---
         $this->SetFont($this->font, '', 10);
-        $this->Cell(48, 6, 'Subtotal:', 0, 0, 'R');
-        $this->Cell(24, 6, number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(40, 6, $this->getBilingualText('subtotal') . ':', 0, 0, 'R');
+        $this->Cell(20, 6, number_format($this->order->total_amount, 2), 0, 1, 'R');
         
         // Add Tax/Discount here if needed
 
         $this->SetFont($this->font, 'B', 12);
-        $this->Cell(48, 8, 'TOTAL:', 0, 0, 'R');
-        $this->Cell(24, 8, $this->currencySymbol . number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(40, 8, $this->getBilingualText('total') . ':', 0, 0, 'R');
+        $this->Cell(20, 8, $this->currencySymbol . number_format($this->order->total_amount, 2), 0, 1, 'R');
         
         $this->SetFont($this->font, '', 10);
-        $this->Cell(48, 6, 'Amount Paid:', 0, 0, 'R');
-        $this->Cell(24, 6, number_format($this->order->paid_amount, 2), 0, 1, 'R');
+        $this->Cell(40, 6, $this->getBilingualText('amount_paid') . ':', 0, 0, 'R');
+        $this->Cell(20, 6, number_format($this->order->paid_amount, 2), 0, 1, 'R');
         
-        $this->SetFont('helvetica', 'B', 10);
-        $this->Cell(48, 6, 'Amount Due:', 0, 0, 'R');
-        $this->Cell(24, 6, number_format($this->order->amount_due, 2), 0, 1, 'R');
+        $this->SetFont('arial', 'B', 10);
+        $this->Cell(40, 6, $this->getBilingualText('amount_due') . ':', 0, 0, 'R');
+        $this->Cell(20, 6, number_format($this->order->amount_due, 2), 0, 1, 'R');
         
         $this->Ln(5);
 
         // --- Notes Section ---
         if ($this->order->notes) {
-            $this->SetFont('helvetica', 'I', 8);
-            $this->MultiCell(0, 4, "Notes: " . $this->order->notes, 0, 'L');
+            $this->SetFont('arial', 'I', 8);
+            $this->MultiCell(0, 4, $this->getBilingualText('notes') . ": " . $this->order->notes, 0, 'L');
         }
 
         // --- Barcode ---
@@ -130,10 +224,4 @@ class PosInvoicePdf extends TCPDF
         // $this->write1DBarcode(strval($this->order->id), 'C128', '', '', '', 15, 0.4, $style, 'N');
     }
     
-    private function drawDashedLine()
-    {
-        $this->SetLineStyle(['width' => 0.1, 'dash' => '2,2', 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY()); // 72mm width for 80mm paper with margins
-        $this->Ln(1);
-    }
 }

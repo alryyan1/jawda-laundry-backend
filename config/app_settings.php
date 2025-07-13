@@ -32,5 +32,6 @@ return [
     'whatsapp_api_url' => env('WHATSAPP_API_URL', ''),
     'whatsapp_api_token' => env('WHATSAPP_API_TOKEN', ''),
     'whatsapp_notification_number' => env('WHATSAPP_NOTIFICATION_NUMBER', ''),
+    'whatsapp_country_code' => env('WHATSAPP_COUNTRY_CODE', '968'),
 
 ];

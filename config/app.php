@@ -70,7 +70,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Muscat',
 
     /*
     |--------------------------------------------------------------------------
@@ -184,5 +184,23 @@ return [
     'aliases' => Facade::defaultAliases()->merge([
         // 'Example' => App\Facades\Example::class,
     ])->toArray(),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Order Statuses
+    |--------------------------------------------------------------------------
+    |
+    | This array defines the valid order statuses that can be used throughout
+    | the application. These statuses are used for validation and UI display.
+    |
+    */
+
+    'order_statuses' => [
+        'pending',
+        'processing', 
+        'ready_for_pickup',
+        'completed',
+        'cancelled'
+    ],
 
 ];

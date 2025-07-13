@@ -45,6 +45,9 @@ class WhatsAppService
      */
     public function sendMessage(string $chatId, string $message)
     {
+
+        // Log::info("WhatsAppService: Sending message to {$chatId}: {$message}");
+        $chatId = $this->formatChatId($chatId);
         if (!$this->isEnabled) {
             Log::info("WhatsAppService: Sending disabled. Message not sent to {$chatId}: {$message}");
             return true; // Or false if you want to indicate a "failure" due to being disabled
@@ -52,12 +55,20 @@ class WhatsAppService
 
         if (empty($this->apiUrl) || empty($this->apiToken)) {
             Log::error("WhatsAppService: API URL or Token is not configured.");
-            return false;
+            return [
+                'status' => 'error',
+                'message' => 'WhatsApp API is not configured.',
+                'data' => null
+            ];
         }
 
         if (empty($chatId)) {
             Log::error("WhatsAppService: Chat ID is empty. Cannot send message.");
-            return false;
+            return [
+                'status' => 'error',
+                'message' => 'Chat ID is empty. Cannot send message.',
+                'data' => null
+            ];
         }
 
         // Construct the proper API endpoint for sending messages
@@ -102,7 +113,11 @@ class WhatsAppService
                 ];
             } else {
                 Log::error("WhatsAppService: Failed to send message to {$chatId}. Status: {$statusCode}", ['response' => $responseBody]);
-                return false;
+                return [
+                    'status' => 'error',
+                    'message' => 'Failed to send message. API returned status: ' . $statusCode,
+                    'data' => $responseBody
+                ];
             }
         } catch (RequestException $e) {
             $errorMessage = $e->getMessage();
@@ -114,13 +129,21 @@ class WhatsAppService
                 'error' => $errorMessage,
                 'endpoint' => $apiEndpoint
             ]);
-            return false;
+            return [
+                'status' => 'error',
+                'message' => 'Request exception: ' . $errorMessage,
+                'data' => null
+            ];
         } catch (\Exception $e) {
             Log::error("WhatsAppService: Generic Exception sending message to {$chatId}", [
                 'error' => $e->getMessage(),
                 'endpoint' => $apiEndpoint
             ]);
-            return false;
+            return [
+                'status' => 'error',
+                'message' => 'Generic exception: ' . $e->getMessage(),
+                'data' => null
+            ];
         }
     }
 
@@ -135,6 +158,7 @@ class WhatsAppService
      */
     public function sendMediaBase64(string $phoneNumber, string $base64Data, string $fileName, ?string $caption = null): array
     {
+        $phoneNumber = $this->formatChatId($phoneNumber);
         if (!$this->isConfigured()) {
             return ['status' => 'error', 'message' => 'WhatsApp service is not configured or enabled in settings.'];
         }
@@ -154,11 +178,10 @@ class WhatsAppService
      */
     public function sendTestMessage(string $testPhoneNumber)
     {
-        $chatId = $this->formatChatId($testPhoneNumber);
         $message = "This is a test message from your LaundryPro system. WhatsApp integration is working!";
         
-        $success = $this->sendMessage($chatId, $message);
-        return $success;
+        $result = $this->sendMessage($testPhoneNumber, $message);
+        return $result;
         
     }
 
@@ -198,6 +221,17 @@ class WhatsAppService
      */
     private function formatChatId(string $phoneNumber): string
     {
-        return preg_replace('/[^0-9]/', '', $phoneNumber) . '@c.us';
+        // Get the country code from config, default to Oman (968)
+        $countryCode = Config::get('app_settings.whatsapp_country_code', '968');
+        
+        // Clean the phone number (remove any non-digits)
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
+        
+        // If the phone number doesn't start with the country code, add it
+        if (!str_starts_with($cleanPhone, $countryCode)) {
+            $cleanPhone = $countryCode . $cleanPhone;
+        }
+        
+        return $cleanPhone . '@c.us';
     }
 }

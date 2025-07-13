@@ -119,18 +119,18 @@ class SettingController extends Controller
         }
 
         $result = $whatsAppService->sendTestMessage($validated['test_phone_number']);
-        return $result;
-        // if ($result['status'] === 'success') {
-        //     return response()->json([
-        //         'message' => 'Test message sent successfully!',
-        //         'response' => $result['data']
-        //     ]);
-        // } else {
-        //     return response()->json([
-        //         'message' => 'Failed to send test message.',
-        //         'details' => $result['message'] ?? 'An unknown error occurred.',
-        //         'api_response' => $result['data'] ?? null
-        //     ], 500);
-        // }
+        
+        if ($result['status'] === 'success') {
+            return response()->json([
+                'message' => 'Test message sent successfully!',
+                'response' => $result['data']
+            ]);
+        } else {
+            return response()->json([
+                'message' => 'Failed to send test message.',
+                'details' => $result['message'] ?? 'An unknown error occurred.',
+                'api_response' => $result['data'] ?? null
+            ], 500);
+        }
     }
 }

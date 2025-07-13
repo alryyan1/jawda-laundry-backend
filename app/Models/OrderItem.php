@@ -17,14 +17,16 @@ class OrderItem extends Model
         'width_meters',
         'calculated_price_per_unit_item',
         'sub_total',
-        'notes'
+        'notes',
+        'status'
     ];
     protected $casts = [
         'quantity' => 'integer',
         'length_meters' => 'decimal:2',
         'width_meters' => 'decimal:2',
         'calculated_price_per_unit_item' => 'decimal:2',
-        'sub_total' => 'decimal:2'
+        'sub_total' => 'decimal:2',
+        'status' => 'string'
     ];
     public function order()
     {
