@@ -30,6 +30,8 @@ class Order extends Model
         'due_date',
         'pickup_date',
         'delivery_address',     // Ensure this is here if used
+        'whatsapp_text_sent',
+        'whatsapp_pdf_sent',
     ];
     
     /**
@@ -43,6 +45,8 @@ class Order extends Model
         'order_date' => 'datetime',
         'due_date' => 'datetime',
         'pickup_date' => 'datetime',
+        'whatsapp_text_sent' => 'boolean',
+        'whatsapp_pdf_sent' => 'boolean',
     ];
 
     /**

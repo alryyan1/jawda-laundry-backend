@@ -31,12 +31,21 @@ class ReportController extends Controller
         $validated = $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d',
+            'month' => 'nullable|date_format:Y-m', // Format: 2024-01
             'top_services_limit' => 'nullable|integer|min:1|max:20',
         ]);
 
-        // Set default date range to the last 30 days if not provided
-        $dateTo = isset($validated['date_to']) ? Carbon::parse($validated['date_to'])->endOfDay() : Carbon::now()->endOfDay();
-        $dateFrom = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : $dateTo->copy()->subDays(29)->startOfDay();
+        // Handle monthly view
+        if (isset($validated['month'])) {
+            $monthDate = Carbon::createFromFormat('Y-m', $validated['month']);
+            $dateFrom = Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()->startOfDay();
+            $dateTo = Carbon::createFromFormat('Y-m', $validated['month'])->endOfMonth()->endOfDay();
+        } else {
+            // Set default date range to the last 30 days if not provided
+            $dateTo = isset($validated['date_to']) ? Carbon::parse($validated['date_to'])->endOfDay() : Carbon::now()->endOfDay();
+            $dateFrom = isset($validated['date_from']) ? Carbon::parse($validated['date_from'])->startOfDay() : $dateTo->copy()->subDays(29)->startOfDay();
+        }
+        
         $topServicesLimit = $validated['top_services_limit'] ?? 10;
 
         // --- 1. Main KPI Calculations ---
@@ -51,13 +60,36 @@ class ReportController extends Controller
         $totalOrders = (clone $completedOrdersQuery)->count();
         $averageOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
 
-        // --- 2. Top Performing Services Calculation ---
+        // --- 2. Daily Breakdown (for monthly view) ---
+        $dailyBreakdown = [];
+        if (isset($validated['month'])) {
+            $dailyBreakdown = DB::table('orders')
+                ->where('status', 'completed')
+                ->whereBetween('updated_at', [$dateFrom, $dateTo])
+                ->select(
+                    DB::raw('DATE(updated_at) as date'),
+                    DB::raw('COUNT(*) as total_orders'),
+                    DB::raw('SUM(total_amount) as total_revenue')
+                )
+                ->groupBy(DB::raw('DATE(updated_at)'))
+                ->orderBy('date', 'asc')
+                ->get()
+                ->map(function ($day) {
+                    return [
+                        'date' => $day->date,
+                        'total_orders' => (int) $day->total_orders,
+                        'total_revenue' => (float) $day->total_revenue,
+                    ];
+                });
+        }
+
+        // --- 3. Top Performing Services Calculation ---
         $topServices = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('service_offerings', 'order_items.service_offering_id', '=', 'service_offerings.id')
             ->join('product_types', 'service_offerings.product_type_id', '=', 'product_types.id')
             ->join('service_actions', 'service_offerings.service_action_id', '=', 'service_actions.id')
-            ->where('orders.status', 'completed')
+            // ->where('orders.status', 'completed')
             ->whereBetween('orders.updated_at', [$dateFrom, $dateTo])
             ->select(
                 'service_offerings.id',
@@ -69,9 +101,17 @@ class ReportController extends Controller
             ->groupBy('service_offerings.id', 'display_name')
             ->orderBy('total_revenue', 'desc')
             ->limit($topServicesLimit)
-            ->get();
+            ->get()
+            ->map(function ($service) {
+                return [
+                    'id' => (int) $service->id,
+                    'display_name' => $service->display_name,
+                    'total_quantity' => (int) $service->total_quantity,
+                    'total_revenue' => (float) $service->total_revenue,
+                ];
+            });
 
-        // --- 3. Return the consolidated report data ---
+        // --- 4. Return the consolidated report data ---
         return response()->json([
             'data' => [
                 'summary' => [
@@ -79,11 +119,13 @@ class ReportController extends Controller
                     'total_orders' => (int) $totalOrders,
                     'average_order_value' => (float) $averageOrderValue,
                 ],
+                'daily_breakdown' => $dailyBreakdown,
                 'top_services' => $topServices,
                 'date_range' => [
                     'from' => $dateFrom->toDateString(),
                     'to' => $dateTo->toDateString(),
-                ]
+                ],
+                'view_type' => isset($validated['month']) ? 'monthly' : 'custom_range'
             ]
         ]);
     }
@@ -176,5 +218,155 @@ class ReportController extends Controller
         // لا نحتاج إلى Resource هنا لأننا أضفنا حقلًا مخصصًا
         // لكن استخدامه يضمن التناسق. سنقوم بتعديل OrderResource.
         return OrderResource::collection($orders);
+    }
+
+    
+    /**
+     * Generates a daily revenue and order count report for a specific month.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function dailyRevenueReport(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:' . date('Y'),
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+        $startDate = Carbon::create($year, $month, 1)->startOfDay();
+        $endDate = $startDate->copy()->endOfMonth();
+
+        // Query to get aggregated data for completed orders, grouped by date
+        $dailyData = Order::where('status', 'completed')
+            ->whereBetween('updated_at', [$startDate, $endDate]) // Use updated_at for completion date
+            ->select(
+                DB::raw('DATE(updated_at) as date'),
+                DB::raw('COUNT(*) as order_count'),
+                DB::raw('SUM(total_amount) as daily_revenue')
+            )
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->keyBy('date'); // Key by date for easy lookup
+
+        // --- Create a full calendar for the month ---
+        $reportData = [];
+        $totalDaysInMonth = $startDate->daysInMonth;
+        $totalMonthRevenue = 0;
+        $totalMonthOrders = 0;
+
+        for ($day = 1; $day <= $totalDaysInMonth; $day++) {
+            $currentDate = Carbon::create($year, $month, $day)->format('Y-m-d');
+            
+            if (isset($dailyData[$currentDate])) {
+                $dayData = $dailyData[$currentDate];
+                $reportData[] = [
+                    'date' => $dayData->date,
+                    'order_count' => (int) $dayData->order_count,
+                    'daily_revenue' => (float) $dayData->daily_revenue,
+                ];
+                $totalMonthRevenue += $dayData->daily_revenue;
+                $totalMonthOrders += $dayData->order_count;
+            } else {
+                // Add an entry with 0 values for days with no sales
+                $reportData[] = [
+                    'date' => $currentDate,
+                    'order_count' => 0,
+                    'daily_revenue' => 0,
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => [
+                'report_details' => [
+                    'month' => $month,
+                    'year' => $year,
+                    'month_name' => $startDate->format('F Y'),
+                ],
+                'summary' => [
+                    'total_revenue' => (float) $totalMonthRevenue,
+                    'total_orders' => (int) $totalMonthOrders,
+                    'average_daily_revenue' => $totalDaysInMonth > 0 ? (float)($totalMonthRevenue / $totalDaysInMonth) : 0,
+                ],
+                'daily_data' => $reportData,
+            ]
+        ]);
+    }
+
+
+    
+    /**
+     * Generates a daily cost and expense count report for a specific month.
+     */
+    public function dailyCostsReport(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:' . date('Y'),
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+        $startDate = Carbon::create($year, $month, 1)->startOfDay();
+        $endDate = $startDate->copy()->endOfMonth();
+
+        // --- Query for Expenses ---
+        $dailyData = Expense::whereBetween('expense_date', [$startDate, $endDate])
+            ->select(
+                DB::raw('DATE(expense_date) as date'),
+                DB::raw('COUNT(*) as expense_count'),
+                DB::raw('SUM(amount) as daily_cost')
+            )
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->keyBy('date');
+
+        // --- Create a full calendar for the month ---
+        $reportData = [];
+        $totalMonthCost = 0;
+        $totalMonthEntries = 0;
+        $totalDaysInMonth = $startDate->daysInMonth;
+
+        for ($day = 1; $day <= $totalDaysInMonth; $day++) {
+            $currentDate = Carbon::create($year, $month, $day)->format('Y-m-d');
+            
+            if (isset($dailyData[$currentDate])) {
+                $dayData = $dailyData[$currentDate];
+                $reportData[] = [
+                    'date' => $dayData->date,
+                    'expense_count' => (int) $dayData->expense_count,
+                    'daily_cost' => (float) $dayData->daily_cost,
+                ];
+                $totalMonthCost += $dayData->daily_cost;
+                $totalMonthEntries += $dayData->expense_count;
+            } else {
+                $reportData[] = [
+                    'date' => $currentDate,
+                    'expense_count' => 0,
+                    'daily_cost' => 0,
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => [
+                'report_details' => [
+                    'month' => $month,
+                    'year' => $year,
+                    'month_name' => $startDate->format('F Y'),
+                ],
+                'summary' => [
+                    'total_cost' => (float) $totalMonthCost,
+                    'total_entries' => (int) $totalMonthEntries,
+                    'average_daily_cost' => $totalDaysInMonth > 0 ? (float)($totalMonthCost / $totalDaysInMonth) : 0,
+                ],
+                'daily_data' => $reportData,
+            ]
+        ]);
     }
 }

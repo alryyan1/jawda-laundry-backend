@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/orders/quote-item', [OrderController::class, 'quoteOrderItem']);
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
+  Route::get('/orders/statistics', [OrderController::class, 'statistics']);
   Route::get('service-offerings/all-for-select', [ServiceOfferingController::class, 'allForSelect']);
   Route::get('product-types/all-for-select', [ProductTypeController::class, 'allForSelect']); // Add this if needed for dropdowns
 
@@ -128,7 +129,10 @@ Route::delete(
     Route::get('/customers/{customer}/ledger', [CustomerLedgerController::class, 'show']);
     Route::get('/dashboard/today-summary', [App\Http\Controllers\Api\DashboardController::class, 'todaySummary']);
     Route::patch('/order-items/{id}/status', [\App\Http\Controllers\Api\OrderItemController::class, 'updateStatus']);
+    Route::patch('/order-items/{id}/picked-up-quantity', [\App\Http\Controllers\Api\OrderItemController::class, 'updatePickedUpQuantity']);
     Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
+    Route::get('/reports/daily-revenue', [ReportController::class, 'dailyRevenueReport']);
+    Route::get('/reports/daily-costs', [ReportController::class, 'dailyCostsReport']);
 
 
   });

@@ -29,6 +29,7 @@ class OrderItemResource extends JsonResource
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
             'status' => $this->status,
+            'picked_up_quantity' => (int) $this->picked_up_quantity,
         ];
     }
 }

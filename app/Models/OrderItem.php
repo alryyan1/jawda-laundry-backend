@@ -18,7 +18,8 @@ class OrderItem extends Model
         'calculated_price_per_unit_item',
         'sub_total',
         'notes',
-        'status'
+        'status',
+        'picked_up_quantity'
     ];
     protected $casts = [
         'quantity' => 'integer',
@@ -26,7 +27,8 @@ class OrderItem extends Model
         'width_meters' => 'decimal:2',
         'calculated_price_per_unit_item' => 'decimal:2',
         'sub_total' => 'decimal:2',
-        'status' => 'string'
+        'status' => 'string',
+        'picked_up_quantity' => 'integer'
     ];
     public function order()
     {

@@ -311,7 +311,7 @@ class OrderController extends Controller
      /**
      * Generate and download a PDF invoice formatted for a POS thermal printer.
      */
-    public function downloadPosInvoice(Order $order)
+    public function downloadPosInvoice(Order $order, bool $base64 = false)
     {
         // $this->authorize('view', $order);
 
@@ -355,11 +355,16 @@ class OrderController extends Controller
         // Call your custom generate method which builds the PDF with Cell()
         $pdf->generate();
 
-        // Close and output PDF document
-        // 'I' for inline browser display. This is best for POS printing.
-        // The browser's PDF viewer will handle the print dialog.
-        $pdf->Output('receipt-'.$order->order_number.'.pdf', 'I');
-        exit;
+        if ($base64) {
+            // Return base64 encoded PDF content
+            return $pdf->Output('receipt-'.$order->order_number.'.pdf', 'S');
+        } else {
+            // Close and output PDF document
+            // 'I' for inline browser display. This is best for POS printing.
+            // The browser's PDF viewer will handle the print dialog.
+            $pdf->Output('receipt-'.$order->order_number.'.pdf', 'I');
+            exit;
+        }
     }
     
     /**
@@ -378,27 +383,8 @@ class OrderController extends Controller
             return response()->json(['message' => 'Customer phone number is missing.'], 400);
         }
 
-        // --- 1. Generate the PDF in memory ---
-        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
-        $order->load(['customer', 'user', 'items.serviceOffering']); // Eager load necessary data
-        
-        $settings = [
-            'general_company_name' => config('app_settings.company_name', config('app.name')),
-            'general_company_name_ar' => config('app_settings.company_name_ar', 'لوندرى برو'),
-            'general_company_address' => config('app_settings.company_address'),
-            'general_company_address_ar' => config('app_settings.company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة'),
-            'general_company_phone' => config('app_settings.company_phone'),
-            'general_company_phone_ar' => config('app_settings.company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧'),
-            'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
-            'language' => 'en', // Default language, can be made configurable
-        ];
-        $pdf->setOrder($order);
-        $pdf->setSettings($settings);
-        $pdf->generate(); // This builds the PDF content
-
-        // Get the raw PDF content as a string
-        // 'S' tells TCPDF to output as a string instead of to the browser
-        $pdfContent = $pdf->Output('invoice.pdf', 'S');
+        // --- 1. Generate the PDF using the refactored method ---
+        $pdfContent = $this->downloadPosInvoice($order, true); // true for base64
 
         // --- 2. Base64 Encode the PDF Content ---
         $base64Pdf = base64_encode($pdfContent);
@@ -414,6 +400,8 @@ class OrderController extends Controller
 
         // --- 4. Return Response to Frontend ---
         if ($result['status'] === 'success') {
+            // Update the tracking field
+            $order->update(['whatsapp_pdf_sent' => true]);
             // Optionally log this action
             $order->logActivity("Invoice sent to customer via WhatsApp.");
             return response()->json(['message' => 'Invoice sent successfully via WhatsApp!']);
@@ -452,6 +440,8 @@ class OrderController extends Controller
         $result = $whatsAppService->sendMessage($phoneNumber, $validated['message']);
 
         if ($result['status'] === 'success') {
+            // Update the tracking field
+            $order->update(['whatsapp_text_sent' => true]);
             // Log this action
             $order->logActivity("Custom WhatsApp message sent to customer: " . substr($validated['message'], 0, 50) . "...");
             return response()->json(['message' => 'Message sent successfully via WhatsApp!']);
@@ -532,7 +522,8 @@ class OrderController extends Controller
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where(fn($q) => $q->where('order_number', 'LIKE', "%{$searchTerm}%")
+            $query->where(fn($q) => $q->where('id', $searchTerm)
+                ->orWhere('order_number', 'LIKE', "%{$searchTerm}%")
                 ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%")));
         }
 
@@ -543,6 +534,56 @@ class OrderController extends Controller
             $query->whereDate('created_at', $request->created_date);
         }
         return $query;
+    }
+
+    /**
+     * Get order statistics for the specified date range.
+     */
+    public function statistics(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+
+        $query = Order::query();
+
+        if ($dateFrom) {
+            $query->whereDate('order_date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('order_date', '<=', $dateTo);
+        }
+
+        // Get total orders
+        $totalOrders = $query->count();
+
+        // Get total amount paid
+        $totalAmountPaid = $query->sum('paid_amount');
+
+        // Get payment breakdown
+        $paymentBreakdown = $query->join('payments', 'orders.id', '=', 'payments.order_id')
+            ->selectRaw('payments.method, SUM(payments.amount) as total_amount')
+            ->groupBy('payments.method')
+            ->pluck('total_amount', 'method')
+            ->toArray();
+
+        // Ensure all payment methods are present with 0 values
+        $allPaymentMethods = ['cash', 'card', 'online', 'credit'];
+        $paymentBreakdown = array_merge(
+            array_fill_keys($allPaymentMethods, 0),
+            $paymentBreakdown
+        );
+
+        return response()->json([
+            'totalOrders' => $totalOrders,
+            'totalAmountPaid' => $totalAmountPaid,
+            'paymentBreakdown' => $paymentBreakdown,
+        ]);
     }
 
  

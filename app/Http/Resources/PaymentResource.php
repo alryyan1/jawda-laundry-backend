@@ -10,7 +10,7 @@ class PaymentResource extends JsonResource
         return [
             'id' => $this->id,
             'order_id' => $this->order_id,
-            'user' => new UserResource($this->whenLoaded('user')),
+            'user' => new UserResource($this->user),
             'amount' => (float) $this->amount,
             'method' => $this->method,
             'type' => $this->type,
