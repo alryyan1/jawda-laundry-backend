@@ -23,7 +23,7 @@ class UserSeeder extends Seeder
             ['username' => 'admin'], // Use username as the unique key for checking existence
             [
                 'name' => 'Admin User',
-                'email' => 'admin@laundry.com',
+                'email' => 'admin@admin.com',
                 'email_verified_at' => now(),
                 'password' => Hash::make('12345678'), // IMPORTANT: Change this for production!
                 'remember_token' => Str::random(10),
@@ -38,7 +38,7 @@ class UserSeeder extends Seeder
             ['username' => 'staff'], // Use username as the unique key
             [
                 'name' => 'Staff Receptionist',
-                'email' => 'staff@laundry.com',
+                'email' => 'staff@staff.com',
                 'email_verified_at' => now(),
                 'password' => Hash::make('12345678'),
                 'remember_token' => Str::random(10),

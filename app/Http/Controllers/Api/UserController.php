@@ -30,6 +30,7 @@ class UserController extends Controller // For admin management of users
         $query = User::with('roles:id,name')->orderBy('name');
          if ($request->filled('search')) {
             $query->where('name', 'LIKE', "%{$request->search}%")
+                  ->orWhere('username', 'LIKE', "%{$request->search}%")
                   ->orWhere('email', 'LIKE', "%{$request->search}%");
         }
         if($request->filled('role')) {
@@ -42,22 +43,24 @@ class UserController extends Controller // For admin management of users
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username|alpha_dash',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::defaults()],
-            'roles' => 'sometimes|array',
-            'roles.*' => 'integer|exists:roles,id', // Validate role IDs
+            'role_ids' => 'sometimes|array',
+            'role_ids.*' => 'integer|exists:roles,id', // Validate role IDs
         ]);
 
         DB::beginTransaction();
         try {
             $user = User::create([
                 'name' => $validated['name'],
+                'username' => $validated['username'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
             ]);
 
-            if (!empty($validated['roles'])) {
-                $rolesToAssign = Role::whereIn('id', $validated['roles'])->pluck('name');
+            if (!empty($validated['role_ids'])) {
+                $rolesToAssign = Role::whereIn('id', $validated['role_ids'])->pluck('name');
                 $user->syncRoles($rolesToAssign);
             }
             DB::commit();
@@ -80,22 +83,27 @@ class UserController extends Controller // For admin management of users
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'username' => ['sometimes','required','string','max:255','alpha_dash', Rule::unique('users')->ignore($user->id)],
             'email' => ['sometimes','required','string','email','max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'confirmed', Password::defaults()], // Password optional on update
-            'roles' => 'sometimes|array',
-            'roles.*' => 'integer|exists:roles,id',
+            'role_ids' => 'sometimes|array',
+            'role_ids.*' => 'integer|exists:roles,id',
         ]);
 
         DB::beginTransaction();
         try {
-            $updateData = ['name' => $validated['name'] ?? $user->name, 'email' => $validated['email'] ?? $user->email];
+            $updateData = [
+                'name' => $validated['name'] ?? $user->name, 
+                'username' => $validated['username'] ?? $user->username,
+                'email' => $validated['email'] ?? $user->email
+            ];
             if (!empty($validated['password'])) {
                 $updateData['password'] = Hash::make($validated['password']);
             }
             $user->update($updateData);
 
-            if ($request->has('roles')) { // Allows sending empty array to remove all roles
-                $rolesToAssign = Role::whereIn('id', $validated['roles'] ?? [])->pluck('name');
+            if ($request->has('role_ids')) { // Allows sending empty array to remove all roles
+                $rolesToAssign = Role::whereIn('id', $validated['role_ids'] ?? [])->pluck('name');
                 $user->syncRoles($rolesToAssign);
             }
             DB::commit();

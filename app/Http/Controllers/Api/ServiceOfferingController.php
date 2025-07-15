@@ -170,6 +170,34 @@ class ServiceOfferingController extends Controller
     }
 
     /**
+     * Update the first service offering's price for a product type.
+     */
+    public function updateFirstOfferingPrice(Request $request, $productTypeId)
+    {
+        $validatedData = $request->validate([
+            'default_price' => 'required|numeric|min:0',
+        ]);
+
+        $firstOffering = ServiceOffering::where('product_type_id', $productTypeId)
+            ->where('is_active', true)
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if (!$firstOffering) {
+            return response()->json(['message' => 'No active service offering found for this product type.'], 404);
+        }
+
+        try {
+            $firstOffering->update(['default_price' => $validatedData['default_price']]);
+            $firstOffering->load(['productType.category', 'serviceAction']);
+            return new ServiceOfferingResource($firstOffering);
+        } catch (\Exception $e) {
+            Log::error("Error updating first service offering price for product type {$productTypeId}: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update service offering price.'], 500);
+        }
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(ServiceOffering $serviceOffering)
@@ -184,7 +212,7 @@ class ServiceOfferingController extends Controller
             return response()->json(['message' => 'Service offering deleted successfully.']);
         } catch (\Exception $e) {
             Log::error("Error deleting service offering {$serviceOffering->id}: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to delete service offering.'], 500);
+            return response()->json(['message' => 'Failed to delete service offering.' . $e->getMessage()], 500);
         }
     }
 }

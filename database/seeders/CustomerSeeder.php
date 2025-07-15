@@ -13,44 +13,26 @@ class CustomerSeeder extends Seeder
     {
         $staffUser = User::first();
         $individualType = CustomerType::where('name', 'Individual')->first();
-        $corporateType = CustomerType::where('name', 'Corporate')->first();
 
         if (!$staffUser || !$individualType) {
             $this->command->warn('Staff user or Individual customer type not found. Skipping some customer seeds.');
             // return; // Or handle differently
         }
 
+        // Create default customer
         Customer::firstOrCreate(
-            ['email' => 'john.doe@example.com'],
+            ['email' => 'default@laundry.com'],
             [
-                'name' => 'John Doe',
-                'phone' => '555-0100',
-                'address' => '123 Main St, Anytown, USA',
+                'name' => 'Default Customer',
+                'phone' => '000-0000',
+                'address' => 'Default Address',
                 'user_id' => $staffUser?->id,
                 'customer_type_id' => $individualType?->id,
-                'notes' => 'Regular customer, prefers starch on shirts.',
+                'notes' => 'Default customer for system operations.',
+                'is_default' => true,
             ]
         );
 
-        Customer::firstOrCreate(
-            ['email' => 'acme.corp@example.com'],
-            [
-                'name' => 'Acme Corp',
-                'phone' => '555-0200',
-                'address' => '789 Business Rd, Anytown, USA',
-                'user_id' => $staffUser?->id,
-                'customer_type_id' => $corporateType?->id,
-                'notes' => 'Monthly billing, contact person: Jane Smith.',
-            ]
-        );
 
-        // Create more customers using a factory
-        if (Customer::count() < 10) { // Only create if not many exist
-             Customer::factory()->count(8)
-                ->sequence(
-                    fn ($sequence) => ['customer_type_id' => ($sequence->index % 2 == 0) ? $individualType?->id : $corporateType?->id]
-                )
-                ->create(['user_id' => $staffUser?->id]);
-        }
     }
 }

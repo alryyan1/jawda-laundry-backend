@@ -27,7 +27,17 @@ class NotifyCustomerForOrderStatus {
             // Generate PDF in memory
             $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
             $order->load(['customer', 'user', 'items.serviceOffering']);
-            $settings = ['general_company_name' => config('app_settings.company_name', config('app.name'))];
+            $settings = [
+                'general_company_name' => config('app_settings.company_name', config('app.name')),
+                'general_company_name_ar' => config('app_settings.company_name_ar', 'شاي خدري'),
+                'general_company_address' => config('app_settings.company_address'),
+                'general_company_address_ar' => config('app_settings.company_address_ar', 'مسقط'),
+                'general_company_phone' => config('app_settings.company_phone'),
+                'general_company_phone_ar' => config('app_settings.company_phone_ar', '--'),
+                'general_default_currency_symbol' => config('app_settings.currency_symbol', 'OMR'),
+                'company_logo_url' => config('app_settings.company_logo_url'),
+                'language' => 'en',
+            ];
             $pdf->setOrder($order);
             $pdf->setSettings($settings);
             $pdf->generate();

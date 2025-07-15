@@ -25,10 +25,18 @@ use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WhatsappTemplateController;
+use App\Http\Controllers\Api\RestaurantTableController;
+use App\Http\Controllers\Api\DiningTableController;
+use App\Http\Controllers\Api\TableReservationController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Temporary public routes for testing
+Route::get('/dining-tables', [DiningTableController::class, 'index']);
+Route::get('/dining-tables/statistics', [DiningTableController::class, 'statistics']);
+Route::get('/table-reservations/today', [TableReservationController::class, 'todayReservations']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -69,6 +77,7 @@ Route::delete(
   Route::apiResource('product-types', ProductTypeController::class);
   Route::apiResource('service-actions', ServiceActionController::class);
   Route::apiResource('service-offerings', ServiceOfferingController::class);
+  Route::put('/product-types/{productTypeId}/first-offering-price', [ServiceOfferingController::class, 'updateFirstOfferingPrice']);
   // Add other service-related resources if needed (e.g., PricingRules)
 
   // Admin Management
@@ -103,6 +112,8 @@ Route::delete(
   // Application Settings
   Route::get('/settings', [SettingController::class, 'index']);
   Route::put('/settings', [SettingController::class, 'update']);
+  Route::post('/settings/logo/upload', [SettingController::class, 'uploadLogo']);
+  Route::delete('/settings/logo', [SettingController::class, 'deleteLogo']);
   Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
   
   Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
@@ -113,6 +124,19 @@ Route::delete(
     Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
     Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
     Route::apiResource('customer-types', CustomerTypeController::class);
+    
+    // Restaurant Table Management
+    Route::apiResource('restaurant-tables', RestaurantTableController::class);
+    Route::get('/restaurant-tables/available', [RestaurantTableController::class, 'available']);
+    Route::patch('/restaurant-tables/{restaurantTable}/status', [RestaurantTableController::class, 'updateStatus']);
+    
+    // Dining Table Management (moved to public for testing)
+    Route::patch('/dining-tables/{diningTable}/status', [DiningTableController::class, 'updateStatus']);
+    
+    // Table Reservation Management
+    Route::apiResource('table-reservations', TableReservationController::class);
+    Route::post('/table-reservations/{tableReservation}/assign-order', [TableReservationController::class, 'assignOrder']);
+    
     // This defines GET /product-types/{product_type}/predefined-sizes
  
     // Product Type Management

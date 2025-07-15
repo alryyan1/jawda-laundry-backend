@@ -100,16 +100,16 @@ class PermissionSeeder extends Seeder
         $this->command->info('Delivery role created and permissions assigned.');
 
         // ----------------- ASSIGN ROLES TO DEFAULT USERS -----------------
-        $adminUser = User::where('email', 'admin@laundry.com')->first();
+        $adminUser = User::where('email', 'admin@admin.com')->first();
         if ($adminUser) {
             $adminUser->syncRoles(['admin']);
-            $this->command->info('Assigned "admin" role to admin@laundry.com.');
+            $this->command->info('Assigned "admin" role to admin@admin.com.');
         }
 
-        $staffUser = User::where('email', 'staff@laundry.com')->first();
+        $staffUser = User::where('email', 'staff@staff.com')->first();
         if ($staffUser) {
             $staffUser->syncRoles(['receptionist']);
-            $this->command->info('Assigned "receptionist" role to staff@laundry.com.');
+            $this->command->info('Assigned "receptionist" role to staff@staff.com.');
         }
     }
 }

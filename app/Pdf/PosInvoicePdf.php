@@ -4,6 +4,7 @@ namespace App\Pdf;
 
 use App\Models\Order;
 use TCPDF;
+use Exception;
 
 class PosInvoicePdf extends TCPDF
 {
@@ -25,6 +26,58 @@ class PosInvoicePdf extends TCPDF
         $this->currencySymbol = $settings['general_default_currency_symbol'] ?? '$';
         $this->language = $settings['language'] ?? 'en';
         $this->loadTranslations();
+    }
+
+    /**
+     * Add logo to the PDF if logo URL is provided
+     */
+    private function addLogo()
+    {
+        $logoUrl = $this->settings['company_logo_url'] ?? null;
+        
+        if (!$logoUrl) {
+            return false;
+        }
+
+        try {
+            // Get the current Y position
+            $currentY = $this->GetY();
+            
+            // Calculate logo dimensions (max width 20mm for POS receipt)
+            $maxWidth = 20;
+            $maxHeight = 15;
+            
+            // Get image dimensions
+            $imageInfo = getimagesize($logoUrl);
+            if (!$imageInfo) {
+                return false;
+            }
+            
+            $imageWidth = $imageInfo[0];
+            $imageHeight = $imageInfo[1];
+            
+            // Calculate scaling to fit within max dimensions while maintaining aspect ratio
+            $scaleX = $maxWidth / $imageWidth;
+            $scaleY = $maxHeight / $imageHeight;
+            $scale = min($scaleX, $scaleY);
+            
+            $scaledWidth = $imageWidth * $scale;
+            $scaledHeight = $imageHeight * $scale;
+            
+            // Center the logo horizontally
+            $x = ($this->GetPageWidth() - $scaledWidth) / 2;
+            
+            // Add the logo
+            $this->Image($logoUrl, $x, $currentY, $scaledWidth, $scaledHeight);
+            
+            // Move Y position down to account for logo
+            $this->SetY($currentY + $scaledHeight + 2);
+            
+            return true;
+        } catch (Exception $e) {
+            // Log error or handle gracefully
+            return false;
+        }
     }
 
     private function loadTranslations()
@@ -125,7 +178,14 @@ class PosInvoicePdf extends TCPDF
         $leftPadding = 0;
         $rightPadding = 0;
 
-        // --- Company Header ---
+        // --- Company Header with Logo ---
+        $logoAdded = $this->addLogo();
+        
+        // If logo was added, we don't need extra spacing
+        if (!$logoAdded) {
+            $this->Ln(2);
+        }
+        
         $this->SetFont($this->font, 'B', 14);
         $this->Cell(0, 6, $this->getBilingualText('company_name'), 0, 1, 'C');
         $this->SetFont($this->font, '', 8);

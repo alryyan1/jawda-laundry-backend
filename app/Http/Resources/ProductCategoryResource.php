@@ -18,6 +18,7 @@ class ProductCategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
+            'image_url' => $this->image_url,
             'product_types_count' => $this->whenCounted('productTypes'),
             // 'product_types' => ProductTypeResource::collection($this->whenLoaded('productTypes')), // If needed
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,

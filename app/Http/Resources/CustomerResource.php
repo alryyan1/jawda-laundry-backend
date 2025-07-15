@@ -29,6 +29,7 @@ class CustomerResource extends JsonResource
             'total_orders' => $this->whenCounted('orders'),
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
+            'is_default' => $this->is_default,
             // You can add a link to their orders if needed:
             // 'orders_link' => $this->when(Auth::check(), route('api.orders.index', ['customer_id' => $this->id])),
         ];

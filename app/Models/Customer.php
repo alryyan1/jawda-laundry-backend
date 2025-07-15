@@ -23,6 +23,7 @@ class Customer extends Model
         'address',
         'user_id', // Foreign key for the staff member who created/manages this customer (optional)
         'notes',   // Any additional notes about the customer
+        'is_default', // New field for default customer
     ];
 
     /**
@@ -32,6 +33,7 @@ class Customer extends Model
      */
     protected $casts = [
         // 'date_of_birth' => 'date', // Example if you had such a field
+        'is_default' => 'boolean',
     ];
 
     /**

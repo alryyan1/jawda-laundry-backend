@@ -17,11 +17,17 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'order_number' => $this->order_number,
+            'daily_order_number' => $this->daily_order_number,
             'customer_id' => $this->customer_id,
             'customer' => new CustomerResource($this->whenLoaded('customer')),
+            'table_id' => $this->table_id,
+            'table' => new RestaurantTableResource($this->whenLoaded('table')),
+            'dining_table_id' => $this->dining_table_id,
+            'dining_table' => new DiningTableResource($this->whenLoaded('diningTable')),
             'user_id' => $this->user_id,
             'staff_user' => new UserResource($this->whenLoaded('user')), // Assuming 'user' is the relationship name for staff
             'status' => $this->status,
+            'order_type' => $this->order_type,
             'total_amount' => (float) $this->total_amount,
             'paid_amount' => (float) $this->paid_amount,
             'amount_due' => (float) $this->amount_due, // Accessor defined in Order model

@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class UserResource extends JsonResource
+class RestaurantTableResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -17,14 +17,15 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'username' => $this->username,
-            'email' => $this->email,
-            'role' => $this->role, // Primary display role if you keep it
-            'avatar_url' => $this->avatar_url,
+            'number' => $this->number,
+            'capacity' => $this->capacity,
+            'description' => $this->description,
+            'status' => $this->status,
+            'is_active' => $this->is_active,
+            'is_available' => $this->isAvailable(),
+            'active_orders_count' => $this->whenCounted('activeOrders'),
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            'roles' => $this->getRoleNames(), // Get roles from Spatie, e.g., ["admin", "receptionist"]
-            'permissions' => $this->getAllPermissions()->pluck('name'), // Get all 
         ];
     }
-}
+} 

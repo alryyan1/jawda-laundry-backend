@@ -18,9 +18,13 @@ class Order extends Model
      */
     protected $fillable = [
         'order_number',
+        'daily_order_number',
         'customer_id',
+        'table_id',
+        'dining_table_id',
         'user_id',
         'status',
+        'order_type', // New field for dine-in/take-away/delivery
         'total_amount',
         'paid_amount',
         'payment_method',       // Ensure this is here
@@ -55,6 +59,22 @@ class Order extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Get the table associated with the Order.
+     */
+    public function table()
+    {
+        return $this->belongsTo(RestaurantTable::class, 'table_id');
+    }
+
+    /**
+     * Get the dining table associated with the Order.
+     */
+    public function diningTable()
+    {
+        return $this->belongsTo(DiningTable::class);
     }
 
     /**
@@ -106,5 +126,33 @@ class Order extends Model
     {
         return $this->hasMany(Payment::class);
     }
- 
+
+    /**
+     * Generate the next daily order number for today
+     */
+    public static function generateDailyOrderNumber(): int
+    {
+        $today = now()->format('Y-m-d');
+        
+        // Get the highest daily order number for today
+        $maxDailyNumber = self::whereDate('created_at', $today)
+            ->whereNotNull('daily_order_number')
+            ->max('daily_order_number');
+        
+        return ($maxDailyNumber ?? 0) + 1;
+    }
+
+    /**
+     * Boot method to automatically set daily_order_number when creating
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($order) {
+            if (empty($order->daily_order_number)) {
+                $order->daily_order_number = self::generateDailyOrderNumber();
+            }
+        });
+    }
 }

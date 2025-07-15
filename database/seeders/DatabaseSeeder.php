@@ -20,13 +20,14 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             UserSeeder::class,
-            PermissionSeeder::class,
+            CustomerTypeSeeder::class,      // Before CustomerSeeder
+            CustomerSeeder::class,
+            RestaurantTableSeeder::class,
             ProductCategorySeeder::class,
             ProductTypeSeeder::class,
+            PermissionSeeder::class,
             ServiceActionSeeder::class,
             ServiceOfferingSeeder::class,
-            // CustomerTypeSeeder::class,      // Before CustomerSeeder
-            // CustomerSeeder::class,
             // ProductCategorySeeder::class,   // Before ProductTypeSeeder
             // ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
             // ServiceActionSeeder::class,     // Before ServiceOfferingSeeder

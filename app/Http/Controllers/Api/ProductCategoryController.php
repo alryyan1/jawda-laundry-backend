@@ -42,10 +42,21 @@ class ProductCategoryController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:product_categories,name',
             'description' => 'nullable|string|max:1000',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         try {
-            $category = ProductCategory::create($validatedData);
+            $data = $validatedData;
+            
+            // Handle image upload
+            if ($request->hasFile('image')) {
+                $image = $request->file('image');
+                $imageName = time() . '_' . $image->getClientOriginalName();
+                $image->storeAs('public/product-categories', $imageName);
+                $data['image_url'] = asset('storage/product-categories/' . $imageName);
+            }
+
+            $category = ProductCategory::create($data);
             return new ProductCategoryResource($category);
         } catch (\Exception $e) {
             Log::error("Error creating product category: " . $e->getMessage());
@@ -76,10 +87,35 @@ class ProductCategoryController extends Controller
                 Rule::unique('product_categories')->ignore($productCategory->id),
             ],
             'description' => 'sometimes|nullable|string|max:1000',
+            'image' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        // Log the request data for debugging
+        Log::info('ProductCategory update request', [
+            'category_id' => $productCategory->id,
+            'has_image' => $request->hasFile('image'),
+            'validated_data' => $validatedData,
+            'all_request_data' => $request->all()
         ]);
 
         try {
-            $productCategory->update($validatedData);
+            $data = $validatedData;
+            
+            // Handle image upload
+            if ($request->hasFile('image')) {
+                $image = $request->file('image');
+                $imageName = time() . '_' . $image->getClientOriginalName();
+                $image->storeAs('public/product-categories', $imageName);
+                $data['image_url'] = asset('storage/product-categories/' . $imageName);
+                
+                Log::info('Image uploaded successfully', [
+                    'original_name' => $image->getClientOriginalName(),
+                    'stored_name' => $imageName,
+                    'image_url' => $data['image_url']
+                ]);
+            }
+
+            $productCategory->update($data);
             return new ProductCategoryResource($productCategory);
         } catch (\Exception $e) {
             Log::error("Error updating product category {$productCategory->id}: " . $e->getMessage());

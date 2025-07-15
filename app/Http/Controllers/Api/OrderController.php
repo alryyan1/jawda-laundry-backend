@@ -63,6 +63,8 @@ class OrderController extends Controller
             'items.*.length_meters' => 'nullable|numeric|min:0',
             'items.*.width_meters' => 'nullable|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:1000',
+            'order_type' => 'sometimes|in:in_house,take_away,delivery',
+            'dining_table_id' => 'nullable|exists:dining_tables,id', // Add validation for dining table
         ]);
 
         $customer = Customer::findOrFail($validatedData['customer_id']);
@@ -100,6 +102,8 @@ class OrderController extends Controller
                 'customer_id' => $customer->id,
                 'user_id' => Auth::id(),
                 'status' => 'pending',
+                'order_type' => $validatedData['order_type'] ?? 'in_house',
+                'dining_table_id' => $validatedData['dining_table_id'] ?? null, // Add dining table ID
                 'total_amount' => $orderTotalAmount,
                 'paid_amount' => 0,
                 'payment_status' => 'pending',
@@ -111,7 +115,7 @@ class OrderController extends Controller
             $order->items()->createMany($orderItemsToCreate);
             DB::commit();
 
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             return new OrderResource($order);
 
         } catch (\Exception $e) {
@@ -126,7 +130,7 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
+        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         return new OrderResource($order);
     }
   /**
@@ -142,6 +146,7 @@ class OrderController extends Controller
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
+            'order_type' => 'sometimes|in:in_house,take_away,delivery',
         ]);
         
         $oldStatus = $order->status;
@@ -331,12 +336,13 @@ class OrderController extends Controller
         $pdf->setOrder($order);
         $settings = [
             'general_company_name' => config('app_settings.company_name', config('app.name')),
-            'general_company_name_ar' => config('app_settings.company_name_ar', 'لوندرى برو'),
+            'general_company_name_ar' => config('app_settings.company_name_ar', 'شاي خدري'),
             'general_company_address' => config('app_settings.company_address'),
-            'general_company_address_ar' => config('app_settings.company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة'),
+            'general_company_address_ar' => config('app_settings.company_address_ar', 'مسقط'),
             'general_company_phone' => config('app_settings.company_phone'),
-            'general_company_phone_ar' => config('app_settings.company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧'),
-            'general_default_currency_symbol' => config('app_settings.currency_symbol', '$'),
+            'general_company_phone_ar' => config('app_settings.company_phone_ar', '--'),
+            'general_default_currency_symbol' => config('app_settings.currency_symbol', 'OMR'),
+            'company_logo_url' => config('app_settings.company_logo_url'),
             'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setSettings($settings);
@@ -532,6 +538,11 @@ class OrderController extends Controller
         }
         if ($request->filled('created_date')) {
             $query->whereDate('created_at', $request->created_date);
+        }
+        
+        // Handle today parameter
+        if ($request->boolean('today')) {
+            $query->whereDate('created_at', now()->toDateString());
         }
         return $query;
     }
