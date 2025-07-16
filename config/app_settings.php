@@ -35,7 +35,7 @@ return [
     'whatsapp_country_code' => env('WHATSAPP_COUNTRY_CODE', '968'),
 
     // POS settings
-    'pos_auto_show_pdf' => env('POS_AUTO_SHOW_PDF', true),
-    'pos_show_products_as_list' => env('POS_SHOW_PRODUCTS_AS_LIST', true),
+    'pos_auto_show_pdf' => env('POS_AUTO_SHOW_PDF', false),
+    'pos_show_products_as_list' => env('POS_SHOW_PRODUCTS_AS_LIST', false),
 
 ];

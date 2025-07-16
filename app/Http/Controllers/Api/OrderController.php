@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
+use App\Models\DiningTable;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
@@ -113,6 +114,15 @@ class OrderController extends Controller
             ]);
 
             $order->items()->createMany($orderItemsToCreate);
+            
+            // Update dining table status to occupied if the order has a dining table
+            if ($order->dining_table_id) {
+                $diningTable = DiningTable::find($order->dining_table_id);
+                if ($diningTable) {
+                    $diningTable->update(['status' => 'occupied']);
+                }
+            }
+            
             DB::commit();
 
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
@@ -169,6 +179,14 @@ class OrderController extends Controller
 
         // If status changed, log it and send notification
         if ($oldStatus !== $newStatus) {
+            // Update dining table status to available if order is completed and has a dining table
+            if ($newStatus === 'completed' && $order->dining_table_id) {
+                $diningTable = DiningTable::find($order->dining_table_id);
+                if ($diningTable) {
+                    $diningTable->update(['status' => 'available']);
+                }
+            }
+            
             $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
             $notifier->execute($order);
         }
@@ -178,7 +196,7 @@ class OrderController extends Controller
         }
 
         // Return the fresh resource with all relations
-        return new OrderResource($order->fresh(['customer', 'user', 'items']));
+        return new OrderResource($order->fresh(['customer', 'user', 'items', 'diningTable']));
     }
     /**
      * Update only the status of the specified order and trigger notifications.
@@ -194,9 +212,19 @@ class OrderController extends Controller
             $order->status = $newStatus;
             if ($newStatus === 'completed' && !$order->pickup_date) $order->pickup_date = now();
             $order->save();
+            
+            // Update dining table status to available if order is completed and has a dining table
+            if ($newStatus === 'completed' && $order->dining_table_id) {
+                $diningTable = DiningTable::find($order->dining_table_id);
+                if ($diningTable) {
+                    $diningTable->update(['status' => 'available']);
+                }
+            }
+            
             $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
             $notifier->execute($order); // Call the action to handle notification logic
         }
+        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         return new OrderResource($order);
     }
 
@@ -519,7 +547,7 @@ class OrderController extends Controller
      */
     private function buildOrderQuery(Request $request)
     {
-        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction'])->latest('order_date');
+        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable'])->latest('order_date');
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);

@@ -145,7 +145,8 @@ class PosInvoicePdf extends TCPDF
             ],
             'thank_you' => [
                 'en' => 'Thank you for your business!',
-                'ar' => 'شكراً لتعاملكم معنا!'
+                //reverse the arabic text
+                'ar' => 'معنا تعاملكم شكراً'
             ]
         ];
     }
