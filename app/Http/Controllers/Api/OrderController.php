@@ -14,6 +14,8 @@ use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
+use App\Events\OrderCreated;
+use App\Events\OrderUpdated;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -126,6 +128,10 @@ class OrderController extends Controller
             DB::commit();
 
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+            
+            // Broadcast the order created event
+            event(new OrderCreated($order));
+            
             return new OrderResource($order);
 
         } catch (\Exception $e) {
@@ -143,9 +149,9 @@ class OrderController extends Controller
         $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         return new OrderResource($order);
     }
-  /**
+      /**
      * Update the specified resource in storage.
-     * This now handles updates for notes, due_date, status, and pickup_date.
+     * This now handles updates for notes, due_date, status, pickup_date, and adding items.
      */
     public function update(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
@@ -157,6 +163,13 @@ class OrderController extends Controller
             'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
+            'items' => 'sometimes|array|min:1', // Allow items to be updated
+            'items.*.service_offering_id' => 'required_with:items|exists:service_offerings,id',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
+            'items.*.product_description_custom' => 'nullable|string|max:255',
+            'items.*.length_meters' => 'nullable|numeric|min:0',
+            'items.*.width_meters' => 'nullable|numeric|min:0',
+            'items.*.notes' => 'nullable|string|max:1000',
         ]);
         
         $oldStatus = $order->status;
@@ -173,30 +186,104 @@ class OrderController extends Controller
              $order->pickup_date = null;
         }
 
+        DB::beginTransaction();
+        try {
+            // Handle items update if provided
+            if ($request->has('items')) {
+                $customer = $order->customer;
+                $orderTotalAmount = 0;
+                $orderItemsToCreate = [];
 
-        // Save all changes
-        $order->save();
+                // Process all items (existing + new)
+                foreach ($validatedData['items'] as $itemData) {
+                    $serviceOffering = ServiceOffering::findOrFail($itemData['service_offering_id']);
 
-        // If status changed, log it and send notification
-        if ($oldStatus !== $newStatus) {
-            // Update dining table status to available if order is completed and has a dining table
-            if ($newStatus === 'completed' && $order->dining_table_id) {
-                $diningTable = DiningTable::find($order->dining_table_id);
-                if ($diningTable) {
-                    $diningTable->update(['status' => 'available']);
+                    $priceDetails = $this->pricingService->calculatePrice(
+                        $serviceOffering,
+                        $customer,
+                        $itemData['quantity'],
+                        $itemData['length_meters'] ?? null,
+                        $itemData['width_meters'] ?? null
+                    );
+
+                    $orderItemsToCreate[] = [
+                        'service_offering_id' => $serviceOffering->id,
+                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                        'quantity' => $itemData['quantity'],
+                        'length_meters' => $itemData['length_meters'] ?? null,
+                        'width_meters' => $itemData['width_meters'] ?? null,
+                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
+                        'sub_total' => $priceDetails['sub_total'],
+                        'notes' => $itemData['notes'] ?? null,
+                    ];
+                    $orderTotalAmount += $priceDetails['sub_total'];
                 }
+
+                // Delete existing items and create new ones
+                $order->items()->delete();
+                $order->items()->createMany($orderItemsToCreate);
+                
+                // Update order total
+                $order->total_amount = $orderTotalAmount;
+                
+                $order->logActivity("Order items were updated. New total: " . $orderTotalAmount);
             }
+
+            // Save all changes
+            $order->save();
+
+            // If status changed, log it and send notification
+            if ($oldStatus !== $newStatus) {
+                // Remove all payments when order is cancelled
+                if ($newStatus === 'cancelled') {
+                    $paymentsCount = $order->payments()->count();
+                    if ($paymentsCount > 0) {
+                        $order->payments()->delete();
+                        $order->paid_amount = 0;
+                        $order->payment_status = 'pending';
+                        $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
+                    }
+                }
+                
+                // Update dining table status to available if order is completed and has a dining table
+                if ($newStatus === 'completed' && $order->dining_table_id) {
+                    $diningTable = DiningTable::find($order->dining_table_id);
+                    if ($diningTable) {
+                        $diningTable->update(['status' => 'available']);
+                    }
+                }
+                
+                // Update dining table status to available if order is cancelled and has a dining table
+                if ($newStatus === 'cancelled' && $order->dining_table_id) {
+                    $diningTable = DiningTable::find($order->dining_table_id);
+                    if ($diningTable) {
+                        $diningTable->update(['status' => 'available']);
+                    }
+                }
+                
+                $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
+                $notifier->execute($order);
+            }
+
+            if ($request->has('pickup_date')) {
+                 $order->logActivity("Pickup date was updated.");
+            }
+
+            DB::commit();
+
+            // Return the fresh resource with all relations
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
-            $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
-            $notifier->execute($order);
-        }
+            // Broadcast the order updated event
+            event(new OrderUpdated($order, ['status' => $newStatus]));
+            
+            return new OrderResource($order);
 
-        if ($request->has('pickup_date')) {
-             $order->logActivity("Pickup date was updated.");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error updating order: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            return response()->json(['message' => 'Failed to update order. An internal error occurred.'], 500);
         }
-
-        // Return the fresh resource with all relations
-        return new OrderResource($order->fresh(['customer', 'user', 'items', 'diningTable']));
     }
     /**
      * Update only the status of the specified order and trigger notifications.
@@ -209,22 +296,56 @@ class OrderController extends Controller
         $newStatus = $validated['status'];
 
         if ($oldStatus !== $newStatus) {
-            $order->status = $newStatus;
-            if ($newStatus === 'completed' && !$order->pickup_date) $order->pickup_date = now();
-            $order->save();
-            
-            // Update dining table status to available if order is completed and has a dining table
-            if ($newStatus === 'completed' && $order->dining_table_id) {
-                $diningTable = DiningTable::find($order->dining_table_id);
-                if ($diningTable) {
-                    $diningTable->update(['status' => 'available']);
+            DB::beginTransaction();
+            try {
+                $order->status = $newStatus;
+                if ($newStatus === 'completed' && !$order->pickup_date) $order->pickup_date = now();
+                
+                // Remove all payments when order is cancelled
+                if ($newStatus === 'cancelled') {
+                    $paymentsCount = $order->payments()->count();
+                    if ($paymentsCount > 0) {
+                        $order->payments()->delete();
+                        $order->paid_amount = 0;
+                        $order->payment_status = 'pending';
+                        $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
+                    }
                 }
+                
+                $order->save();
+                
+                // Update dining table status to available if order is completed and has a dining table
+                if ($newStatus === 'completed' && $order->dining_table_id) {
+                    $diningTable = DiningTable::find($order->dining_table_id);
+                    if ($diningTable) {
+                        $diningTable->update(['status' => 'available']);
+                    }
+                }
+                
+                // Update dining table status to available if order is cancelled and has a dining table
+                if ($newStatus === 'cancelled' && $order->dining_table_id) {
+                    $diningTable = DiningTable::find($order->dining_table_id);
+                    if ($diningTable) {
+                        $diningTable->update(['status' => 'available']);
+                    }
+                }
+                
+                $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
+                $notifier->execute($order); // Call the action to handle notification logic
+                
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Error updating order status: " . $e->getMessage());
+                return response()->json(['message' => 'Failed to update order status.'], 500);
             }
-            
-            $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
-            $notifier->execute($order); // Call the action to handle notification logic
         }
+        
         $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
+        
+        // Broadcast the order updated event
+        event(new OrderUpdated($order, ['status' => $newStatus]));
+        
         return new OrderResource($order);
     }
 
@@ -604,25 +725,48 @@ class OrderController extends Controller
         // Get total amount paid
         $totalAmountPaid = $query->sum('paid_amount');
 
-        // Get payment breakdown
-        $paymentBreakdown = $query->join('payments', 'orders.id', '=', 'payments.order_id')
-            ->selectRaw('payments.method, SUM(payments.amount) as total_amount')
-            ->groupBy('payments.method')
-            ->pluck('total_amount', 'method')
-            ->toArray();
-
-        // Ensure all payment methods are present with 0 values
-        $allPaymentMethods = ['cash', 'card', 'online', 'credit'];
-        $paymentBreakdown = array_merge(
-            array_fill_keys($allPaymentMethods, 0),
-            $paymentBreakdown
-        );
+        // Get payment breakdown with detailed information
+        $paymentBreakdown = $this->calculatePaymentBreakdown($query, $totalAmountPaid);
 
         return response()->json([
             'totalOrders' => $totalOrders,
             'totalAmountPaid' => $totalAmountPaid,
             'paymentBreakdown' => $paymentBreakdown,
+            'averagePerOrder' => $totalOrders > 0 ? round($totalAmountPaid / $totalOrders, 2) : 0,
         ]);
+    }
+
+    /**
+     * Calculate detailed payment breakdown with percentages.
+     */
+    private function calculatePaymentBreakdown($query, $totalAmountPaid)
+    {
+        // Get payment breakdown from payments table
+        $paymentData = $query->join('payments', 'orders.id', '=', 'payments.order_id')
+            ->selectRaw('payments.method, SUM(payments.amount) as total_amount')
+            ->groupBy('payments.method')
+            ->get()
+            ->keyBy('method')
+            ->toArray();
+
+        // Define all payment methods
+        $allPaymentMethods = ['cash', 'visa', 'bank_transfer'];
+        
+        // Build detailed breakdown with percentages
+        $detailedBreakdown = [];
+        
+        foreach ($allPaymentMethods as $method) {
+            $amount = isset($paymentData[$method]) ? (float) $paymentData[$method]['total_amount'] : 0;
+            $percentage = $totalAmountPaid > 0 ? round(($amount / $totalAmountPaid) * 100, 1) : 0;
+            
+            $detailedBreakdown[$method] = [
+                'amount' => $amount,
+                'percentage' => $percentage,
+                'method' => $method
+            ];
+        }
+
+        return $detailedBreakdown;
     }
 
  

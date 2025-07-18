@@ -88,6 +88,23 @@ class PaymentController extends Controller
             // Update the order's payment status based on the new total
             if ($order->paid_amount >= $order->total_amount && $order->total_amount > 0) {
                 $order->payment_status = 'paid';
+                
+                // Automatically complete the order if payment is fully paid and order is not already completed
+                if ($order->status !== 'completed' && $order->status !== 'cancelled') {
+                    $oldStatus = $order->status;
+                    $order->status = 'completed';
+                    $order->pickup_date = now();
+                    
+                    // Update dining table status to available if order has a dining table
+                    if ($order->dining_table_id) {
+                        $diningTable = \App\Models\DiningTable::find($order->dining_table_id);
+                        if ($diningTable) {
+                            $diningTable->update(['status' => 'available']);
+                        }
+                    }
+                    
+                    $order->logActivity("Order automatically completed due to full payment. Status changed from '{$oldStatus}' to 'completed'.");
+                }
             } elseif ($order->paid_amount > 0) {
                 $order->payment_status = 'partially_paid';
             } else {
@@ -95,6 +112,12 @@ class PaymentController extends Controller
             }
             
             $order->save();
+            
+            // Broadcast order updated event if status changed
+            if ($order->wasChanged('status')) {
+                event(new \App\Events\OrderUpdated($order, ['status' => $order->status]));
+            }
+            
             DB::commit();
 
             $payment->load('user');

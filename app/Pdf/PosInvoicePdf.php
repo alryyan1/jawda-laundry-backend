@@ -143,6 +143,10 @@ class PosInvoicePdf extends TCPDF
                 'en' => 'Notes',
                 'ar' => 'ملاحظات'
             ],
+            'category' => [
+                'en' => 'Category',
+                'ar' => 'الفئة'
+            ],
             'thank_you' => [
                 'en' => 'Thank you for your business!',
                 //reverse the arabic text
@@ -156,6 +160,30 @@ class PosInvoicePdf extends TCPDF
         $en = $this->translations[$key]['en'] ?? $key;
         $ar = $this->translations[$key]['ar'] ?? $key;
         return $en . ' / ' . $ar;
+    }
+
+    /**
+     * Group order items by category
+     */
+    private function groupItemsByCategory()
+    {
+        $groupedItems = [];
+        
+        foreach ($this->order->items as $item) {
+            $categoryName = $item->serviceOffering->productType->category->name ?? 'Uncategorized';
+            $categoryId = $item->serviceOffering->productType->category->id ?? 0;
+            
+            if (!isset($groupedItems[$categoryId])) {
+                $groupedItems[$categoryId] = [
+                    'name' => $categoryName,
+                    'items' => []
+                ];
+            }
+            
+            $groupedItems[$categoryId]['items'][] = $item;
+        }
+        
+        return $groupedItems;
     }
 
     // We can define a very simple or no header/footer for POS receipts
@@ -225,21 +253,38 @@ class PosInvoicePdf extends TCPDF
         $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
         $this->Ln(1);
 
-        // --- Items Table Body ---
+        // --- Items Table Body (Grouped by Category) ---
         $this->SetFont($this->font, '', 9);
-        foreach ($this->order->items as $item) {
-            // Use MultiCell for the item name to allow wrapping
-            $this->MultiCell(35, 4, $item->serviceOffering->display_name, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
-            $currentY = $this->GetY();
-            $this->SetY($currentY - 4); // Move back up to align other cells
+        $groupedItems = $this->groupItemsByCategory();
+        
+        foreach ($groupedItems as $categoryId => $categoryData) {
+            // Category Header
+            $this->SetFont($this->font, 'B', 9);
+            $this->SetTextColor(100, 100, 100); // Gray color for category
+            $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
+            $this->SetTextColor(0, 0, 0); // Reset to black
+            $this->SetFont($this->font, '', 9);
+            $this->Ln(1);
+            
+            // Items in this category
+            foreach ($categoryData['items'] as $item) {
+                // Use MultiCell for the item name to allow wrapping
+                $this->MultiCell(35, 4, $item->serviceOffering->display_name, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+                $currentY = $this->GetY();
+                $this->SetY($currentY - 4); // Move back up to align other cells
 
-            $this->SetX(39); // Position for Qty
-            $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
-            $this->SetX(47); // Position for Price
-            $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 0, 0, 'R');
-            $this->SetX(59); // Position for Total
-            $this->Cell(14, 4, number_format($item->sub_total, 2), 0, 1, 'R');
-            // $this->Line(5, $this->GetY(), 64, $this->GetY());
+                $this->SetX(39); // Position for Qty
+                $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
+                $this->SetX(47); // Position for Price
+                $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 0, 0, 'R');
+                $this->SetX(59); // Position for Total
+                $this->Cell(14, 4, number_format($item->sub_total, 2), 0, 1, 'R');
+            }
+            
+            // Add spacing between categories (except for the last category)
+            if ($categoryId !== array_key_last($groupedItems)) {
+                $this->Ln(2);
+            }
         }
 
         $this->Ln(1);

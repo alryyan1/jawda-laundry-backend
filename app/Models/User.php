@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 // use Illuminate\Database\Eloquent\SoftDeletes; // Optional: If users can be soft-deleted
 
@@ -64,6 +65,48 @@ class User extends Authenticatable
     public function managedCustomers()
     {
         return $this->hasMany(Customer::class, 'user_id');
+    }
+
+    /**
+     * Get navigation items that this user has explicit permissions for.
+     */
+    public function navigationItems(): BelongsToMany
+    {
+        return $this->belongsToMany(NavigationItem::class, 'user_navigation_permissions')
+                    ->withPivot('is_granted')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get all accessible navigation items for this user.
+     */
+    public function getAccessibleNavigationItems(): array
+    {
+        $allNavigationItems = NavigationItem::active()->topLevel()->ordered()->with('activeChildren')->get();
+        $accessibleItems = [];
+
+        foreach ($allNavigationItems as $item) {
+            if ($item->userCanAccess($this)) {
+                $accessibleItem = $item->toArray();
+                
+                // Filter children that user can access
+                if ($item->activeChildren->isNotEmpty()) {
+                    $accessibleChildren = [];
+                    foreach ($item->activeChildren as $child) {
+                        if ($child->userCanAccess($this)) {
+                            $accessibleChildren[] = $child->toArray();
+                        }
+                    }
+                    $accessibleItem['children'] = $accessibleChildren;
+                } else {
+                    $accessibleItem['children'] = [];
+                }
+                
+                $accessibleItems[] = $accessibleItem;
+            }
+        }
+
+        return $accessibleItems;
     }
 
     // Example role check (simple)

@@ -10,6 +10,8 @@ use App\Models\Purchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Pdf\OrdersReportPdf;
 
 class ReportController extends Controller
 {
@@ -17,7 +19,8 @@ class ReportController extends Controller
     {
         // Protect all report methods with a specific permission.
         // You can get more granular later (e.g., report:view-financial vs. report:view-operational).
-        $this->middleware('can:report:view-financial');
+        // Exclude PDF methods from permission checks to allow public access
+        $this->middleware('can:report:view-financial')->except(['exportOrdersReportPdf', 'viewOrdersReportPdf']);
     }
 
     /**
@@ -368,5 +371,148 @@ class ReportController extends Controller
                 'daily_data' => $reportData,
             ]
         ]);
+    }
+
+    /**
+     * Get orders report data
+     */
+    public function getOrdersReport(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        try {
+            $orders = Order::with([
+                'customer',
+                'user',
+                'items.serviceOffering.productType.category',
+                'items.serviceOffering.serviceAction',
+                'payments'
+            ])
+            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+            ->orderBy('order_date', 'desc')
+            ->get();
+
+            // Calculate summary statistics
+            $totalOrders = $orders->count();
+            $totalAmount = $orders->sum('paid_amount');
+            $averageOrderValue = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
+
+            return response()->json([
+                'orders' => OrderResource::collection($orders),
+                'summary' => [
+                    'total_orders' => $totalOrders,
+                    'total_amount' => $totalAmount,
+                    'average_order_value' => $averageOrderValue,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error generating orders report: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to generate report'], 500);
+        }
+    }
+
+    /**
+     * Export orders report as PDF
+     */
+    public function exportOrdersReportPdf(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        try {
+            $orders = Order::with([
+                'customer',
+                'user',
+                'items.serviceOffering.productType.category',
+                'items.serviceOffering.serviceAction',
+                'payments'
+            ])
+            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+            ->orderBy('order_date', 'desc')
+            ->get();
+
+            // Generate PDF
+            $pdf = new OrdersReportPdf();
+            $pdf->setOrders($orders);
+            $pdf->setDateRange($dateFrom, $dateTo);
+            $pdf->setSettings([
+                'company_name' => config('app_settings.company_name', config('app.name')),
+                'company_address' => config('app_settings.company_address'),
+                'currency_symbol' => config('app_settings.currency_symbol', '$'),
+            ]);
+
+            $pdfContent = $pdf->generate();
+
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="orders-report-' . $dateFrom . '-to-' . $dateTo . '.pdf"'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting orders report PDF: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to export report'], 500);
+        }
+    }
+
+    /**
+     * View orders report as PDF (inline)
+     */
+    public function viewOrdersReportPdf(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        try {
+            $orders = Order::with([
+                'customer',
+                'user',
+                'items.serviceOffering.productType.category',
+                'items.serviceOffering.serviceAction',
+                'payments'
+            ])
+            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+            ->orderBy('order_date', 'desc')
+            ->get();
+
+            // Generate PDF
+            $pdf = new OrdersReportPdf();
+            $pdf->setOrders($orders);
+            $pdf->setDateRange($dateFrom, $dateTo);
+            $pdf->setSettings([
+                'company_name' => config('app_settings.company_name', config('app.name')),
+                'company_address' => config('app_settings.company_address'),
+                'currency_symbol' => config('app_settings.currency_symbol', '$'),
+            ]);
+
+            $pdfContent = $pdf->generate();
+
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="orders-report-' . $dateFrom . '-to-' . $dateTo . '.pdf"'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error viewing orders report PDF: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to view report'], 500);
+        }
     }
 }

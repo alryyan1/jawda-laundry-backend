@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\WhatsappTemplateController;
 use App\Http\Controllers\Api\RestaurantTableController;
 use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
+use App\Http\Controllers\Api\NavigationController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -37,6 +38,14 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/dining-tables', [DiningTableController::class, 'index']);
 Route::get('/dining-tables/statistics', [DiningTableController::class, 'statistics']);
 Route::get('/table-reservations/today', [TableReservationController::class, 'todayReservations']);
+
+// Public download routes (no authentication required)
+Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
+Route::get('/orders/{order}/pos-invoice-pdf', [OrderController::class, 'downloadPosInvoice']);
+
+// Public report PDF routes (no authentication required)
+Route::get('/reports/orders/pdf', [ReportController::class, 'exportOrdersReportPdf']);
+Route::get('/reports/orders/pdf/view', [ReportController::class, 'viewOrdersReportPdf']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -88,9 +97,6 @@ Route::delete(
   // Product Type Management
   Route::get('/product-types/{productType}/available-service-actions', [ProductTypeController::class, 'availableServiceActions']);
   Route::post('/product-types/{productType}/create-all-service-offerings', [ProductTypeController::class, 'createAllOfferings']);
-  
-  // Order Management
-  Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
   
   // Expense Management
   Route::get('/expenses/categories', [ExpenseCategoryController::class, 'index']);
@@ -144,6 +150,7 @@ Route::delete(
     
     // Dashboard endpoints
     Route::get('/dashboard/orders-trend', [DashboardController::class, 'ordersTrend']);
+    Route::get('/dashboard/order-items-trend', [DashboardController::class, 'orderItemsTrend']);
     Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
     Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
@@ -157,6 +164,18 @@ Route::delete(
     Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
     Route::get('/reports/daily-revenue', [ReportController::class, 'dailyRevenueReport']);
     Route::get('/reports/daily-costs', [ReportController::class, 'dailyCostsReport']);
+    
+    // Navigation Management Routes
+    Route::get('/navigation/user', [NavigationController::class, 'getUserNavigation']);
+    Route::apiResource('navigation', NavigationController::class)->except(['show']);
+    Route::put('/navigation/order', [NavigationController::class, 'updateOrder']);
+    Route::get('/users/{user}/navigation-permissions', [NavigationController::class, 'getUserPermissions']);
+    Route::put('/users/{user}/navigation-permissions', [NavigationController::class, 'updateUserPermissions']);
 
 
   });
+
+// Reports routes (protected)
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/reports/orders', [ReportController::class, 'getOrdersReport']);
+});

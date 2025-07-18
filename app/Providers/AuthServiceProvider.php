@@ -6,6 +6,8 @@ namespace App\Providers;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use App\Models\ProductType;
 use App\Policies\ProductTypePolicy;
+use App\Models\NavigationItem;
+use App\Policies\NavigationItemPolicy;
 use Illuminate\Support\Facades\Gate;
 
 class AuthServiceProvider extends ServiceProvider
@@ -17,6 +19,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         ProductType::class => ProductTypePolicy::class,
+        NavigationItem::class => NavigationItemPolicy::class,
     ];
 
     /**

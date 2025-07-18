@@ -21,6 +21,7 @@ class DashboardController extends Controller
         $completedTodayOrders = Order::where('status', 'completed')
                                     ->whereDate('updated_at', Carbon::today()) // Assuming updated_at reflects completion time
                                     ->count();
+        $cancelledOrders = Order::where('status', 'cancelled')->count();
         $totalActiveCustomers = Customer::count(); // Define "active" if needed, e.g., with recent orders
 
         // Example: Revenue this month (sum of total_amount for completed orders)
@@ -35,6 +36,7 @@ class DashboardController extends Controller
             'processingOrders' => $processingOrders,
             'readyForPickupOrders' => $readyForPickupOrders,
             'completedTodayOrders' => $completedTodayOrders,
+            'cancelledOrders' => $cancelledOrders,
             'totalActiveCustomers' => $totalActiveCustomers,
             'monthlyRevenue' => (float) $monthlyRevenue,
         ]);
@@ -79,6 +81,35 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json(['data' => $breakdown]);
+    }
+
+    public function orderItemsTrend(Request $request)
+    {
+        $days = $request->get('days', 7);
+        $startDate = Carbon::now()->subDays($days - 1)->startOfDay();
+
+        $trend = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->selectRaw('DATE(orders.created_at) as date, COUNT(*) as count, SUM(order_items.quantity) as totalQuantity')
+            ->where('orders.created_at', '>=', $startDate)
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->keyBy('date'); // Key by date for easy lookup
+
+        // Fill in missing dates with 0 count
+        $dates = collect();
+        for ($i = 0; $i < $days; $i++) {
+            $date = $startDate->copy()->addDays($i)->format('Y-m-d');
+            $dateData = $trend->get($date, ['count' => 0, 'totalQuantity' => 0]);
+            $dates->put($date, [
+                'date' => $date,
+                'count' => $dateData['count'],
+                'totalQuantity' => (int) $dateData['totalQuantity']
+            ]);
+        }
+
+        return response()->json(['data' => $dates->values()]);
     }
      /**
      * Provides a summary of statistics for the current day,

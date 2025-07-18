@@ -24,6 +24,10 @@ class PermissionSeeder extends Seeder
             'dashboard:view',
             'admin:view-menu', // To see the main "Administration" menu
 
+            // Navigation Management
+            'navigation:view', 'navigation:create', 'navigation:update', 'navigation:delete',
+            'user-navigation:manage', 'user-navigation:view',
+
             // User & Role Management
             'user:list', 'user:create', 'user:update', 'user:delete', 'user:assign-roles',
             'role:list', 'role:create', 'role:update', 'role:delete', 'permission:list',
