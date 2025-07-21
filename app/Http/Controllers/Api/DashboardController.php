@@ -101,11 +101,11 @@ class DashboardController extends Controller
         $dates = collect();
         for ($i = 0; $i < $days; $i++) {
             $date = $startDate->copy()->addDays($i)->format('Y-m-d');
-            $dateData = $trend->get($date, ['count' => 0, 'totalQuantity' => 0]);
+            $dateData = $trend->get($date, (object)['count' => 0, 'totalQuantity' => 0]);
             $dates->put($date, [
                 'date' => $date,
-                'count' => $dateData['count'],
-                'totalQuantity' => (int) $dateData['totalQuantity']
+                'count' => $dateData->count,
+                'totalQuantity' => (int) $dateData->totalQuantity
             ]);
         }
 

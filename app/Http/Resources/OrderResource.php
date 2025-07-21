@@ -42,7 +42,7 @@ class OrderResource extends JsonResource
             'payments' => PaymentResource::collection($this->whenLoaded('payments')), // Collection of PaymentResource
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            //  'user'=>new UserResource($this->load('user')),
+            'user' => new UserResource($this->whenLoaded('user')), // Fixed: use whenLoaded instead of load
                
             // أضف هذا الحقل. سيتم تضمينه فقط إذا كان موجودًا في كائن الطلب.
             'overdue_days' => $this->when(isset($this->overdue_days), (int) $this->overdue_days),

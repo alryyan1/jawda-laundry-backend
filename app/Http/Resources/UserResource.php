@@ -23,8 +23,8 @@ class UserResource extends JsonResource
             'avatar_url' => $this->avatar_url,
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            'roles' => $this->getRoleNames(), // Get roles from Spatie, e.g., ["admin", "receptionist"]
-            'permissions' => $this->getAllPermissions()->pluck('name'), // Get all 
+            'roles' => $this->roles ? $this->roles->pluck('name') : [], // Safe check for roles
+            'permissions' => $this->resource->getAllPermissions() ? $this->resource->getAllPermissions()->pluck('name') : [], // Access model via resource property
         ];
     }
 }

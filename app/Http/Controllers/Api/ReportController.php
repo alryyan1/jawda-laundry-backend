@@ -416,7 +416,7 @@ class ReportController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Error generating orders report: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to generate report'], 500);
+            return response()->json(['message' => 'Failed to generate report', 'error' => $e->getMessage()], 500);
         }
     }
 
