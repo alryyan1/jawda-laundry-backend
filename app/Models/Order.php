@@ -134,12 +134,12 @@ class Order extends Model
     {
         $today = now()->format('Y-m-d');
         
-        // Get the highest daily order number for today
-        $maxDailyNumber = self::whereDate('created_at', $today)
+        // Count the number of orders for today
+        $orderCount = self::whereDate('created_at', $today)
             ->whereNotNull('daily_order_number')
-            ->max('daily_order_number');
+            ->count();
         
-        return ($maxDailyNumber ?? 0) + 1;
+        return $orderCount + 1;
     }
 
     /**

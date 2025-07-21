@@ -131,6 +131,7 @@ class OrderController extends Controller
             
             // Broadcast the order created event
             event(new OrderCreated($order));
+            Log::info('OrderCreated event fired', ['order_id' => $order->id]);
             
             return new OrderResource($order);
 
@@ -276,6 +277,7 @@ class OrderController extends Controller
             
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['status' => $newStatus]));
+            Log::info('OrderUpdated event fired', ['order_id' => $order->id, 'new_status' => $newStatus]);
             
             return new OrderResource($order);
 
@@ -668,7 +670,7 @@ class OrderController extends Controller
      */
     private function buildOrderQuery(Request $request)
     {
-        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable'])->latest('order_date');
+        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable'])->orderBy('id', 'desc');
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);

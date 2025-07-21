@@ -118,8 +118,8 @@ class InvoicePdf extends TCPDF
 
             $this->MultiCell(90, $cellHeight, $description, 1, 'L', $fill, 0);
             $this->MultiCell(25, $cellHeight, $item->quantity, 1, 'C', $fill, 0, '', '', true, 0, false, true, $cellHeight, 'M');
-            $this->MultiCell(30, $cellHeight, number_format($item->calculated_price_per_unit_item, 2), 1, 'R', $fill, 0, '', '', true, 0, false, true, $cellHeight, 'M');
-            $this->MultiCell(35, $cellHeight, number_format($item->sub_total, 2), 1, 'R', $fill, 1, '', '', true, 0, false, true, $cellHeight, 'M');
+            $this->MultiCell(30, $cellHeight, number_format($item->calculated_price_per_unit_item, 3), 1, 'R', $fill, 0, '', '', true, 0, false, true, $cellHeight, 'M');
+            $this->MultiCell(35, $cellHeight, number_format($item->sub_total, 3), 1, 'R', $fill, 1, '', '', true, 0, false, true, $cellHeight, 'M');
             $fill = !$fill;
         }
 
@@ -128,7 +128,7 @@ class InvoicePdf extends TCPDF
         $this->SetFont('arial', '', 10);
         $this->SetX(100); // Move to the right side of the page
         $this->Cell(45, 7, 'Subtotal', 0, 0, 'R');
-        $this->Cell(45, 7, number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(45, 7, number_format($this->order->total_amount, 3), 0, 1, 'R');
 
         // Add Tax/Discount rows here if needed
         // $this->SetX(100);
@@ -138,17 +138,17 @@ class InvoicePdf extends TCPDF
         $this->SetFont('arial', 'B', 11);
         $this->SetX(100);
         $this->Cell(45, 7, 'Total', 0, 0, 'R');
-        $this->Cell(45, 7, number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(45, 7, number_format($this->order->total_amount, 3), 0, 1, 'R');
 
         $this->SetFont('arial', '', 10);
         $this->SetX(100);
         $this->Cell(45, 7, 'Amount Paid', 0, 0, 'R');
-        $this->Cell(45, 7, number_format($this->order->paid_amount, 2), 0, 1, 'R');
+        $this->Cell(45, 7, number_format($this->order->paid_amount, 3), 0, 1, 'R');
 
         $this->SetFont('arial', 'B', 11);
         $this->SetX(100);
         $this->Cell(45, 7, 'Amount Due', 0, 0, 'R');
-        $this->Cell(45, 7, number_format($this->order->amount_due, 2), 0, 1, 'R');
+        $this->Cell(45, 7, number_format($this->order->amount_due, 3), 0, 1, 'R');
 
         // --- Notes Section ---
         if ($this->order->notes) {

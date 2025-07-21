@@ -59,8 +59,8 @@ class NotifyCustomerForOrderStatus {
             '{customer_name}' => $order->customer->name,
             '{order_number}' => $order->order_number,
             '{order_status}' => ucwords(str_replace('_', ' ', $order->status)),
-            '{total_amount}' => number_format($order->total_amount, 2),
-            '{amount_due}' => number_format($order->amount_due, 2),
+            '{total_amount}' => number_format($order->total_amount, 3),
+            '{amount_due}' => number_format($order->amount_due, 3),
             '{company_name}' => config('app_settings.company_name', config('app.name')),
         ];
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);

@@ -67,7 +67,7 @@ class PricingService
 
         return [
             'calculated_price_per_unit_item' => $pricePerUnit,
-            'sub_total' => round($subTotal, 2),
+            'sub_total' => round($subTotal, 3),
             'applied_unit' => $appliedUnit,
             'strategy_applied' => $isDimensionBased ? 'dimension_based' : 'fixed',
         ];

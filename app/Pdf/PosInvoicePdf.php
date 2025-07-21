@@ -276,9 +276,9 @@ class PosInvoicePdf extends TCPDF
                 $this->SetX(39); // Position for Qty
                 $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
                 $this->SetX(47); // Position for Price
-                $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 2), 0, 0, 'R');
+                $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 3), 0, 0, 'R');
                 $this->SetX(59); // Position for Total
-                $this->Cell(14, 4, number_format($item->sub_total, 2), 0, 1, 'R');
+                $this->Cell(14, 4, number_format($item->sub_total, 3), 0, 1, 'R');
             }
             
             // Add spacing between categories (except for the last category)
@@ -295,21 +295,21 @@ class PosInvoicePdf extends TCPDF
         // --- Summary Section ---
         $this->SetFont($this->font, '', 10);
         $this->Cell(40, 6, $this->getBilingualText('subtotal') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(20, 6, number_format($this->order->total_amount, 3), 0, 1, 'R');
         
         // Add Tax/Discount here if needed
 
         $this->SetFont($this->font, 'B', 12);
         $this->Cell(40, 8, $this->getBilingualText('total') . ':', 0, 0, 'R');
-        $this->Cell(20, 8, $this->currencySymbol . number_format($this->order->total_amount, 2), 0, 1, 'R');
+        $this->Cell(20, 8, $this->currencySymbol . number_format($this->order->total_amount, 3), 0, 1, 'R');
         
         $this->SetFont($this->font, '', 10);
         $this->Cell(40, 6, $this->getBilingualText('amount_paid') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->paid_amount, 2), 0, 1, 'R');
+        $this->Cell(20, 6, number_format($this->order->paid_amount, 3), 0, 1, 'R');
         
         $this->SetFont('arial', 'B', 10);
         $this->Cell(40, 6, $this->getBilingualText('amount_due') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->amount_due, 2), 0, 1, 'R');
+        $this->Cell(20, 6, number_format($this->order->amount_due, 3), 0, 1, 'R');
         
         $this->Ln(5);
 

@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             ServiceActionSeeder::class,
             ServiceOfferingSeeder::class,
+            NavigationItemSeeder::class,
             // ProductCategorySeeder::class,   // Before ProductTypeSeeder
             // ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
             // ServiceActionSeeder::class,     // Before ServiceOfferingSeeder

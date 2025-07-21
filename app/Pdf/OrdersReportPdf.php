@@ -66,10 +66,10 @@ class OrdersReportPdf extends TCPDF
         $this->Cell(0, 6, $totalOrders, 0, 1);
         
         $this->Cell(40, 6, 'Total Amount:', 0, 0);
-        $this->Cell(0, 6, number_format($totalAmount, 2), 0, 1);
+        $this->Cell(0, 6, number_format($totalAmount, 3), 0, 1);
         
         $this->Cell(40, 6, 'Average Order:', 0, 0);
-        $this->Cell(0, 6, number_format($averageOrderValue, 2), 0, 1);
+        $this->Cell(0, 6, number_format($averageOrderValue, 3), 0, 1);
         
         $this->Ln(10);
 
@@ -104,7 +104,7 @@ class OrdersReportPdf extends TCPDF
 
             $orderNumber = $order->order_number;
             $orderDate = $order->order_date ? date('m/d/Y H:i', strtotime($order->order_date)) : '-';
-            $amount = number_format($order->paid_amount, 2);
+            $amount = number_format($order->paid_amount, 3);
             $user = $order->user ? $order->user->name : '-';
             $status = ucfirst($order->status);
 
