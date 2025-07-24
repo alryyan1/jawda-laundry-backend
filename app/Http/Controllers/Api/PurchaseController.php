@@ -10,11 +10,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use App\Services\InventoryService;
+use App\Models\InventoryItem;
 
 class PurchaseController extends Controller
 {
-    public function __construct()
+    protected InventoryService $inventoryService;
+
+    public function __construct(InventoryService $inventoryService)
     {
+        $this->inventoryService = $inventoryService;
         $this->middleware('can:purchase:list')->only('index');
         $this->middleware('can:purchase:create')->only('store');
         $this->middleware('can:purchase:update')->only('update');
@@ -35,7 +40,12 @@ class PurchaseController extends Controller
         if ($request->filled('supplier_id')) {
             $query->where('supplier_id', $request->supplier_id);
         }
-        // Add more filters as needed
+        if ($request->filled('date_from')) {
+            $query->where('purchase_date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('purchase_date', '<=', $request->date_to);
+        }
 
         $purchases = $query->paginate($request->get('per_page', 15));
         return PurchaseResource::collection($purchases);
@@ -53,7 +63,7 @@ class PurchaseController extends Controller
             'purchase_date' => 'required|date_format:Y-m-d',
             'notes' => 'nullable|string|max:2000',
             'items' => 'required|array|min:1',
-            'items.*.item_name' => 'required|string|max:255',
+            'items.*.product_type_id' => 'required|integer|exists:product_types,id',
             'items.*.description' => 'nullable|string|max:1000',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit' => 'nullable|string|max:50',
@@ -85,9 +95,49 @@ class PurchaseController extends Controller
 
             $purchase->items()->createMany($itemsToCreate);
 
+            // Update inventory for each purchased item
+            $inventoryWarnings = [];
+            foreach ($validatedData['items'] as $item) {
+                try {
+                    // Find or create inventory item for this product type
+                    $inventoryItem = $this->findOrCreateInventoryItem(
+                        $item['product_type_id'], 
+                        $validatedData['supplier_id']
+                    );
+
+                    // Add stock using the inventory service
+                    $this->inventoryService->addStock(
+                        $inventoryItem->id,
+                        $item['quantity'],
+                        $item['unit_price'],
+                        'purchase',
+                        $purchase->id,
+                        "Purchase #{$purchase->reference_number} - Added {$item['quantity']} units"
+                    );
+
+                } catch (\Exception $e) {
+                    $warning = "Failed to update inventory for product type {$item['product_type_id']}: " . $e->getMessage();
+                    Log::warning($warning);
+                    $inventoryWarnings[] = $warning;
+                    // Continue with other items even if one fails
+                }
+            }
+
             DB::commit();
             $purchase->load(['supplier', 'user', 'items']);
-            return new PurchaseResource($purchase);
+            
+            $response = new PurchaseResource($purchase);
+            
+            // Add inventory warnings to response if any
+            if (!empty($inventoryWarnings)) {
+                return response()->json([
+                    'data' => $response,
+                    'warnings' => $inventoryWarnings,
+                    'message' => 'Purchase created successfully with some inventory warnings.'
+                ]);
+            }
+            
+            return $response;
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -151,5 +201,34 @@ class PurchaseController extends Controller
             Log::error("Error deleting purchase {$purchase->id}: " . $e->getMessage());
             return response()->json(['message' => 'Failed to delete purchase.'], 500);
         }
+    }
+
+    /**
+     * Find or create an inventory item for a given product type
+     */
+    private function findOrCreateInventoryItem($productTypeId, $supplierId = null)
+    {
+        // Try to find existing active inventory item for this product type
+        $inventoryItem = InventoryItem::where('product_type_id', $productTypeId)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$inventoryItem) {
+            // Create new inventory item if none exists
+            $inventoryItem = InventoryItem::create([
+                'product_type_id' => $productTypeId,
+                'sku' => 'AUTO-' . $productTypeId . '-' . time(),
+                'description' => 'Auto-created from purchase',
+                'unit' => 'pcs', // Default unit, can be updated later
+                'min_stock_level' => 0,
+                'max_stock_level' => 1000, // Default max level
+                'current_stock' => 0,
+                'cost_per_unit' => 0,
+                'supplier_id' => $supplierId,
+                'is_active' => true
+            ]);
+        }
+
+        return $inventoryItem;
     }
 }

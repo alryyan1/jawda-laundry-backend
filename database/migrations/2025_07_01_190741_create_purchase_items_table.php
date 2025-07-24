@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('purchase_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_id')->constrained('purchases')->onDelete('cascade');
-            $table->string('item_name'); // e.g., "Tide Professional Detergent"
+            $table->foreignId('product_type_id')->constrained('product_types')->onDelete('restrict'); // replaces item_name
             $table->text('description')->nullable();
             $table->integer('quantity');
             $table->string('unit')->nullable()->comment('e.g., bottle, box, kg');

@@ -69,8 +69,9 @@ class TestSystemSeeder extends Seeder
                         $qty = rand(1, 20);
                         $price = fake()->randomFloat(2, 5, 100);
                         $subTotal = $qty * $price;
+                        $productTypeId = \App\Models\ProductType::inRandomOrder()->value('id');
                         $itemsData[] = [
-                            'item_name' => fake()->words(rand(2,4), true),
+                            'product_type_id' => $productTypeId,
                             'quantity' => $qty,
                             'unit_price' => $price,
                             'sub_total' => $subTotal,

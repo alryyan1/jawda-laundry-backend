@@ -7,12 +7,14 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 use App\Models\DiningTable;
+use App\Models\InventoryTransaction;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
+use App\Services\InventoryService;
 use App\Actions\NotifyCustomerForOrderStatus;
 use App\Events\OrderCreated;
 use App\Events\OrderUpdated;
@@ -22,15 +24,18 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
+use App\Models\InventoryItem; // Added this import for InventoryItem
 
 class OrderController extends Controller
 {
     protected PricingService $pricingService;
+    protected InventoryService $inventoryService;
 
-    public function __construct(PricingService $pricingService)
+    public function __construct(PricingService $pricingService, InventoryService $inventoryService)
     {
         // Use Laravel's service container to automatically inject the PricingService
         $this->pricingService = $pricingService;
+        $this->inventoryService = $inventoryService;
 
         // Apply Spatie permissions middleware
         $this->middleware('can:order:list')->only('index');
@@ -73,6 +78,7 @@ class OrderController extends Controller
         $customer = Customer::findOrFail($validatedData['customer_id']);
         $orderTotalAmount = 0;
         $orderItemsToCreate = [];
+        $warnings = []; // Array to collect warnings
 
         DB::beginTransaction();
         try {
@@ -117,6 +123,56 @@ class OrderController extends Controller
 
             $order->items()->createMany($orderItemsToCreate);
             
+            // Deduct inventory for each order item
+            foreach ($orderItemsToCreate as $itemData) {
+                $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
+                $productType = $serviceOffering->productType;
+                
+                if (!$productType) {
+                    $warning = "Product type not found for service offering {$serviceOffering->id}";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                // Find inventory item for this product type (only one per product type)
+                $inventoryItem = InventoryItem::where('product_type_id', $productType->id)
+                    ->where('is_active', true)
+                    ->first();
+                
+                if (!$inventoryItem) {
+                    $warning = "No active inventory item found for product type {$productType->name}";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                $quantityToDeduct = $itemData['quantity']; // Direct quantity from order
+                
+                // Skip if not enough stock
+                if ($inventoryItem->current_stock < $quantityToDeduct) {
+                    $warning = "Insufficient stock for {$productType->name}. Available: {$inventoryItem->current_stock}, Needed: {$quantityToDeduct}";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                try {
+                    $this->inventoryService->removeStock(
+                        $inventoryItem->id,
+                        $quantityToDeduct,
+                        'order',
+                        $order->id,
+                        "Used for order #{$order->order_number} - {$productType->name} (Qty: {$itemData['quantity']})"
+                    );
+                } catch (\Exception $e) {
+                    $warning = "Failed to deduct inventory for {$productType->name}: " . $e->getMessage();
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    // Continue with other items even if one fails
+                }
+            }
+            
             // Update dining table status to occupied if the order has a dining table
             if ($order->dining_table_id) {
                 $diningTable = DiningTable::find($order->dining_table_id);
@@ -133,12 +189,22 @@ class OrderController extends Controller
             event(new OrderCreated($order));
             Log::info('OrderCreated event fired', ['order_id' => $order->id]);
             
-            return new OrderResource($order);
+            // Return order with warnings if any
+            $response = new OrderResource($order);
+            if (!empty($warnings)) {
+                return response()->json([
+                    'order' => $response,
+                    'warnings' => $warnings,
+                    'message' => 'Order created successfully with some warnings.'
+                ]);
+            }
+            
+            return $response;
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error creating order: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
-            return response()->json(['message' => 'Failed to create order. An internal error occurred.'], 500);
+            return response()->json(['message' => 'Failed to create order. An internal error occurred.' . $e->getMessage()], 500);
         }
     }
 
@@ -176,6 +242,7 @@ class OrderController extends Controller
         $oldStatus = $order->status;
         $order->fill($validatedData); // Fill all validated data
         $newStatus = $order->status;
+        $warnings = []; // Array to collect warnings
 
         // If status changed to 'completed' and no pickup date was explicitly provided, set it to now.
         if ($oldStatus !== 'completed' && $newStatus === 'completed' && !$request->has('pickup_date')) {
@@ -262,6 +329,12 @@ class OrderController extends Controller
                     }
                 }
                 
+                // Create inventory transactions when order is completed
+                if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+                    $order->load(['items.serviceOffering.productType']);
+                    $this->createInventoryTransactionsForOrder($order);
+                }
+                
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order);
             }
@@ -279,7 +352,17 @@ class OrderController extends Controller
             event(new OrderUpdated($order, ['status' => $newStatus]));
             Log::info('OrderUpdated event fired', ['order_id' => $order->id, 'new_status' => $newStatus]);
             
-            return new OrderResource($order);
+            // Return order with warnings if any
+            $response = new OrderResource($order);
+            if (!empty($warnings)) {
+                return response()->json([
+                    'order' => $response,
+                    'warnings' => $warnings,
+                    'message' => 'Order updated successfully with some warnings.'
+                ]);
+            }
+            
+            return $response;
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -296,6 +379,7 @@ class OrderController extends Controller
         $validated = $request->validate(['status' => ['required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])]]);
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
+        $warnings = []; // Array to collect warnings
 
         if ($oldStatus !== $newStatus) {
             DB::beginTransaction();
@@ -332,6 +416,12 @@ class OrderController extends Controller
                     }
                 }
                 
+                // Create inventory transactions when order is completed
+                if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+                    $order->load(['items.serviceOffering.productType']);
+                    $this->createInventoryTransactionsForOrder($order);
+                }
+                
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order); // Call the action to handle notification logic
                 
@@ -348,7 +438,17 @@ class OrderController extends Controller
         // Broadcast the order updated event
         event(new OrderUpdated($order, ['status' => $newStatus]));
         
-        return new OrderResource($order);
+        // Return order with warnings if any
+        $response = new OrderResource($order);
+        if (!empty($warnings)) {
+            return response()->json([
+                'order' => $response,
+                'warnings' => $warnings,
+                'message' => 'Order status updated successfully with some warnings.'
+            ]);
+        }
+        
+        return $response;
     }
 
     /**
@@ -769,6 +869,72 @@ class OrderController extends Controller
         }
 
         return $detailedBreakdown;
+    }
+
+    /**
+     * Create inventory transactions when order is completed.
+     */
+    private function createInventoryTransactionsForOrder(Order $order, &$warnings = [])
+    {
+        try {
+            foreach ($order->items as $orderItem) {
+                $serviceOffering = $orderItem->serviceOffering;
+                if (!$serviceOffering || !$serviceOffering->productType) {
+                    $warning = "Service offering or product type not found for order item";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                $productType = $serviceOffering->productType;
+                
+                // Find inventory item for this product type (only one per product type)
+                $inventoryItem = InventoryItem::where('product_type_id', $productType->id)
+                    ->where('is_active', true)
+                    ->first();
+                
+                if (!$inventoryItem) {
+                    $warning = "No active inventory item found for product type {$productType->name}";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                $quantityToDeduct = $orderItem->quantity; // Direct quantity from order
+                
+                // Skip if not enough stock
+                if ($inventoryItem->current_stock < $quantityToDeduct) {
+                    $warning = "Insufficient stock for {$productType->name}. Available: {$inventoryItem->current_stock}, Needed: {$quantityToDeduct}";
+                    Log::warning($warning);
+                    $warnings[] = $warning;
+                    continue;
+                }
+                
+                // Create inventory transaction for sale
+                InventoryTransaction::create([
+                    'inventory_item_id' => $inventoryItem->id,
+                    'transaction_type' => 'sale',
+                    'quantity' => -$quantityToDeduct, // Negative for sale/outgoing
+                    'unit_cost' => $inventoryItem->cost_per_unit ?? 0,
+                    'total_cost' => $inventoryItem->cost_per_unit 
+                        ? -($quantityToDeduct * $inventoryItem->cost_per_unit) 
+                        : 0,
+                    'reference_type' => 'order',
+                    'reference_id' => $order->id,
+                    'notes' => "Sale from order #{$order->order_number} - {$productType->name} (Qty: {$orderItem->quantity})",
+                    'user_id' => Auth::id()
+                ]);
+                
+                // Update inventory item stock
+                $inventoryItem->current_stock = max(0, $inventoryItem->current_stock - $quantityToDeduct);
+                $inventoryItem->save();
+            }
+            
+            Log::info("Inventory transactions created for completed order #{$order->order_number}");
+        } catch (\Exception $e) {
+            Log::error("Failed to create inventory transactions for order #{$order->order_number}: " . $e->getMessage());
+            // Don't throw exception to avoid breaking order completion
+        }
     }
 
  

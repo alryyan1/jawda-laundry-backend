@@ -33,4 +33,10 @@ class ProductType extends Model
     {
         return $this->hasMany(PredefinedSize::class);
     }
+
+    // Add inventory item relationship (one product type can have only one inventory item)
+    public function inventoryItem()
+    {
+        return $this->hasOne(InventoryItem::class);
+    }
 }
