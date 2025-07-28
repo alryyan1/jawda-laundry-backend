@@ -34,6 +34,8 @@ use App\Http\Controllers\Api\InventoryController;
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('service-offerings/all-for-select', [ServiceOfferingController::class, 'allForSelect']);
+Route::get('product-types/all-for-select', [ProductTypeController::class, 'allForSelect']); // Add this if needed for dropdowns
 
 // Temporary public routes for testing
 Route::get('/dining-tables', [DiningTableController::class, 'index']);
@@ -68,8 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
-  Route::get('service-offerings/all-for-select', [ServiceOfferingController::class, 'allForSelect']);
-  Route::get('product-types/all-for-select', [ProductTypeController::class, 'allForSelect']); // Add this if needed for dropdowns
+
 
   Route::apiResource('orders', OrderController::class);
    // and POST /product-types/{product_type}/predefined-sizes
@@ -83,7 +84,6 @@ Route::delete(
   [PredefinedSizeController::class, 'destroy']
 )->name('product-types.predefined-sizes.destroy');
   // Service Management Admin Routes
-  Route::apiResource('product-categories', ProductCategoryController::class);
   Route::apiResource('product-types', ProductTypeController::class);
   Route::apiResource('service-actions', ServiceActionController::class);
   Route::apiResource('service-offerings', ServiceOfferingController::class);
@@ -116,12 +116,7 @@ Route::delete(
   // Payment Management
   Route::apiResource('orders.payments', PaymentController::class)->except(['show', 'update']);
   
-  // Application Settings
-  Route::get('/settings', [SettingController::class, 'index']);
-  Route::put('/settings', [SettingController::class, 'update']);
-  Route::post('/settings/logo/upload', [SettingController::class, 'uploadLogo']);
-  Route::delete('/settings/logo', [SettingController::class, 'deleteLogo']);
-  Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
+
   
   Route::post('/orders/{order}/send-whatsapp-invoice', [OrderController::class, 'sendWhatsappInvoice'])
     ->name('orders.invoice.whatsapp');
@@ -153,8 +148,7 @@ Route::delete(
     Route::get('/dashboard/orders-trend', [DashboardController::class, 'ordersTrend']);
     Route::get('/dashboard/order-items-trend', [DashboardController::class, 'orderItemsTrend']);
     Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
-    Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
-    Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+
     Route::get('/reports/cost-summary', [ReportController::class, 'costSummary']);
     Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);
     Route::get('/reports/overdue-pickups', [ReportController::class, 'overduePickupOrders']);
@@ -192,3 +186,15 @@ Route::delete(
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/reports/orders', [ReportController::class, 'getOrdersReport']);
 });
+
+
+Route::apiResource('product-categories', ProductCategoryController::class);
+  // Application Settings
+  Route::get('/settings', [SettingController::class, 'index']);
+  Route::put('/settings', [SettingController::class, 'update']);
+  Route::post('/settings/logo/upload', [SettingController::class, 'uploadLogo']);
+  Route::delete('/settings/logo', [SettingController::class, 'deleteLogo']);
+  Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
+  Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
+  Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+

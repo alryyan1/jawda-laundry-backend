@@ -23,14 +23,16 @@ class DatabaseSeeder extends Seeder
             CustomerTypeSeeder::class,      // Before CustomerSeeder
             CustomerSeeder::class,
             RestaurantTableSeeder::class,
-            ProductCategorySeeder::class,
-            ProductTypeSeeder::class,
+            // ProductCategorySeeder::class,
+            // ProductTypeSeeder::class,
             PermissionSeeder::class,
-            ServiceActionSeeder::class,
-            ServiceOfferingSeeder::class,
+            // ServiceActionSeeder::class,
+            // ServiceOfferingSeeder::class,
             NavigationItemSeeder::class,
             InventoryNavigationSeeder::class,
             InventoryItemSeeder::class,
+            // Laundry seeders
+            \Database\Seeders\Laundry\LaundrySeeder::class,
             // ProductCategorySeeder::class,   // Before ProductTypeSeeder
             // ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
             // ServiceActionSeeder::class,     // Before ServiceOfferingSeeder

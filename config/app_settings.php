@@ -38,4 +38,8 @@ return [
     'pos_auto_show_pdf' => env('POS_AUTO_SHOW_PDF', false),
     'pos_show_products_as_list' => env('POS_SHOW_PRODUCTS_AS_LIST', false),
 
+    // App branding settings
+    'app_name' => env('APP_SETTINGS_APP_NAME', 'Jawda Laundry'),
+    'app_description' => env('APP_SETTINGS_APP_DESCRIPTION', 'LAUNDRY MANAGEMENT SYSTEM'),
+
 ];

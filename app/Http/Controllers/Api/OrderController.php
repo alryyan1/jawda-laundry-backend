@@ -118,6 +118,7 @@ class OrderController extends Controller
                 'payment_status' => 'pending',
                 'notes' => $validatedData['notes'] ?? null,
                 'due_date' => $validatedData['due_date'] ?? null,
+                'pickup_date' => now()->addDays(3), // Set pickup date to 3 days after order creation
                 'order_date' => now(),
             ]);
 

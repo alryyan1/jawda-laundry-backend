@@ -200,26 +200,25 @@ class ReportController extends Controller
      */
     public function overduePickupOrders(Request $request)
     {
-        $this->authorize('report:view-operational'); // استخدم صلاحية جديدة للتقارير التشغيلية
+        $this->authorize('report:view-operational');
 
         $query = Order::with('customer:id,name,phone')
-            ->whereNotNull('pickup_date') // يجب أن يكون لها تاريخ استحقاق
-            ->whereRaw('Date(pickup_date) < ?', [Carbon::today()]); // تاريخ الاستحقاق في الماضي
+            ->whereNotNull('pickup_date') // يجب أن يكون لها تاريخ استلام محدد
+            ->where('status', '!=', 'cancelled') // استبعاد الطلبات الملغية
+            ->whereRaw('Date(pickup_date) < ?', [Carbon::today()]); // تاريخ الاستلام في الماضي
 
-        // إضافة فلتر لعدد أيام التأخير
-        if ($request->filled('overdue_days') && is_numeric($request->overdue_days)) {
-            $overdueDays = (int) $request->overdue_days;
-            $cutoffDate = Carbon::today()->subDays($overdueDays);
-            $query->whereRaw('Date(pickup_date) <= ?', [$cutoffDate]);
-        }
+        // // إضافة فلتر لعدد أيام التأخير
+        // if ($request->filled('overdue_days') && is_numeric($request->overdue_days)) {
+        //     $overdueDays = (int) $request->overdue_days;
+        //     $cutoffDate = Carbon::today()->subDays($overdueDays);
+        //     $query->whereRaw('Date(pickup_date) <= ?', [$cutoffDate]);
+        // }
 
         // حساب عدد أيام التأخير مباشرة في الاستعلام
         $query->select('*', DB::raw('DATEDIFF(NOW(), pickup_date) as overdue_days'));
 
         $orders = $query->orderBy('pickup_date', 'asc')->paginate($request->get('per_page', 20));
 
-        // لا نحتاج إلى Resource هنا لأننا أضفنا حقلًا مخصصًا
-        // لكن استخدامه يضمن التناسق. سنقوم بتعديل OrderResource.
         return OrderResource::collection($orders);
     }
 

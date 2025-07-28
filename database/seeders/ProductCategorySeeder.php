@@ -8,11 +8,11 @@ use App\Models\ProductCategory;
 class ProductCategorySeeder extends Seeder
 {
     /**
-     * Run the database seeds based on the provided cafe menu.
+     * Run the database seeds for product categories.
      */
     public function run(): void
     {
-        $this->command->info('Seeding product categories from menu...');
+        $this->command->info('Seeding product categories...');
 
         $categories = [
             ['name' => 'Hot Drinks - مشروبات ساخنة', 'description' => 'A selection of classic hot beverages.'],

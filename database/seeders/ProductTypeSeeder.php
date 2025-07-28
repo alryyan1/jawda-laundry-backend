@@ -9,11 +9,11 @@ use App\Models\ProductCategory;
 class ProductTypeSeeder extends Seeder
 {
     /**
-     * Run the database seeds based on the provided cafe menu items.
+     * Run the database seeds for product types.
      */
     public function run(): void
     {
-        $this->command->info('Seeding product types from menu...');
+        $this->command->info('Seeding product types...');
         
         // Helper function to find a category by its English name part
         $findCat = fn($en_name) => ProductCategory::where('name', 'LIKE', $en_name . '%')->first();

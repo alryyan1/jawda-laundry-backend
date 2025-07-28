@@ -25,7 +25,7 @@ class ProductTypeController extends Controller
     {
         // Add withCount('serviceOfferings') to the query
         $query = ProductType::with(['category', 'serviceOfferings' => function($query) {
-            $query->where('is_active', true)->orderBy('id', 'asc');
+            $query->orderBy('id', 'asc');
         }])
                               ->withCount('serviceOfferings') // <-- ADD THIS LINE
                               ->orderBy('id','desc');

@@ -21,7 +21,7 @@ class ProductTypeResource extends JsonResource
             'is_dimension_based' => $this->is_dimension_based,
             'product_category_id' => $this->product_category_id,
             'category' => new ProductCategoryResource($this->whenLoaded('category')),
-            'is_active' => (bool) $this->is_active, // Assuming you added 'is_active' field
+
             'service_offerings_count' => $this->serviceOfferings()->where('is_active', true)->count(),
             'first_service_offering' => $this->serviceOfferings()->where('is_active', true)->first(),
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,

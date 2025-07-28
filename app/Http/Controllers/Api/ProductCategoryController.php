@@ -53,7 +53,7 @@ class ProductCategoryController extends Controller
                 $image = $request->file('image');
                 $imageName = time() . '_' . $image->getClientOriginalName();
                 $image->storeAs('public/product-categories', $imageName);
-                $data['image_url'] = asset('storage/product-categories/' . $imageName);
+                $data['image_url'] = 'product-categories/' . $imageName;
             }
 
             $category = ProductCategory::create($data);
@@ -106,7 +106,7 @@ class ProductCategoryController extends Controller
                 $image = $request->file('image');
                 $imageName = time() . '_' . $image->getClientOriginalName();
                 $image->storeAs('public/product-categories', $imageName);
-                $data['image_url'] = asset('storage/product-categories/' . $imageName);
+                $data['image_url'] = 'product-categories/' . $imageName;
                 
                 Log::info('Image uploaded successfully', [
                     'original_name' => $image->getClientOriginalName(),
