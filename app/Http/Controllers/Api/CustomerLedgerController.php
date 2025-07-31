@@ -25,6 +25,12 @@ class CustomerLedgerController extends Controller
 
         // --- Transform Orders into Ledger Entries (Debits) ---
         $debits = $customer->orders->map(function ($order) {
+            // Calculate total payments for this order
+            $totalPayments = $order->payments->where('type', 'payment')->sum('amount');
+            $totalRefunds = $order->payments->where('type', 'refund')->sum('amount');
+            $netPayments = $totalPayments - $totalRefunds;
+            $remainingBalance = max(0, $order->total_amount - $netPayments);
+            
             return [
                 'date' => $order->created_at,
                 'type' => 'order',
@@ -32,6 +38,10 @@ class CustomerLedgerController extends Controller
                 'debit' => (float) $order->total_amount,
                 'credit' => 0,
                 'reference_id' => $order->id,
+                'total_amount' => (float) $order->total_amount,
+                'paid_amount' => (float) $netPayments,
+                'remaining_balance' => (float) $remainingBalance,
+                'payment_status' => $remainingBalance > 0 ? 'unpaid' : 'paid',
             ];
         });
 
