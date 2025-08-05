@@ -7,14 +7,12 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 use App\Models\DiningTable;
-use App\Models\InventoryTransaction;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
-use App\Services\InventoryService;
 use App\Actions\NotifyCustomerForOrderStatus;
 use App\Events\OrderCreated;
 use App\Events\OrderUpdated;
@@ -24,18 +22,18 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
-use App\Models\InventoryItem; // Added this import for InventoryItem
 
 class OrderController extends Controller
 {
     protected PricingService $pricingService;
-    protected InventoryService $inventoryService;
+    // protected InventoryService $inventoryService; // Removed inventory service dependency
 
-    public function __construct(PricingService $pricingService, InventoryService $inventoryService)
+    public function __construct(PricingService $pricingService)
     {
         // Use Laravel's service container to automatically inject the PricingService
         $this->pricingService = $pricingService;
-        $this->inventoryService = $inventoryService;
+        // Remove inventory service dependency
+        // $this->inventoryService = $inventoryService;
 
         // Apply Spatie permissions middleware
         $this->middleware('can:order:list')->only('index');
@@ -60,55 +58,79 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
-        $validatedData = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+        // Check if this is an empty order creation
+        $isEmptyOrder = $request->has('create_empty_order') && $request->input('create_empty_order') === true;
+        
+        $validationRules = [
             'notes' => 'nullable|string|max:2000',
             'due_date' => 'nullable|date_format:Y-m-d',
-            'items' => 'required|array|min:1',
-            'items.*.service_offering_id' => 'required|exists:service_offerings,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.product_description_custom' => 'nullable|string|max:255',
-            'items.*.length_meters' => 'nullable|numeric|min:0',
-            'items.*.width_meters' => 'nullable|numeric|min:0',
-            'items.*.notes' => 'nullable|string|max:1000',
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
-            'dining_table_id' => 'nullable|exists:dining_tables,id', // Add validation for dining table
-        ]);
+            'dining_table_id' => 'nullable|exists:dining_tables,id',
+        ];
+        
+        if ($isEmptyOrder) {
+            // For empty orders, customer_id and items are optional
+            $validationRules['customer_id'] = 'nullable|exists:customers,id';
+            $validationRules['items'] = 'nullable|array';
+        } else {
+            // For regular orders, customer_id and items are required
+            $validationRules['customer_id'] = 'required|exists:customers,id';
+            $validationRules['items'] = 'required|array|min:1';
+        }
+        
+        // Add item validation rules if items are provided
+        if (!$isEmptyOrder || ($request->has('items') && !empty($request->input('items')))) {
+            $validationRules['items.*.service_offering_id'] = 'required|exists:service_offerings,id';
+            $validationRules['items.*.quantity'] = 'required|integer|min:1';
+            $validationRules['items.*.product_description_custom'] = 'nullable|string|max:255';
+            $validationRules['items.*.length_meters'] = 'nullable|numeric|min:0';
+            $validationRules['items.*.width_meters'] = 'nullable|numeric|min:0';
+            $validationRules['items.*.notes'] = 'nullable|string|max:1000';
+        }
+        
+        $validatedData = $request->validate($validationRules);
 
-        $customer = Customer::findOrFail($validatedData['customer_id']);
+        $customer = null;
+        if (!empty($validatedData['customer_id'])) {
+            $customer = Customer::findOrFail($validatedData['customer_id']);
+        }
+        
         $orderTotalAmount = 0;
         $orderItemsToCreate = [];
         $warnings = []; // Array to collect warnings
 
         DB::beginTransaction();
         try {
-            foreach ($validatedData['items'] as $itemData) {
-                $serviceOffering = ServiceOffering::findOrFail($itemData['service_offering_id']);
+            // Only process items if they exist and are not empty
+            if (!empty($validatedData['items'])) {
+                foreach ($validatedData['items'] as $itemData) {
+                    $serviceOffering = ServiceOffering::findOrFail($itemData['service_offering_id']);
 
-                $priceDetails = $this->pricingService->calculatePrice(
-                    $serviceOffering,
-                    $customer,
-                    $itemData['quantity'],
-                    $itemData['length_meters'] ?? null,
-                    $itemData['width_meters'] ?? null
-                );
+                    $priceDetails = $this->pricingService->calculatePrice(
+                        $serviceOffering,
+                        $customer,
+                        $itemData['quantity'],
+                        $itemData['length_meters'] ?? null,
+                        $itemData['width_meters'] ?? null
+                    );
 
-                $orderItemsToCreate[] = [
-                    'service_offering_id' => $serviceOffering->id,
-                    'product_description_custom' => $itemData['product_description_custom'] ?? null,
-                    'quantity' => $itemData['quantity'],
-                    'length_meters' => $itemData['length_meters'] ?? null,
-                    'width_meters' => $itemData['width_meters'] ?? null,
-                    'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                    'sub_total' => $priceDetails['sub_total'],
-                    'notes' => $itemData['notes'] ?? null,
-                ];
-                $orderTotalAmount += $priceDetails['sub_total'];
+                    $orderItemsToCreate[] = [
+                        'service_offering_id' => $serviceOffering->id,
+                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                        'quantity' => $itemData['quantity'],
+                        'length_meters' => $itemData['length_meters'] ?? null,
+                        'width_meters' => $itemData['width_meters'] ?? null,
+                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
+                        'sub_total' => $priceDetails['sub_total'],
+                        'notes' => $itemData['notes'] ?? null,
+                    ];
+                    $orderTotalAmount += $priceDetails['sub_total'];
+                }
             }
 
             $order = Order::create([
                 'order_number' => 'ORD-' . strtoupper(Str::random(8)),
-                'customer_id' => $customer->id,
+                'customer_id' => $customer ? $customer->id : null,
                 'user_id' => Auth::id(),
                 'status' => 'pending',
                 'order_type' => $validatedData['order_type'] ?? 'in_house',
@@ -123,56 +145,6 @@ class OrderController extends Controller
             ]);
 
             $order->items()->createMany($orderItemsToCreate);
-            
-            // Deduct inventory for each order item
-            foreach ($orderItemsToCreate as $itemData) {
-                $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
-                $productType = $serviceOffering->productType;
-                
-                if (!$productType) {
-                    $warning = "Product type not found for service offering {$serviceOffering->id}";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                // Find inventory item for this product type (only one per product type)
-                $inventoryItem = InventoryItem::where('product_type_id', $productType->id)
-                    ->where('is_active', true)
-                    ->first();
-                
-                if (!$inventoryItem) {
-                    $warning = "No active inventory item found for product type {$productType->name}";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                $quantityToDeduct = $itemData['quantity']; // Direct quantity from order
-                
-                // Skip if not enough stock
-                if ($inventoryItem->current_stock < $quantityToDeduct) {
-                    $warning = "Insufficient stock for {$productType->name}. Available: {$inventoryItem->current_stock}, Needed: {$quantityToDeduct}";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                try {
-                    $this->inventoryService->removeStock(
-                        $inventoryItem->id,
-                        $quantityToDeduct,
-                        'order',
-                        $order->id,
-                        "Used for order #{$order->order_number} - {$productType->name} (Qty: {$itemData['quantity']})"
-                    );
-                } catch (\Exception $e) {
-                    $warning = "Failed to deduct inventory for {$productType->name}: " . $e->getMessage();
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    // Continue with other items even if one fails
-                }
-            }
             
             // Update dining table status to occupied if the order has a dining table
             if ($order->dining_table_id) {
@@ -200,7 +172,10 @@ class OrderController extends Controller
                 ]);
             }
             
-            return $response;
+            return response()->json([
+                'order' => $response,
+                'message' => 'Order created successfully.'
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -226,6 +201,7 @@ class OrderController extends Controller
         $this->authorize('update', $order);
 
         $validatedData = $request->validate([
+            'customer_id' => 'sometimes|exists:customers,id',
             'notes' => 'sometimes|nullable|string|max:2000',
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
@@ -260,6 +236,14 @@ class OrderController extends Controller
             // Handle items update if provided
             if ($request->has('items')) {
                 $customer = $order->customer;
+                
+                // If no customer is set, we can't calculate prices
+                if (!$customer) {
+                    return response()->json([
+                        'message' => 'Cannot add items to order without a customer. Please select a customer first.'
+                    ], 400);
+                }
+                
                 $orderTotalAmount = 0;
                 $orderItemsToCreate = [];
 
@@ -330,11 +314,11 @@ class OrderController extends Controller
                     }
                 }
                 
-                // Create inventory transactions when order is completed
-                if ($oldStatus !== 'completed' && $newStatus === 'completed') {
-                    $order->load(['items.serviceOffering.productType']);
-                    $this->createInventoryTransactionsForOrder($order);
-                }
+                // Remove inventory transaction creation when order is completed
+                // if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+                //     $order->load(['items.serviceOffering.productType']);
+                //     $this->createInventoryTransactionsForOrder($order);
+                // }
                 
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order);
@@ -417,11 +401,11 @@ class OrderController extends Controller
                     }
                 }
                 
-                // Create inventory transactions when order is completed
-                if ($oldStatus !== 'completed' && $newStatus === 'completed') {
-                    $order->load(['items.serviceOffering.productType']);
-                    $this->createInventoryTransactionsForOrder($order);
-                }
+                // Remove inventory transaction creation when order is completed
+                // if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+                //     $order->load(['items.serviceOffering.productType']);
+                //     $this->createInventoryTransactionsForOrder($order);
+                // }
                 
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order); // Call the action to handle notification logic
@@ -870,72 +854,6 @@ class OrderController extends Controller
         }
 
         return $detailedBreakdown;
-    }
-
-    /**
-     * Create inventory transactions when order is completed.
-     */
-    private function createInventoryTransactionsForOrder(Order $order, &$warnings = [])
-    {
-        try {
-            foreach ($order->items as $orderItem) {
-                $serviceOffering = $orderItem->serviceOffering;
-                if (!$serviceOffering || !$serviceOffering->productType) {
-                    $warning = "Service offering or product type not found for order item";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                $productType = $serviceOffering->productType;
-                
-                // Find inventory item for this product type (only one per product type)
-                $inventoryItem = InventoryItem::where('product_type_id', $productType->id)
-                    ->where('is_active', true)
-                    ->first();
-                
-                if (!$inventoryItem) {
-                    $warning = "No active inventory item found for product type {$productType->name}";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                $quantityToDeduct = $orderItem->quantity; // Direct quantity from order
-                
-                // Skip if not enough stock
-                if ($inventoryItem->current_stock < $quantityToDeduct) {
-                    $warning = "Insufficient stock for {$productType->name}. Available: {$inventoryItem->current_stock}, Needed: {$quantityToDeduct}";
-                    Log::warning($warning);
-                    $warnings[] = $warning;
-                    continue;
-                }
-                
-                // Create inventory transaction for sale
-                InventoryTransaction::create([
-                    'inventory_item_id' => $inventoryItem->id,
-                    'transaction_type' => 'sale',
-                    'quantity' => -$quantityToDeduct, // Negative for sale/outgoing
-                    'unit_cost' => $inventoryItem->cost_per_unit ?? 0,
-                    'total_cost' => $inventoryItem->cost_per_unit 
-                        ? -($quantityToDeduct * $inventoryItem->cost_per_unit) 
-                        : 0,
-                    'reference_type' => 'order',
-                    'reference_id' => $order->id,
-                    'notes' => "Sale from order #{$order->order_number} - {$productType->name} (Qty: {$orderItem->quantity})",
-                    'user_id' => Auth::id()
-                ]);
-                
-                // Update inventory item stock
-                $inventoryItem->current_stock = max(0, $inventoryItem->current_stock - $quantityToDeduct);
-                $inventoryItem->save();
-            }
-            
-            Log::info("Inventory transactions created for completed order #{$order->order_number}");
-        } catch (\Exception $e) {
-            Log::error("Failed to create inventory transactions for order #{$order->order_number}: " . $e->getMessage());
-            // Don't throw exception to avoid breaking order completion
-        }
     }
 
  

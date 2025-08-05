@@ -55,6 +55,28 @@ class Customer extends Model
     public function CustomerType(){
         return $this->belongsTo(CustomerType::class);
     }
-   
-   
+    
+    /**
+     * Get all pricing rules for this customer
+     */
+    public function pricingRules()
+    {
+        return $this->hasMany(PricingRule::class);
+    }
+
+    /**
+     * Get all product types assigned to this customer
+     */
+    public function productTypes()
+    {
+        return $this->hasMany(CustomerProductType::class);
+    }
+
+    /**
+     * Get all service offering pricing for this customer
+     */
+    public function serviceOfferingPricing()
+    {
+        return $this->hasMany(CustomerProductServiceOffering::class);
+    }
 }

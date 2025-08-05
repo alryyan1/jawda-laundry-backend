@@ -63,7 +63,7 @@ class NavigationItemSeeder extends Seeder
             ],
             [
                 'key' => 'dining',
-                'title' => ['en' => 'Dining Management', 'ar' => 'إدارة المطعم'],
+                'title' => ['en' => 'Section Management', 'ar' => 'إدارة الأقسام'],
                 'icon' => 'UtensilsCrossed',
                 'route' => '/dining',
                 'sort_order' => 6,

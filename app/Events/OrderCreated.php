@@ -59,10 +59,10 @@ class OrderCreated implements ShouldBroadcast
                 'total_amount' => $this->order->total_amount,
                 'paid_amount' => $this->order->paid_amount,
                 'order_date' => $this->order->order_date,
-                'customer' => [
+                'customer' => $this->order->customer ? [
                     'id' => $this->order->customer->id,
                     'name' => $this->order->customer->name,
-                ],
+                ] : null,
                 'items_count' => $this->order->items->count(),
             ],
             'message' => 'New order created',

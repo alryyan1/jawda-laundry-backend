@@ -30,6 +30,9 @@ use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\CustomerPriceListController;
+use App\Http\Controllers\Api\CustomerProductTypeController;
+use App\Http\Controllers\Api\CustomerServiceOfferingController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -178,6 +181,26 @@ Route::delete(
     Route::post('/inventories/{inventory}/add-stock', [InventoryController::class, 'addStock']);
     Route::post('/inventories/{inventory}/remove-stock', [InventoryController::class, 'removeStock']);
     Route::apiResource('inventories', InventoryController::class);
+
+  // Customer Price List Management
+  Route::get('/customers/{customer}/price-list', [CustomerPriceListController::class, 'show']);
+  Route::put('/customers/{customer}/price-list', [CustomerPriceListController::class, 'update']);
+  Route::delete('/customers/{customer}/price-list', [CustomerPriceListController::class, 'destroy']);
+  Route::get('/customers/{customer}/price-list/summary', [CustomerPriceListController::class, 'summary']);
+  Route::get('/customers/{customer}/price-list/export', [CustomerPriceListController::class, 'export']);
+
+  // Customer Product Type Management
+                Route::get('/customers/{customer}/product-types', [CustomerProductTypeController::class, 'index']);
+              Route::post('/customers/{customer}/product-types/import-all', [CustomerProductTypeController::class, 'importAll']);
+              Route::post('/customers/{customer}/product-types', [CustomerProductTypeController::class, 'store']);
+              Route::delete('/customers/{customer}/product-types/{customerProductType}', [CustomerProductTypeController::class, 'destroy']);
+              Route::get('/customers/{customer}/product-types/available', [CustomerProductTypeController::class, 'getAvailableProductTypes']);
+              
+              // Customer Service Offerings Management
+              Route::get('/customers/{customer}/product-types/{productTypeId}/service-offerings', [CustomerServiceOfferingController::class, 'index']);
+              Route::post('/customers/{customer}/product-types/{productTypeId}/service-offerings', [CustomerServiceOfferingController::class, 'store']);
+              Route::put('/customers/{customer}/product-types/{productTypeId}/service-offerings/{serviceActionId}', [CustomerServiceOfferingController::class, 'update']);
+              Route::delete('/customers/{customer}/product-types/{productTypeId}/service-offerings/{serviceActionId}', [CustomerServiceOfferingController::class, 'destroy']);
 
 
   });
