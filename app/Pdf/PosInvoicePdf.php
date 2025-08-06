@@ -237,6 +237,15 @@ class PosInvoicePdf extends TCPDF
         $this->Cell(0, 5, $this->order->customer->name, 0, 1, 'R');
         $this->Cell(20, 5, $this->getBilingualText('cashier'));
         $this->Cell(0, 5, $this->order->user->name ?? 'N/A', 0, 1, 'R');
+        
+        // Display category sequences if available
+        if ($this->order->category_sequences && !empty($this->order->category_sequences)) {
+            $this->Ln(1);
+            $this->SetFont($this->font, 'B', 10);
+            $this->Cell(0, 5, 'Category Sequences: ' . $this->order->getCategorySequencesString(), 0, 1, 'C');
+            $this->SetFont($this->font, '', 9);
+        }
+        
         $this->Ln(2);
 
         $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
@@ -258,9 +267,24 @@ class PosInvoicePdf extends TCPDF
         $groupedItems = $this->groupItemsByCategory();
         
         foreach ($groupedItems as $categoryId => $categoryData) {
+            // Check if this category has sequence enabled
+            $category = \App\Models\ProductCategory::find($categoryId);
+            $hasSequence = $category && $category->sequence_enabled && $category->sequence_prefix;
+            
+            // Add division line for categories with sequences
+            if ($hasSequence) {
+                $this->SetLineStyle(['width' => 0.3, 'color' => [0, 0, 0]]);
+                $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+                $this->Ln(1);
+            }
+            
             // Category Header
             $this->SetFont($this->font, 'B', 9);
-            $this->SetTextColor(100, 100, 100); // Gray color for category
+            if ($hasSequence) {
+                $this->SetTextColor(0, 0, 0); // Black color for sequence categories
+            } else {
+                $this->SetTextColor(100, 100, 100); // Gray color for regular categories
+            }
             $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             $this->SetTextColor(0, 0, 0); // Reset to black
             $this->SetFont($this->font, '', 9);
