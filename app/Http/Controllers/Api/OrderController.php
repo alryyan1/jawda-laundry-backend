@@ -368,21 +368,7 @@ class OrderController extends Controller
                     }
                 }
                 
-                // Update dining table status to available if order is completed and has a dining table
-                if ($newStatus === 'completed' && $order->dining_table_id) {
-                    $diningTable = DiningTable::find($order->dining_table_id);
-                    if ($diningTable) {
-                        $diningTable->update(['status' => 'available']);
-                    }
-                }
-                
-                // Update dining table status to available if order is cancelled and has a dining table
-                if ($newStatus === 'cancelled' && $order->dining_table_id) {
-                    $diningTable = DiningTable::find($order->dining_table_id);
-                    if ($diningTable) {
-                        $diningTable->update(['status' => 'available']);
-                    }
-                }
+      
                 
                 // Remove inventory transaction creation when order is completed
                 // if ($oldStatus !== 'completed' && $newStatus === 'completed') {
@@ -593,8 +579,8 @@ class OrderController extends Controller
         // Pass data to the PDF class
         $pdf->setOrder($order);
         $pdf->setCompanyDetails(
-            config('app_settings.company_name', config('app.name')),
-            config('app_settings.company_address') . "\nPhone: " . config('app_settings.company_phone')
+            app_setting('company_name', config('app.name')),
+            app_setting('company_address') . "\nPhone: " . app_setting('company_phone')
         );
 
         // Set document information
@@ -646,14 +632,14 @@ class OrderController extends Controller
         // Pass data to the PDF class
         $pdf->setOrder($order);
         $settings = [
-            'general_company_name' => config('app_settings.company_name', config('app.name')),
-            'general_company_name_ar' => config('app_settings.company_name_ar', 'شاي خدري'),
-            'general_company_address' => config('app_settings.company_address'),
-            'general_company_address_ar' => config('app_settings.company_address_ar', 'مسقط'),
-            'general_company_phone' => config('app_settings.company_phone'),
-            'general_company_phone_ar' => config('app_settings.company_phone_ar', '--'),
-            'general_default_currency_symbol' => config('app_settings.currency_symbol', 'OMR'),
-            'company_logo_url' => config('app_settings.company_logo_url'),
+            'general_company_name' => app_setting('company_name', config('app.name')),
+            'general_company_name_ar' => app_setting('company_name_ar', 'شاي خدري'),
+            'general_company_address' => app_setting('company_address'),
+            'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
+            'general_company_phone' => app_setting('company_phone'),
+            'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
+            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
+            'company_logo_url' => app_setting('company_logo_url'),
             'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setSettings($settings);

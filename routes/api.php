@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\CustomerPriceListController;
 use App\Http\Controllers\Api\CustomerPricingRuleController;
+use App\Http\Controllers\Api\SettingsController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -205,4 +206,19 @@ Route::apiResource('product-categories', ProductCategoryController::class);
   Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
   Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
   Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+
+  // New Database Settings API
+  Route::get('/settings/public', [SettingsController::class, 'public']);
+  Route::get('/settings/group/{group}', [SettingsController::class, 'getByGroup']);
+  Route::get('/settings/key/{key}', [SettingsController::class, 'show']);
+  Route::put('/settings/bulk', [SettingsController::class, 'update']);
+  Route::put('/settings/single/{key}', [SettingsController::class, 'updateSingle']);
+  Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache']);
+
+  // Specific settings endpoints
+  Route::get('/settings/company/info', [SettingsController::class, 'companyInfo']);
+  Route::get('/settings/app/branding', [SettingsController::class, 'appBranding']);
+  Route::get('/settings/pos/config', [SettingsController::class, 'posConfig']);
+  Route::get('/settings/whatsapp/config', [SettingsController::class, 'whatsappConfig']);
+  Route::get('/settings/theme/config', [SettingsController::class, 'themeConfig']);
 

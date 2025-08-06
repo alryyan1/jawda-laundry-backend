@@ -28,14 +28,14 @@ class NotifyCustomerForOrderStatus {
             $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
             $order->load(['customer', 'user', 'items.serviceOffering']);
             $settings = [
-                'general_company_name' => config('app_settings.company_name', config('app.name')),
-                'general_company_name_ar' => config('app_settings.company_name_ar', 'شاي خدري'),
-                'general_company_address' => config('app_settings.company_address'),
-                'general_company_address_ar' => config('app_settings.company_address_ar', 'مسقط'),
-                'general_company_phone' => config('app_settings.company_phone'),
-                'general_company_phone_ar' => config('app_settings.company_phone_ar', '--'),
-                'general_default_currency_symbol' => config('app_settings.currency_symbol', 'OMR'),
-                'company_logo_url' => config('app_settings.company_logo_url'),
+                'general_company_name' => app_setting('company_name', config('app.name')),
+                'general_company_name_ar' => app_setting('company_name_ar', 'شاي خدري'),
+                'general_company_address' => app_setting('company_address'),
+                'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
+                'general_company_phone' => app_setting('company_phone'),
+                'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
+                'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
+                'company_logo_url' => app_setting('company_logo_url'),
                 'language' => 'en',
             ];
             $pdf->setOrder($order);
@@ -61,7 +61,7 @@ class NotifyCustomerForOrderStatus {
             '{order_status}' => ucwords(str_replace('_', ' ', $order->status)),
             '{total_amount}' => number_format($order->total_amount, 3),
             '{amount_due}' => number_format($order->amount_due, 3),
-            '{company_name}' => config('app_settings.company_name', config('app.name')),
+            '{company_name}' => app_setting('company_name', config('app.name')),
         ];
         return str_replace(array_keys($placeholders), array_values($placeholders), $template);
     }

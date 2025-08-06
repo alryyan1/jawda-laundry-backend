@@ -41,7 +41,7 @@ class PaymentController extends Controller
         $this->authorize('recordPayment', $order); // From OrderPolicy
 
         // Dynamically get the list of allowed payment method keys from the config file.
-        $allowedPaymentMethods = array_keys(config('app_settings.payment_methods_ar', []));
+        $allowedPaymentMethods = array_keys(app_setting('payment_methods_ar', []));
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',

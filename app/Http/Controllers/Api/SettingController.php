@@ -20,14 +20,9 @@ class SettingController extends Controller
      */
     public function index(Request $request)
     {
-
-
-        // Fetch settings directly from the config file
-        // We use 'app_settings' as the config file name (config/app_settings.php)
-        $settings = config('app_settings');
-
-        // Filter out any null values if desired, or return all
-        // $settings = array_filter($settings, fn($value) => !is_null($value));
+        // Use the new database settings approach
+        $settingsService = app(\App\Services\SettingsService::class);
+        $settings = $settingsService->getAll();
 
         return response()->json(['data' => $settings]);
     }
@@ -41,7 +36,8 @@ class SettingController extends Controller
     {
 
         // Get current settings to know which keys are valid
-        $currentSettings = config('app_settings');
+        $settingsService = app(\App\Services\SettingsService::class);
+        $currentSettings = $settingsService->getAll();
         $validKeys = array_keys($currentSettings);
 
         // Define validation rules based on expected types from config
@@ -89,8 +85,8 @@ class SettingController extends Controller
             Artisan::call('config:clear'); // Important for changes to take effect
             Artisan::call('config:cache');  // Recache for production (optional here, but good practice)
 
-            // Fetch the newly updated settings from the reloaded config
-            $newSettings = config('app_settings');
+            // Fetch the newly updated settings from the database
+            $newSettings = $settingsService->getAll();
 
             return response()->json([
                 'message' => 'Settings updated successfully. Config cache cleared.',
@@ -115,7 +111,7 @@ class SettingController extends Controller
 
         try {
             // Delete old logo if it exists
-            $oldLogoUrl = config('app_settings.company_logo_url');
+            $oldLogoUrl = app_setting('company_logo_url');
             if ($oldLogoUrl) {
                 // Extract path from URL to delete from storage
                 $oldPath = str_replace(asset('storage/'), '', $oldLogoUrl);
@@ -164,7 +160,7 @@ class SettingController extends Controller
     public function deleteLogo()
     {
         try {
-            $logoUrl = config('app_settings.company_logo_url');
+            $logoUrl = app_setting('company_logo_url');
             if ($logoUrl) {
                 // Extract path from URL to delete from storage
                 $path = str_replace(asset('storage/'), '', $logoUrl);

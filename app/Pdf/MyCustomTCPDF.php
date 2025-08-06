@@ -24,8 +24,8 @@ class MyCustomTCPDF extends TCPDF
     {
         parent::__construct($orientation, $unit, $format, $unicode, $encoding, $diskcache, $pdfa);
 
-        $this->companyName = config('app_settings.company_name', 'Your Company');
-        $this->companyAddress = config('app_settings.company_address', '');
+        $this->companyName = app_setting('company_name', 'Your Company');
+        $this->companyAddress = app_setting('company_address', '');
 
         $this->SetCreator('Your App Name');
         $this->SetAuthor($this->companyName);

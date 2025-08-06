@@ -32,7 +32,7 @@ class OrderSequenceService
                 
                 // Only increment if this category hasn't been incremented for this order yet
                 // AND this is not an update (first time creating sequences)
-                if (!in_array($category->id, $incrementedCategories) && !$isUpdate) {
+                if (!in_array($category->id, $incrementedCategories) && $itemCount == 1) {
                     Log::info("Incrementing sequence for category {$category->id} from {$category->current_sequence}");
                     $category->incrementSequence();
                     $incrementedCategories[] = $category->id;

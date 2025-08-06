@@ -18,8 +18,8 @@ class InvoicePdf extends TCPDF
 
     public function setCompanyDetails(string $name = null, string $address = null)
     {
-        $this->companyName = $name ?? config('app_settings.company_name', config('app.name'));
-        $this->companyAddress = $address ?? config('app_settings.company_address', '');
+        $this->companyName = $name ?? app_setting('company_name', config('app.name'));
+        $this->companyAddress = $address ?? app_setting('company_address', '');
     }
 
     // Page header
