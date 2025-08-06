@@ -17,12 +17,11 @@ class ServiceOfferingSeeder extends Seeder
     {
         $this->command->info('Creating 1-to-1 Service Offerings...');
 
-        // A map of [ProductTypeID => Price] based on your PDF menu and INSERT statement.
-        // This remains the source of truth for prices.
+        // A map of [ProductTypeID => Price] with all prices in the range 0.1 to 0.8
         $priceMap = [
             1 => 0.500, 2 => 0.400, 3 => 0.300, 4 => 0.200, 5 => 0.200, 6 => 0.300,
-            7 => 0.300, 8 => 0.300, 9 => 0.300, 10 => 0.200, 11 => 0.800, 12 => 1.000,
-            13 => 0.900, 14 => 0.900, 15 => 0.900, 16 => 0.900,
+            7 => 0.300, 8 => 0.300, 9 => 0.300, 10 => 0.200, 11 => 0.800, 12 => 0.800,
+            13 => 0.800, 14 => 0.800, 15 => 0.800, 16 => 0.800,
             // Prices for Al-Habab (Product Category 4)
             17 => 0.400, 18 => 0.500, 19 => 0.500, 21 => 0.500, 20 => 0.700,
             // Prices for Croissant (Product Category 5)
@@ -34,15 +33,13 @@ class ServiceOfferingSeeder extends Seeder
             // Prices for Toast (Product Category 8)
             44 => 0.200, 45 => 0.400, 49 => 0.400, 48 => 0.400, 50 => 0.500, 51 => 0.500, 52 => 0.500, 47 => 0.400,
             // Pastries (Category 9)
-            53 => 1.500, // Assuming large price for Luqaimat
+            53 => 0.800, // Luqaimat - capped at 0.8
             54 => 0.100,
             55 => 0.300, 56 => 0.300, 57 => 0.300, 58 => 0.300,
             // Other Meals (Category 10)
-            59 => 2.900, 60 => 3.500, 61 => 1.500, 62 => 1.400, 63 => 1.500, 64 => 1.800, 65 => 1.500,
+            59 => 0.800, 60 => 0.800, 61 => 0.800, 62 => 0.800, 63 => 0.800, 64 => 0.800, 65 => 0.800,
         ];
-        // Note: The menu shows multiple prices for some items (e.g. Karak Tea). You must decide which price to use
-        // or create separate ProductTypes like "Karak Tea - Small", "Karak Tea - Large" as discussed previously.
-        // I have used a single price from the menu for these items for now.
+        // Note: All prices have been adjusted to be within the 0.1 to 0.8 range as requested.
 
         $productTypes = ProductType::all();
         $serviceActions = ServiceAction::all()->keyBy('name');
@@ -52,7 +49,7 @@ class ServiceOfferingSeeder extends Seeder
             $action = $serviceActions[$pt->name] ?? null;
 
             if ($action) {
-                $price = $priceMap[$pt->id] ?? 0; // Default to 0 if not in our price map
+                $price = $priceMap[$pt->id] ?? 0.200; // Default to 0.200 if not in our price map
 
                 $offeringData = [
                     'is_active' => true,

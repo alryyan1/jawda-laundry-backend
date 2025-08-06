@@ -24,6 +24,7 @@ class Order extends Model
         'dining_table_id',
         'user_id',
         'status',
+        'order_complete',       // Track if order is completed
         'order_type', // New field for dine-in/take-away/delivery
         'total_amount',
         'paid_amount',
@@ -50,6 +51,7 @@ class Order extends Model
         'order_date' => 'datetime',
         'due_date' => 'datetime',
         'pickup_date' => 'datetime',
+        'order_complete' => 'boolean',
         'whatsapp_text_sent' => 'boolean',
         'whatsapp_pdf_sent' => 'boolean',
         'category_sequences' => 'array',
@@ -124,6 +126,26 @@ class Order extends Model
         return (float) $this->total_amount - (float) $this->paid_amount;
     }
 
+    /**
+     * Calculate the total amount from order items dynamically.
+     * Accessor: $order->calculated_total_amount
+     */
+    public function getCalculatedTotalAmountAttribute(): float
+    {
+        return (float) $this->items()->sum('sub_total');
+    }
+
+    /**
+     * Recalculate and update the stored total_amount from order items
+     */
+    public function recalculateTotalAmount(): void
+    {
+        $this->total_amount = $this->calculated_total_amount;
+        $this->save();
+    }
+
+
+
     public function payments()
     {
         return $this->hasMany(Payment::class);
@@ -168,7 +190,7 @@ class Order extends Model
     }
 
     /**
-     * Boot method to automatically set daily_order_number when creating
+     * Boot method to automatically set daily_order_number when creating and recalculate totals
      */
     protected static function boot()
     {
@@ -177,6 +199,17 @@ class Order extends Model
         static::creating(function ($order) {
             if (empty($order->daily_order_number)) {
                 $order->daily_order_number = self::generateDailyOrderNumber();
+            }
+        });
+
+        // Recalculate total when order is saved (but not when total_amount was explicitly changed)
+        static::saved(function ($order) {
+            if ($order->wasChanged('total_amount') === false) {
+                $calculatedTotal = $order->calculated_total_amount;
+                if ($order->total_amount != $calculatedTotal) {
+                    $order->total_amount = $calculatedTotal;
+                    $order->saveQuietly(); // Use saveQuietly to avoid infinite loop
+                }
             }
         });
 

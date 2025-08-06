@@ -241,11 +241,20 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
+        // Debug: Log the incoming request data
+        Log::info('Order update request data:', [
+            'order_id' => $order->id,
+            'request_data' => $request->all(),
+            'status' => $request->input('status'),
+            'order_complete' => $request->input('order_complete'),
+        ]);
+
         $validatedData = $request->validate([
             'customer_id' => 'sometimes|exists:customers,id',
             'notes' => 'sometimes|nullable|string|max:2000',
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
+            'order_complete' => 'sometimes|boolean',
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
             'items' => 'sometimes|array|min:1', // Allow items to be updated
@@ -262,9 +271,28 @@ class OrderController extends Controller
         $newStatus = $order->status;
         $warnings = []; // Array to collect warnings
 
+        // Debug: Log the status changes and order_complete field
+        Log::info('Order status and order_complete debug:', [
+            'order_id' => $order->id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'old_order_complete' => $order->getOriginal('order_complete'),
+            'new_order_complete' => $order->order_complete,
+            'validated_order_complete' => $validatedData['order_complete'] ?? null,
+        ]);
+
         // If status changed to 'completed' and no pickup date was explicitly provided, set it to now.
         if ($oldStatus !== 'completed' && $newStatus === 'completed' && !$request->has('pickup_date')) {
             $order->pickup_date = now();
+        }
+        
+        // Handle order_complete based on status changes
+        if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+            $order->order_complete = true;
+            Log::info('Setting order_complete to true for order:', ['order_id' => $order->id]);
+        } elseif ($newStatus === 'cancelled') {
+            $order->order_complete = false;
+            Log::info('Setting order_complete to false for cancelled order:', ['order_id' => $order->id]);
         }
         
         // If status changed to something else, clear the pickup date unless it was explicitly sent.
@@ -354,6 +382,14 @@ class OrderController extends Controller
 
             // Save all changes
             $order->save();
+            
+            // Debug: Log the final state after save
+            Log::info('Order saved - final state:', [
+                'order_id' => $order->id,
+                'status' => $order->status,
+                'order_complete' => $order->order_complete,
+                'pickup_date' => $order->pickup_date,
+            ]);
 
             // If status changed, log it and send notification
             if ($oldStatus !== $newStatus) {
@@ -431,7 +467,12 @@ class OrderController extends Controller
             DB::beginTransaction();
             try {
                 $order->status = $newStatus;
-                if ($newStatus === 'completed' && !$order->pickup_date) $order->pickup_date = now();
+                if ($newStatus === 'completed') {
+                    if (!$order->pickup_date) $order->pickup_date = now();
+                    $order->order_complete = true;
+                } elseif ($newStatus === 'cancelled') {
+                    $order->order_complete = false;
+                }
                 
                 // Remove all payments when order is cancelled
                 if ($newStatus === 'cancelled') {
@@ -495,6 +536,69 @@ class OrderController extends Controller
         }
         
         return $response;
+    }
+
+    /**
+     * Cancel a completed order by setting order_complete to false.
+     */
+    public function cancelOrder(Order $order, NotifyCustomerForOrderStatus $notifier)
+    {
+        $this->authorize('update', $order);
+
+        // Check if order is completed (can only cancel completed orders)
+        if (!$order->order_complete) {
+            return response()->json([
+                'message' => 'Only completed orders can be cancelled.',
+                'order' => new OrderResource($order)
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Set order_complete to false and status to cancelled
+            $order->order_complete = false;
+            $order->status = 'cancelled';
+            $order->pickup_date = null; // Clear pickup date for cancelled orders
+            
+            // Remove all payments when order is cancelled
+            $paymentsCount = $order->payments()->count();
+            if ($paymentsCount > 0) {
+                $order->payments()->delete();
+                $order->paid_amount = 0;
+                $order->payment_status = 'pending';
+                $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
+            }
+
+            // Update dining table status to available if order has a dining table
+            if ($order->dining_table_id) {
+                $diningTable = DiningTable::find($order->dining_table_id);
+                if ($diningTable) {
+                    $diningTable->update(['status' => 'available']);
+                }
+            }
+
+            $order->save();
+            $order->logActivity("Order cancelled - order_complete set to false.");
+
+            DB::commit();
+
+            // Load relationships for response
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+
+            // Broadcast the order updated event
+            event(new OrderUpdated($order, ['status' => 'cancelled']));
+            Log::info('Order cancelled', ['order_id' => $order->id]);
+
+            return response()->json([
+                'message' => 'Order cancelled successfully.',
+                'order' => new OrderResource($order)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error cancelling order: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to cancel order. An internal error occurred.'], 500);
+        }
     }
 
     /**
@@ -623,17 +727,14 @@ class OrderController extends Controller
         // --- PDF Generation ---
         // Page format arguments: orientation, unit, format (array(width, height) in mm for custom roll)
         // 80mm is a common POS paper width
-        // Calculate dynamic page height based on number of items (10mm per item)
-        $baseHeight = 120;
-        $itemHeight = 10;
-        $pageHeight = $baseHeight + ($order->items->count() * $itemHeight);
-        $pdf = new PosInvoicePdf('P', 'mm', [80, $pageHeight], true, 'UTF-8', false);
-
-        // Pass data to the PDF class
+        // Calculate dynamic page height based on content including category headers
+        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false); // Use A4 height as default
+        
+        // Pass data to the PDF class first so we can calculate height
         $pdf->setOrder($order);
         $settings = [
             'general_company_name' => app_setting('company_name', config('app.name')),
-            'general_company_name_ar' => app_setting('company_name_ar', 'شاي خدري'),
+            'general_company_name_ar' => app_setting('company_name_ar', ''),
             'general_company_address' => app_setting('company_address'),
             'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
             'general_company_phone' => app_setting('company_phone'),
@@ -642,6 +743,15 @@ class OrderController extends Controller
             'company_logo_url' => app_setting('company_logo_url'),
             'language' => 'en', // Default language, can be made configurable
         ];
+        $pdf->setSettings($settings);
+        
+        // Calculate the actual height needed including category headers
+        $requiredHeight = $pdf->calculateTotalHeight();
+        $pageHeight = max(120, $requiredHeight + 20 + 20); // Minimum 120mm, add 20mm buffer
+        
+        // Recreate PDF with calculated height
+        $pdf = new PosInvoicePdf('P', 'mm', [80, $pageHeight], true, 'UTF-8', false);
+        $pdf->setOrder($order);
         $pdf->setSettings($settings);
 
         // Set document information
@@ -915,6 +1025,44 @@ class OrderController extends Controller
         }
 
         return $detailedBreakdown;
+    }
+    
+    /**
+     * Get the height breakdown for a POS invoice (useful for debugging)
+     */
+    public function getPosInvoiceHeight(Order $order)
+    {
+        $this->authorize('view', $order);
+        
+        $order->load(['customer', 'user', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
+        
+        $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
+        $pdf->setOrder($order);
+        $settings = [
+            'general_company_name' => app_setting('company_name', config('app.name')),
+            'general_company_name_ar' => app_setting('company_name_ar', ''),
+            'general_company_address' => app_setting('company_address'),
+            'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
+            'general_company_phone' => app_setting('company_phone'),
+            'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
+            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
+            'company_logo_url' => app_setting('company_logo_url'),
+            'language' => 'en',
+        ];
+        $pdf->setSettings($settings);
+        
+        $heightBreakdown = $pdf->getHeightBreakdown();
+        $totalHeight = $pdf->calculateTotalHeight();
+        
+        return response()->json([
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'total_height_mm' => $totalHeight,
+            'height_breakdown' => $heightBreakdown,
+            'items_count' => $order->items->count(),
+            'categories_count' => $order->items->groupBy('serviceOffering.productType.category.id')->count(),
+            'recommended_page_height_mm' => max(120, $totalHeight + 20)
+        ]);
     }
 
  

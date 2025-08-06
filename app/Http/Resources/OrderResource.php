@@ -27,6 +27,7 @@ class OrderResource extends JsonResource
             'user_id' => $this->user_id,
             'staff_user' => new UserResource($this->whenLoaded('user')), // Assuming 'user' is the relationship name for staff
             'status' => $this->status,
+            'order_complete' => $this->order_complete,
             'order_type' => $this->order_type,
             'total_amount' => (float) $this->total_amount,
             'paid_amount' => (float) $this->paid_amount,

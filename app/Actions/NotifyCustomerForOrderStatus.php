@@ -29,7 +29,7 @@ class NotifyCustomerForOrderStatus {
             $order->load(['customer', 'user', 'items.serviceOffering']);
             $settings = [
                 'general_company_name' => app_setting('company_name', config('app.name')),
-                'general_company_name_ar' => app_setting('company_name_ar', 'شاي خدري'),
+                'general_company_name_ar' => app_setting('company_name_ar', ''),
                 'general_company_address' => app_setting('company_address'),
                 'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
                 'general_company_phone' => app_setting('company_phone'),

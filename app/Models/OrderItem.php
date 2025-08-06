@@ -38,4 +38,24 @@ class OrderItem extends Model
     {
         return $this->belongsTo(ServiceOffering::class);
     }
+
+    /**
+     * Boot method to recalculate order total when items are saved
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($orderItem) {
+            if ($orderItem->order) {
+                $orderItem->order->recalculateTotalAmount();
+            }
+        });
+
+        static::deleted(function ($orderItem) {
+            if ($orderItem->order) {
+                $orderItem->order->recalculateTotalAmount();
+            }
+        });
+    }
 }

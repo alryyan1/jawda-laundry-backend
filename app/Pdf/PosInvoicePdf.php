@@ -148,9 +148,8 @@ class PosInvoicePdf extends TCPDF
                 'ar' => 'الفئة'
             ],
             'thank_you' => [
-                'en' => 'Thank you for your business!',
-                //reverse the arabic text
-                'ar' => 'معنا تعاملكم شكراً'
+                'en' => 'We work for the comfort of our customers',
+                'ar' => 'نعـمل من أجل راحـــة عمالئـنا'
             ]
         ];
     }
@@ -192,7 +191,216 @@ class PosInvoicePdf extends TCPDF
     public function Footer() {
         $this->SetY(-15);
         $this->SetFont($this->font, '', 8);
-        $this->Cell(0, 10, $this->getBilingualText('thank_you'), 0, false, 'C');
+        $this->Cell(0, 5, 'we work for the comfort of our customers', 0, 1, 'C');
+        $this->Cell(0, 5, 'نعمل من أجل راحة عملائنا', 0, false, 'C');
+
+    }
+
+    /**
+     * Calculate the total height needed for the receipt including category headers
+     */
+    public function calculateTotalHeight(): float
+    {
+        $totalHeight = 0;
+        
+        // Header section height
+        $totalHeight += 20; // Company header with logo
+        $totalHeight += 10; // Order details section
+        $totalHeight += 8;  // Items table header
+        $totalHeight += 2;  // Header line
+        
+        // Items section height
+        $groupedItems = $this->groupItemsByCategory();
+        foreach ($groupedItems as $categoryId => $categoryData) {
+            $category = \App\Models\ProductCategory::find($categoryId);
+            $hasSequence = $category && $category->sequence_enabled && $category->sequence_prefix;
+            
+            // Category division line (if sequence enabled)
+            if ($hasSequence) {
+                $totalHeight += 2; // Line height
+            }
+            
+            // Category header with sequence
+            $categoryHeaderHeight = $this->calculateCategoryHeaderHeight($categoryId, $categoryData['name'], $hasSequence);
+            $totalHeight += $categoryHeaderHeight;
+            $totalHeight += 1; // Spacing after category name
+            
+            // Items in this category
+            foreach ($categoryData['items'] as $item) {
+                // Calculate combined text height (product name + display name)
+                $productName = $item->serviceOffering->productType->name ?? '';
+                $displayName = $item->serviceOffering->display_name ?? '';
+                $combinedText = $productName . ' - ' . $displayName;
+                $itemNameHeight = $this->calculateTextHeight(35, $combinedText, 4);
+                $totalHeight += max(4, $itemNameHeight); // Minimum 4mm height per item
+            }
+            
+            // Spacing between categories (except for the last category)
+            if ($categoryId !== array_key_last($groupedItems)) {
+                $totalHeight += 2;
+            }
+        }
+        
+        // Summary section height
+        $totalHeight += 2;  // Line before summary
+        $totalHeight += 6;  // Subtotal
+        $totalHeight += 8;  // Total
+        $totalHeight += 6;  // Amount paid
+        $totalHeight += 6;  // Amount due
+        $totalHeight += 5;  // Spacing
+        
+        // Notes section height (if exists)
+        if ($this->order->notes) {
+            $notesHeight = $this->calculateTextHeight(72, $this->getBilingualText('notes') . ": " . $this->order->notes, 4);
+            $totalHeight += $notesHeight;
+        }
+        
+        // Footer height
+        $totalHeight += 15; // Thank you message
+        
+        return $totalHeight;
+    }
+    
+    /**
+     * Get the remaining space on the current page
+     */
+    public function getRemainingPageHeight(): float
+    {
+        $pageHeight = $this->getPageHeight();
+        $currentY = $this->GetY();
+        $bottomMargin = 15; // Footer space
+        
+        return $pageHeight - $currentY - $bottomMargin;
+    }
+    
+    /**
+     * Check if there's enough space for the remaining content
+     */
+    public function hasEnoughSpace(float $requiredHeight): bool
+    {
+        return $this->getRemainingPageHeight() >= $requiredHeight;
+    }
+    
+    /**
+     * Calculate the height needed for just the items section (including category headers)
+     */
+    public function calculateItemsSectionHeight(): float
+    {
+        $totalHeight = 0;
+        $groupedItems = $this->groupItemsByCategory();
+        
+        foreach ($groupedItems as $categoryId => $categoryData) {
+            $category = \App\Models\ProductCategory::find($categoryId);
+            $hasSequence = $category && $category->sequence_enabled && $category->sequence_prefix;
+            
+            // Category division line (if sequence enabled)
+            if ($hasSequence) {
+                $totalHeight += 2; // Line height
+            }
+            
+            // Category header with sequence
+            $categoryHeaderHeight = $this->calculateCategoryHeaderHeight($categoryId, $categoryData['name'], $hasSequence);
+            $totalHeight += $categoryHeaderHeight;
+            $totalHeight += 1; // Spacing after category name
+            
+            // Items in this category
+            foreach ($categoryData['items'] as $item) {
+                // Calculate combined text height (product name + display name)
+                $productName = $item->serviceOffering->productType->name ?? '';
+                $displayName = $item->serviceOffering->display_name ?? '';
+                $combinedText = $productName . ' - ' . $displayName;
+                $itemNameHeight = $this->calculateTextHeight(35, $combinedText, 4);
+                $totalHeight += max(4, $itemNameHeight); // Minimum 4mm height per item
+            }
+            
+            // Spacing between categories (except for the last category)
+            if ($categoryId !== array_key_last($groupedItems)) {
+                $totalHeight += 2;
+            }
+        }
+        
+        return $totalHeight;
+    }
+    
+    /**
+     * Get a detailed breakdown of the receipt height
+     */
+    public function getHeightBreakdown(): array
+    {
+        $breakdown = [
+            'header' => 20,
+            'order_details' => 10,
+            'table_header' => 8,
+            'header_line' => 2,
+            'items_section' => $this->calculateItemsSectionHeight(),
+            'summary_line' => 2,
+            'subtotal' => 6,
+            'total' => 8,
+            'amount_paid' => 6,
+            'amount_due' => 6,
+            'spacing' => 5,
+            'footer' => 15
+        ];
+        
+        // Add notes height if exists
+        if ($this->order->notes) {
+            $breakdown['notes'] = $this->calculateTextHeight(72, $this->getBilingualText('notes') . ": " . $this->order->notes, 4);
+        } else {
+            $breakdown['notes'] = 0;
+        }
+        
+        $breakdown['total_height'] = array_sum($breakdown);
+        
+        return $breakdown;
+    }
+    
+    /**
+     * Calculate the height needed for text that may wrap
+     */
+    private function calculateTextHeight(float $width, string $text, float $lineHeight): float
+    {
+        // Use TCPDF's getStringHeight method for more accurate calculation
+        $this->SetFont($this->font, '', 9);
+        $height = $this->getStringHeight($width, $text);
+        return max($lineHeight, $height);
+    }
+    
+    /**
+     * Get the display name for a category including sequence if available
+     */
+    private function getCategoryDisplayName(int $categoryId, string $categoryName, bool $hasSequence): string
+    {
+        if ($hasSequence) {
+            $sequence = $this->order->category_sequences[$categoryId] ?? '';
+            if ($sequence) {
+                return $sequence . ' - ' . $categoryName;
+            }
+        }
+        return $categoryName;
+    }
+    
+    /**
+     * Get the sequence number for a category
+     */
+    private function getCategorySequence(int $categoryId): string
+    {
+        return $this->order->category_sequences[$categoryId] ?? '';
+    }
+    
+    /**
+     * Calculate the height needed for a category header including sequence
+     */
+    private function calculateCategoryHeaderHeight(int $categoryId, string $categoryName, bool $hasSequence): float
+    {
+        if ($hasSequence) {
+            $sequence = $this->getCategorySequence($categoryId);
+            if ($sequence) {
+                // Height for sequence number (bigger font) + spacing + category name
+                return 8 + 1 + 5; // 8mm for sequence, 1mm spacing, 5mm for category name
+            }
+        }
+        // Regular category name height
+        return $this->calculateTextHeight(72, $categoryName, 5);
     }
 
     /**
@@ -279,21 +487,40 @@ class PosInvoicePdf extends TCPDF
             }
             
             // Category Header
-            $this->SetFont($this->font, 'B', 9);
             if ($hasSequence) {
-                $this->SetTextColor(0, 0, 0); // Black color for sequence categories
+                // Display sequence number on separate line with bigger font
+                $sequence = $this->getCategorySequence($categoryId);
+                if ($sequence) {
+                    $this->SetFont($this->font, 'B', 14);
+                    $this->SetTextColor(0, 0, 0); // Black color for sequence
+                    $this->Cell(0, 8, $sequence, 0, 1, 'C');
+                    $this->Ln(1);
+                }
+                
+                // Display category name
+                $this->SetFont($this->font, 'B', 9);
+                $this->SetTextColor(100, 100, 100); // Gray color for category name
+                $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             } else {
+                // Regular category without sequence
+                $this->SetFont($this->font, 'B', 9);
                 $this->SetTextColor(100, 100, 100); // Gray color for regular categories
+                $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             }
-            $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
+            
             $this->SetTextColor(0, 0, 0); // Reset to black
             $this->SetFont($this->font, '', 9);
             $this->Ln(1);
             
             // Items in this category
             foreach ($categoryData['items'] as $item) {
-                // Use MultiCell for the item name to allow wrapping
-                $this->MultiCell(35, 4, $item->serviceOffering->display_name, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+                // Create combined text: Product Name - Display Name
+                $productName = $item->serviceOffering->productType->name ?? '';
+                $displayName = $item->serviceOffering->display_name ?? '';
+                $combinedText = $productName . ' - (' . $displayName.')';
+                
+                // Use MultiCell for the combined name to allow wrapping
+                $this->MultiCell(35, 4, $combinedText, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
                 $currentY = $this->GetY();
                 $this->SetY($currentY - 4); // Move back up to align other cells
 
@@ -319,21 +546,21 @@ class PosInvoicePdf extends TCPDF
         // --- Summary Section ---
         $this->SetFont($this->font, '', 10);
         $this->Cell(40, 6, $this->getBilingualText('subtotal') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->total_amount, 3), 0, 1, 'R');
+        $this->Cell(25, 6, number_format($this->order->calculated_total_amount, 3), 0, 1, 'R');
         
         // Add Tax/Discount here if needed
 
         $this->SetFont($this->font, 'B', 12);
         $this->Cell(40, 8, $this->getBilingualText('total') . ':', 0, 0, 'R');
-        $this->Cell(20, 8, $this->currencySymbol . number_format($this->order->total_amount, 3), 0, 1, 'R');
+        $this->Cell(25, 8, $this->currencySymbol . number_format($this->order->calculated_total_amount, 3), 0, 1, 'R');
         
         $this->SetFont($this->font, '', 10);
         $this->Cell(40, 6, $this->getBilingualText('amount_paid') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->paid_amount, 3), 0, 1, 'R');
+        $this->Cell(25, 6, number_format($this->order->paid_amount, 3), 0, 1, 'R');
         
         $this->SetFont('arial', 'B', 10);
         $this->Cell(40, 6, $this->getBilingualText('amount_due') . ':', 0, 0, 'R');
-        $this->Cell(20, 6, number_format($this->order->amount_due, 3), 0, 1, 'R');
+        $this->Cell(25, 6, number_format($this->order->calculated_total_amount - $this->order->paid_amount, 3), 0, 1, 'R');
         
         $this->Ln(5);
 
@@ -354,4 +581,4 @@ class PosInvoicePdf extends TCPDF
         // $this->write1DBarcode(strval($this->order->id), 'C128', '', '', '', 15, 0.4, $style, 'N');
     }
     
-}
+}   

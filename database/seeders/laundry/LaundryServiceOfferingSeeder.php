@@ -65,29 +65,30 @@ class LaundryServiceOfferingSeeder extends Seeder
 
     /**
      * Get default price based on product type and service action
+     * All prices are adjusted to be within the 0.1 to 0.8 range
      */
     private function getDefaultPrice(ProductType $productType, ServiceAction $serviceAction): float
     {
-        // Base prices for different service actions
+        // Base prices for different service actions (adjusted to 0.1-0.8 range)
         $basePrices = [
-            'Ironing - كي' => 5.00,
-            'Washing - غسيل' => 8.00,
-            'Dry Clean - غسيل جاف' => 15.00
+            'Ironing - كي' => 0.300,
+            'Washing - غسيل' => 0.400,
+            'Dry Clean - غسيل جاف' => 0.600
         ];
 
-        $basePrice = $basePrices[$serviceAction->name] ?? 10.00;
+        $basePrice = $basePrices[$serviceAction->name] ?? 0.400;
 
         // Adjust price based on product type category
         $categoryName = $productType->productCategory->name ?? '';
         
         if (str_contains($categoryName, 'Special Items')) {
-            return $basePrice * 1.5; // 50% premium for special items
+            return min(0.800, $basePrice * 1.3); // 30% premium for special items, capped at 0.8
         } elseif (str_contains($categoryName, 'Accessories')) {
-            return $basePrice * 0.7; // 30% discount for accessories
+            return max(0.100, $basePrice * 0.8); // 20% discount for accessories, minimum 0.1
         } elseif (str_contains($categoryName, 'Household Items')) {
-            return $basePrice * 1.2; // 20% premium for household items
+            return min(0.800, $basePrice * 1.2); // 20% premium for household items, capped at 0.8
         } elseif (str_contains($categoryName, 'Carpets & Rugs')) {
-            return $basePrice * 2.0; // 100% premium for carpets
+            return min(0.800, $basePrice * 1.5); // 50% premium for carpets, capped at 0.8
         }
 
         return $basePrice; // Default for regular clothes
@@ -95,23 +96,24 @@ class LaundryServiceOfferingSeeder extends Seeder
 
     /**
      * Get default price per square meter for dimension-based items
+     * All prices are adjusted to be within the 0.1 to 0.8 range
      */
     private function getDefaultPricePerSqMeter(ProductType $productType, ServiceAction $serviceAction): float
     {
-        // Base prices per square meter for different service actions
+        // Base prices per square meter for different service actions (adjusted to 0.1-0.8 range)
         $basePricesPerSqMeter = [
-            'Ironing - كي' => 3.00,
-            'Washing - غسيل' => 5.00,
-            'Dry Clean - غسيل جاف' => 8.00
+            'Ironing - كي' => 0.200,
+            'Washing - غسيل' => 0.300,
+            'Dry Clean - غسيل جاف' => 0.500
         ];
 
-        $basePrice = $basePricesPerSqMeter[$serviceAction->name] ?? 5.00;
+        $basePrice = $basePricesPerSqMeter[$serviceAction->name] ?? 0.300;
 
         // Adjust price based on product type category
         $categoryName = $productType->productCategory->name ?? '';
         
         if (str_contains($categoryName, 'Carpets & Rugs')) {
-            return $basePrice * 1.5; // 50% premium for carpets
+            return min(0.800, $basePrice * 1.4); // 40% premium for carpets, capped at 0.8
         }
 
         return $basePrice;

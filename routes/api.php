@@ -47,6 +47,7 @@ Route::get('/table-reservations/today', [TableReservationController::class, 'tod
 // Public download routes (no authentication required)
 Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
 Route::get('/orders/{order}/pos-invoice-pdf', [OrderController::class, 'downloadPosInvoice']);
+Route::get('/orders/{order}/pos-invoice-height', [OrderController::class, 'getPosInvoiceHeight']);
 
 // Public report PDF routes (no authentication required)
 Route::get('/reports/orders/pdf', [ReportController::class, 'exportOrdersReportPdf']);
@@ -75,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
   Route::apiResource('orders', OrderController::class);
+  Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
    // and POST /product-types/{product_type}/predefined-sizes
    Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)
    ->only(['index', 'store']);
@@ -158,6 +160,7 @@ Route::delete(
     Route::get('/dashboard/today-summary', [App\Http\Controllers\Api\DashboardController::class, 'todaySummary']);
     Route::patch('/order-items/{id}/status', [\App\Http\Controllers\Api\OrderItemController::class, 'updateStatus']);
     Route::patch('/order-items/{id}/picked-up-quantity', [\App\Http\Controllers\Api\OrderItemController::class, 'updatePickedUpQuantity']);
+    Route::delete('/order-items/{id}', [\App\Http\Controllers\Api\OrderItemController::class, 'destroy']);
     Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
     Route::get('/reports/daily-revenue', [ReportController::class, 'dailyRevenueReport']);
     Route::get('/reports/daily-costs', [ReportController::class, 'dailyCostsReport']);

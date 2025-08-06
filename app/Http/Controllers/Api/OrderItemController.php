@@ -45,4 +45,22 @@ class OrderItemController extends Controller
             'order_item' => $orderItem
         ]);
     }
+
+    public function destroy($id)
+    {
+        $orderItem = OrderItem::findOrFail($id);
+        
+        // Store order reference before deletion for recalculation
+        $order = $orderItem->order;
+        
+        // Delete the order item
+        $orderItem->delete();
+        
+        // The order total will be automatically recalculated via the model events
+        
+        return response()->json([
+            'message' => 'Order item deleted successfully.',
+            'order' => $order->fresh(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable'])
+        ]);
+    }
 } 
