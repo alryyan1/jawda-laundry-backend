@@ -3,6 +3,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
 class ProductCategory extends Model
 {
@@ -46,8 +47,11 @@ class ProductCategory extends Model
     public function incrementSequence(): void
     {
         if ($this->sequence_enabled) {
-            $this->current_sequence = ($this->current_sequence ?? 0) + 1;
+            $oldSequence = $this->current_sequence ?? 0;
+            $this->current_sequence = $oldSequence + 1;
+            Log::info("ProductCategory::incrementSequence - Category {$this->id}: {$oldSequence} -> {$this->current_sequence}");
             $this->save();
+            Log::info("ProductCategory::incrementSequence - Saved successfully");
         }
     }
 }

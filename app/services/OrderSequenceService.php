@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\ProductCategory;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class OrderSequenceService
 {
@@ -32,8 +33,10 @@ class OrderSequenceService
                 // Only increment if this category hasn't been incremented for this order yet
                 // AND this is not an update (first time creating sequences)
                 if (!in_array($category->id, $incrementedCategories) && !$isUpdate) {
+                    Log::info("Incrementing sequence for category {$category->id} from {$category->current_sequence}");
                     $category->incrementSequence();
                     $incrementedCategories[] = $category->id;
+                    Log::info("Sequence incremented to {$category->current_sequence}");
                 }
                 
                 $sequence = $this->generateSequenceForCategory($category, $itemCount);

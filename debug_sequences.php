@@ -10,14 +10,24 @@ use App\Models\ProductCategory;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 
-echo "Testing order creation with category sequences...\n\n";
+echo "Debugging category sequences...\n\n";
 
-// Check current sequence before creating order
+// Check the category
 $category = ProductCategory::find(4);
-echo "Before creating order:\n";
 echo "Category: {$category->name}\n";
 echo "Current Sequence: {$category->current_sequence}\n";
 echo "Next Sequence: {$category->getNextSequence()}\n\n";
+
+// Check last 5 orders
+echo "Last 5 orders with category_sequences:\n";
+$orders = Order::orderBy('id', 'desc')->take(5)->get(['id', 'order_number', 'category_sequences', 'created_at']);
+
+foreach ($orders as $order) {
+    echo "Order #{$order->id} ({$order->order_number}) - Created: {$order->created_at}\n";
+    echo "  Sequences: " . json_encode($order->category_sequences) . "\n";
+}
+
+echo "\n--- Testing new order creation ---\n";
 
 // Get a customer and service offering for testing
 $customer = Customer::first();
@@ -30,13 +40,14 @@ if (!$customer || !$serviceOffering) {
     exit;
 }
 
-echo "Using Customer: {$customer->name}\n";
-echo "Using Service Offering: {$serviceOffering->display_name}\n\n";
+echo "Before creating order:\n";
+echo "Category Current Sequence: {$category->current_sequence}\n";
+echo "Category Next Sequence: {$category->getNextSequence()}\n\n";
 
 // Create a test order
 try {
     $order = Order::create([
-        'order_number' => 'TEST-' . strtoupper(uniqid()),
+        'order_number' => 'DEBUG-' . strtoupper(uniqid()),
         'customer_id' => $customer->id,
         'user_id' => 1,
         'status' => 'pending',
@@ -55,21 +66,24 @@ try {
         'sub_total' => 10.00,
     ]);
 
+    echo "Order created with ID: {$order->id}\n";
+    echo "Items count: {$order->items()->count()}\n\n";
+
     // Generate category sequences
+    echo "Generating category sequences...\n";
     $order->generateCategorySequences();
 
-    echo "Order created successfully!\n";
-    echo "Order ID: {$order->id}\n";
-    echo "Category Sequences: " . json_encode($order->category_sequences) . "\n\n";
+    echo "Order sequences: " . json_encode($order->category_sequences) . "\n\n";
 
     // Check sequence after creating order
     $category->refresh();
     echo "After creating order:\n";
-    echo "Current Sequence: {$category->current_sequence}\n";
-    echo "Next Sequence: {$category->getNextSequence()}\n\n";
+    echo "Category Current Sequence: {$category->current_sequence}\n";
+    echo "Category Next Sequence: {$category->getNextSequence()}\n\n";
 
 } catch (Exception $e) {
     echo "Error creating order: " . $e->getMessage() . "\n";
+    echo "Trace: " . $e->getTraceAsString() . "\n";
 }
 
 echo "Done.\n"; 

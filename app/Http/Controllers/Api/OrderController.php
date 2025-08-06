@@ -190,14 +190,14 @@ class OrderController extends Controller
                 }
             }
             
-            DB::commit();
-
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
-            
-            // Generate category sequences for the order
+            // Generate category sequences for the order (inside transaction)
             if ($order->items()->count() > 0) {
                 $order->generateCategorySequences();
             }
+            
+            DB::commit();
+
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
             // Broadcast the order created event
             event(new OrderCreated($order));
