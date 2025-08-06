@@ -29,7 +29,6 @@ use App\Http\Controllers\Api\RestaurantTableController;
 use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\NavigationController;
-use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\CustomerPriceListController;
 use App\Http\Controllers\Api\CustomerPricingRuleController;
 
@@ -169,17 +168,7 @@ Route::delete(
     Route::get('/users/{user}/navigation-permissions', [NavigationController::class, 'getUserPermissions']);
     Route::put('/users/{user}/navigation-permissions', [NavigationController::class, 'updateUserPermissions']);
 
-    // Inventory Management
-    Route::get('/inventories/categories', [InventoryController::class, 'categories']);
-    Route::get('/inventories/transactions', [InventoryController::class, 'transactions']);
-    Route::post('/inventories/transactions', [InventoryController::class, 'createTransaction']);
-    Route::get('/inventories/statistics', [InventoryController::class, 'statistics']);
-    Route::get('/inventories/product-type-inventory', [InventoryController::class, 'getProductTypeInventory']);
-    Route::get('/inventories/available', [InventoryController::class, 'available']);
-    Route::get('/inventories/low-stock', [InventoryController::class, 'lowStock']);
-    Route::post('/inventories/{inventory}/add-stock', [InventoryController::class, 'addStock']);
-    Route::post('/inventories/{inventory}/remove-stock', [InventoryController::class, 'removeStock']);
-    Route::apiResource('inventories', InventoryController::class);
+
 
   // Customer Price List Management
   Route::get('/customers/{customer}/price-list', [CustomerPriceListController::class, 'show']);

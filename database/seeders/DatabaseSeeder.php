@@ -29,8 +29,6 @@ class DatabaseSeeder extends Seeder
             // ServiceActionSeeder::class,
             // ServiceOfferingSeeder::class,
             NavigationItemSeeder::class,
-            InventoryNavigationSeeder::class,
-            InventoryItemSeeder::class,
             // Laundry seeders
             \Database\Seeders\Laundry\LaundrySeeder::class,
             // ProductCategorySeeder::class,   // Before ProductTypeSeeder

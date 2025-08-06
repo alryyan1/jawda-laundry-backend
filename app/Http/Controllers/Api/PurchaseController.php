@@ -10,16 +10,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
-use App\Services\InventoryService;
-use App\Models\InventoryItem;
+
 
 class PurchaseController extends Controller
 {
-    protected InventoryService $inventoryService;
 
-    public function __construct(InventoryService $inventoryService)
+    public function __construct()
     {
-        $this->inventoryService = $inventoryService;
         $this->middleware('can:purchase:list')->only('index');
         $this->middleware('can:purchase:create')->only('store');
         $this->middleware('can:purchase:update')->only('update');
@@ -95,49 +92,10 @@ class PurchaseController extends Controller
 
             $purchase->items()->createMany($itemsToCreate);
 
-            // Update inventory for each purchased item
-            $inventoryWarnings = [];
-            foreach ($validatedData['items'] as $item) {
-                try {
-                    // Find or create inventory item for this product type
-                    $inventoryItem = $this->findOrCreateInventoryItem(
-                        $item['product_type_id'], 
-                        $validatedData['supplier_id']
-                    );
-
-                    // Add stock using the inventory service
-                    $this->inventoryService->addStock(
-                        $inventoryItem->id,
-                        $item['quantity'],
-                        $item['unit_price'],
-                        'purchase',
-                        $purchase->id,
-                        "Purchase #{$purchase->reference_number} - Added {$item['quantity']} units"
-                    );
-
-                } catch (\Exception $e) {
-                    $warning = "Failed to update inventory for product type {$item['product_type_id']}: " . $e->getMessage();
-                    Log::warning($warning);
-                    $inventoryWarnings[] = $warning;
-                    // Continue with other items even if one fails
-                }
-            }
-
             DB::commit();
             $purchase->load(['supplier', 'user', 'items']);
             
-            $response = new PurchaseResource($purchase);
-            
-            // Add inventory warnings to response if any
-            if (!empty($inventoryWarnings)) {
-                return response()->json([
-                    'data' => $response,
-                    'warnings' => $inventoryWarnings,
-                    'message' => 'Purchase created successfully with some inventory warnings.'
-                ]);
-            }
-            
-            return $response;
+            return new PurchaseResource($purchase);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -203,32 +161,5 @@ class PurchaseController extends Controller
         }
     }
 
-    /**
-     * Find or create an inventory item for a given product type
-     */
-    private function findOrCreateInventoryItem($productTypeId, $supplierId = null)
-    {
-        // Try to find existing active inventory item for this product type
-        $inventoryItem = InventoryItem::where('product_type_id', $productTypeId)
-            ->where('is_active', true)
-            ->first();
 
-        if (!$inventoryItem) {
-            // Create new inventory item if none exists
-            $inventoryItem = InventoryItem::create([
-                'product_type_id' => $productTypeId,
-                'sku' => 'AUTO-' . $productTypeId . '-' . time(),
-                'description' => 'Auto-created from purchase',
-                'unit' => 'pcs', // Default unit, can be updated later
-                'min_stock_level' => 0,
-                'max_stock_level' => 1000, // Default max level
-                'current_stock' => 0,
-                'cost_per_unit' => 0,
-                'supplier_id' => $supplierId,
-                'is_active' => true
-            ]);
-        }
-
-        return $inventoryItem;
-    }
 }
