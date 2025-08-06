@@ -10,30 +10,21 @@ class PricingRule extends Model
     protected $fillable = [
         'service_offering_id',
         'customer_id',
-        'customer_type_id',
         'price',
-        'price_per_sq_meter',
-        'valid_from',
-        'valid_to',
-        'min_quantity',
-        'min_area_sq_meter'
+        'price_per_sq_meter'
     ];
     protected $casts = [
         'price' => 'decimal:2',
-        'price_per_sq_meter' => 'decimal:2',
-        'valid_from' => 'date',
-        'valid_to' => 'date'
+        'price_per_sq_meter' => 'decimal:2'
     ];
+    
     public function serviceOffering()
     {
         return $this->belongsTo(ServiceOffering::class);
     }
+    
     public function customer()
     {
         return $this->belongsTo(Customer::class);
-    }
-    public function customerType()
-    {
-        return $this->belongsTo(CustomerType::class);
     }
 }

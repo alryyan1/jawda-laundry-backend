@@ -21,7 +21,7 @@ class CustomerTypeResource extends JsonResource
             // Include other fields from CustomerType model if they exist
             // 'discount_percentage' => $this->discount_percentage,
             'customers_count' => $this->whenCounted('customers'),
-            'pricing_rules_count' => $this->whenCounted('pricingRules'),
+            // 'pricing_rules_count' => $this->whenCounted('pricingRules'), // Removed - pricing rules no longer link to customer types
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
         ];

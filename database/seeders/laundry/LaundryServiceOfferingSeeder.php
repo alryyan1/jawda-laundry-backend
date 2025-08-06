@@ -48,7 +48,6 @@ class LaundryServiceOfferingSeeder extends Seeder
                         'name_override' => null, // Use default display name
                         'description_override' => null, // Use default description
                         'default_price' => $this->getDefaultPrice($productType, $serviceAction),
-                        'pricing_strategy' => $productType->is_dimension_based ? 'area_based' : 'piece_based',
                         'default_price_per_sq_meter' => $productType->is_dimension_based ? $this->getDefaultPricePerSqMeter($productType, $serviceAction) : null,
                         'applicable_unit' => $productType->is_dimension_based ? 'sq_meter' : 'piece',
                         'is_active' => true

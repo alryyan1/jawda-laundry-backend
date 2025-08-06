@@ -52,6 +52,7 @@ class Customer extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+    
     public function CustomerType(){
         return $this->belongsTo(CustomerType::class);
     }
@@ -62,21 +63,5 @@ class Customer extends Model
     public function pricingRules()
     {
         return $this->hasMany(PricingRule::class);
-    }
-
-    /**
-     * Get all product types assigned to this customer
-     */
-    public function productTypes()
-    {
-        return $this->hasMany(CustomerProductType::class);
-    }
-
-    /**
-     * Get all service offering pricing for this customer
-     */
-    public function serviceOfferingPricing()
-    {
-        return $this->hasMany(CustomerProductServiceOffering::class);
     }
 }

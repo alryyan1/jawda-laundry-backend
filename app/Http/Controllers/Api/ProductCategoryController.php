@@ -43,6 +43,9 @@ class ProductCategoryController extends Controller
             'name' => 'required|string|max:255|unique:product_categories,name',
             'description' => 'nullable|string|max:1000',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'sequence_prefix' => 'nullable|string|max:10',
+            'sequence_enabled' => 'boolean',
+            'current_sequence' => 'integer|min:0',
         ]);
 
         try {
@@ -88,6 +91,9 @@ class ProductCategoryController extends Controller
             ],
             'description' => 'sometimes|nullable|string|max:1000',
             'image' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'sequence_prefix' => 'sometimes|nullable|string|max:10',
+            'sequence_enabled' => 'sometimes|boolean',
+            'current_sequence' => 'sometimes|integer|min:0',
         ]);
 
         // Log the request data for debugging

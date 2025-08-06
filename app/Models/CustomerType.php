@@ -28,9 +28,11 @@ class CustomerType extends Model
 
     /**
      * Get all of the pricing rules associated with this customer type.
+     * Note: This relationship was removed when pricing_rules table was simplified.
+     * Pricing rules now only link to customers directly, not customer types.
      */
-    public function pricingRules()
-    {
-        return $this->hasMany(PricingRule::class);
-    }
+    // public function pricingRules()
+    // {
+    //     return $this->hasMany(PricingRule::class);
+    // }
 }

@@ -35,7 +35,7 @@ class PricingService
         // Eager load necessary relationships if they haven't been loaded already.
         $offering->loadMissing(['productType', 'pricingRules']);
         if ($customer) {
-            $customer->loadMissing('customerType.pricingRules');
+            $customer->loadMissing('customerType');
         }
 
         $productType = $offering->productType;
@@ -75,7 +75,8 @@ class PricingService
 
     /**
      * Determines the correct price per unit by checking rules in order of precedence.
-     * Precedence: Customer Rule > Customer Type Rule > Service Offering Default.
+     * Precedence: Customer Rule > Service Offering Default.
+     * Note: Customer Type rules were removed when pricing_rules table was simplified.
      *
      * @param ServiceOffering $offering
      * @param Customer|null $customer
@@ -111,22 +112,8 @@ class PricingService
             }
         }
 
-        // 2. If no customer-specific rule, check for a rule for the customer's type
-        if ($customer->customerType) {
-            $customerTypeRule = $offering->pricingRules
-                ->where('customer_type_id', $customer->customer_type_id)
-                ->first();
-
-            if ($customerTypeRule) {
-                $rulePrice = $isDimensionBased
-                    ? $customerTypeRule->price_per_sq_meter
-                    : $customerTypeRule->price;
-                
-                if ($rulePrice !== null) {
-                    return (float) $rulePrice;
-                }
-            }
-        }
+        // 2. Customer type rules were removed when pricing_rules table was simplified
+        // Pricing rules now only link directly to customers, not customer types
 
         // 3. If no rules applied, return the initial default price from the offering
         return (float) $price;

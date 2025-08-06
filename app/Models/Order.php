@@ -30,6 +30,7 @@ class Order extends Model
         'payment_method',       // Ensure this is here
         'payment_status',       // Ensure this is here
         'notes',
+        'category_sequences',   // Category-specific sequences
         'order_date',
         'due_date',
         'pickup_date',
@@ -51,6 +52,7 @@ class Order extends Model
         'pickup_date' => 'datetime',
         'whatsapp_text_sent' => 'boolean',
         'whatsapp_pdf_sent' => 'boolean',
+        'category_sequences' => 'array',
     ];
 
     /**
@@ -143,6 +145,29 @@ class Order extends Model
     }
 
     /**
+     * Generate category-specific sequences for this order
+     */
+    public function generateCategorySequences(): void
+    {
+        $sequenceService = app(\App\Services\OrderSequenceService::class);
+        $sequences = $sequenceService->generateOrderSequences($this);
+        $this->category_sequences = $sequences;
+        $this->save();
+    }
+
+    /**
+     * Get category sequences as a formatted string
+     */
+    public function getCategorySequencesString(): string
+    {
+        if (empty($this->category_sequences)) {
+            return '';
+        }
+
+        return implode(', ', $this->category_sequences);
+    }
+
+    /**
      * Boot method to automatically set daily_order_number when creating
      */
     protected static function boot()
@@ -152,6 +177,13 @@ class Order extends Model
         static::creating(function ($order) {
             if (empty($order->daily_order_number)) {
                 $order->daily_order_number = self::generateDailyOrderNumber();
+            }
+        });
+
+        static::created(function ($order) {
+            // Generate category sequences after order is created
+            if ($order->items()->count() > 0) {
+                $order->generateCategorySequences();
             }
         });
     }

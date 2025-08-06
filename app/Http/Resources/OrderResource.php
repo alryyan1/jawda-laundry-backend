@@ -34,6 +34,8 @@ class OrderResource extends JsonResource
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
             'notes' => $this->notes,
+            'category_sequences' => $this->category_sequences,
+            'category_sequences_string' => $this->getCategorySequencesString(),
             'order_date' => $this->order_date ? $this->order_date->toIso8601String() : null,
             'due_date' => $this->due_date ? $this->due_date->toIso8601String() : null,
             'pickup_date' => $this->pickup_date ? $this->pickup_date->toIso8601String() : null,

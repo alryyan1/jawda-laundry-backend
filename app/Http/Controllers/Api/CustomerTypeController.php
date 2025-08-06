@@ -19,7 +19,7 @@ class CustomerTypeController extends Controller
     {
         // Add authorization if needed: e.g., $this->authorize('viewAny', CustomerType::class);
 
-        $query = CustomerType::withCount(['customers', 'pricingRules'])->orderBy('name');
+        $query = CustomerType::withCount(['customers'])->orderBy('name');
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
@@ -64,7 +64,7 @@ class CustomerTypeController extends Controller
     public function show(CustomerType $customerType) // Route model binding
     {
         // Add authorization: e.g., $this->authorize('view', $customerType);
-        $customerType->loadCount(['customers', 'pricingRules']);
+        $customerType->loadCount(['customers']);
         return new CustomerTypeResource($customerType);
     }
 
@@ -106,9 +106,6 @@ class CustomerTypeController extends Controller
         // Check if this customer type is in use by any customers or pricing rules
         if ($customerType->customers()->exists()) {
             return response()->json(['message' => 'Cannot delete customer type. It is currently assigned to customers. Please reassign those customers first.'], 409); // Conflict
-        }
-        if ($customerType->pricingRules()->exists()) {
-            return response()->json(['message' => 'Cannot delete customer type. It is used in pricing rules. Please remove those rules first.'], 409);
         }
 
 

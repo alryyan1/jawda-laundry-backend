@@ -31,8 +31,7 @@ use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\CustomerPriceListController;
-use App\Http\Controllers\Api\CustomerProductTypeController;
-use App\Http\Controllers\Api\CustomerServiceOfferingController;
+use App\Http\Controllers\Api\CustomerPricingRuleController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -190,17 +189,14 @@ Route::delete(
   Route::get('/customers/{customer}/price-list/export', [CustomerPriceListController::class, 'export']);
 
   // Customer Product Type Management
-                Route::get('/customers/{customer}/product-types', [CustomerProductTypeController::class, 'index']);
-              Route::post('/customers/{customer}/product-types/import-all', [CustomerProductTypeController::class, 'importAll']);
-              Route::post('/customers/{customer}/product-types', [CustomerProductTypeController::class, 'store']);
-              Route::delete('/customers/{customer}/product-types/{customerProductType}', [CustomerProductTypeController::class, 'destroy']);
-              Route::get('/customers/{customer}/product-types/available', [CustomerProductTypeController::class, 'getAvailableProductTypes']);
-              
-              // Customer Service Offerings Management
-              Route::get('/customers/{customer}/product-types/{productTypeId}/service-offerings', [CustomerServiceOfferingController::class, 'index']);
-              Route::post('/customers/{customer}/product-types/{productTypeId}/service-offerings', [CustomerServiceOfferingController::class, 'store']);
-              Route::put('/customers/{customer}/product-types/{productTypeId}/service-offerings/{serviceActionId}', [CustomerServiceOfferingController::class, 'update']);
-              Route::delete('/customers/{customer}/product-types/{productTypeId}/service-offerings/{serviceActionId}', [CustomerServiceOfferingController::class, 'destroy']);
+                // Customer Pricing Rules
+              Route::get('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'index']);
+              Route::post('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'store']);
+              Route::put('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'update']);
+              Route::delete('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'destroy']);
+              Route::get('/customers/{customer}/pricing-rules/available-service-offerings', [CustomerPricingRuleController::class, 'getAvailableServiceOfferings']);
+Route::post('/customers/{customer}/pricing-rules/import-all', [CustomerPricingRuleController::class, 'importAllServiceOfferings']);
+Route::get('/customers/{customer}/pricing-rules/products', [CustomerPricingRuleController::class, 'getCustomerProductsWithPricingRules']);
 
 
   });

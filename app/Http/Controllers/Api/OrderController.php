@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 use App\Models\DiningTable;
+use App\Models\CustomerProductServiceOffering;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
@@ -80,7 +81,7 @@ class OrderController extends Controller
         
         // Add item validation rules if items are provided
         if (!$isEmptyOrder || ($request->has('items') && !empty($request->input('items')))) {
-            $validationRules['items.*.service_offering_id'] = 'required|exists:service_offerings,id';
+            $validationRules['items.*.service_offering_id'] = 'required|integer';
             $validationRules['items.*.quantity'] = 'required|integer|min:1';
             $validationRules['items.*.product_description_custom'] = 'nullable|string|max:255';
             $validationRules['items.*.length_meters'] = 'nullable|numeric|min:0';
@@ -104,7 +105,42 @@ class OrderController extends Controller
             // Only process items if they exist and are not empty
             if (!empty($validatedData['items'])) {
                 foreach ($validatedData['items'] as $itemData) {
-                    $serviceOffering = ServiceOffering::findOrFail($itemData['service_offering_id']);
+                    // Try to find the service offering in regular service_offerings table first
+                    $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
+                    
+                    // If not found in regular table, try customer_product_service_offerings table
+                    if (!$serviceOffering && $customer) {
+                        $customerServiceOffering = CustomerProductServiceOffering::where('id', $itemData['service_offering_id'])
+                            ->where('customer_id', $customer->id)
+                            ->first();
+                        
+                        if ($customerServiceOffering) {
+                            // Check if a regular service offering exists for this product_type and service_action
+                            $regularServiceOffering = ServiceOffering::where('product_type_id', $customerServiceOffering->product_type_id)
+                                ->where('service_action_id', $customerServiceOffering->service_action_id)
+                                ->first();
+                            
+                            if (!$regularServiceOffering) {
+                                // Create the missing regular service offering
+                                $regularServiceOffering = ServiceOffering::create([
+                                    'product_type_id' => $customerServiceOffering->product_type_id,
+                                    'service_action_id' => $customerServiceOffering->service_action_id,
+                                    'name' => $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name,
+                                    'description' => $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description,
+                                    'default_price' => $customerServiceOffering->default_price,
+                                    'default_price_per_sq_meter' => $customerServiceOffering->default_price_per_sq_meter,
+                                    'is_active' => $customerServiceOffering->is_active,
+                                ]);
+                            }
+                            
+                            // Use the regular service offering for the order item
+                            $serviceOffering = $regularServiceOffering;
+                        }
+                    }
+                    
+                    if (!$serviceOffering) {
+                        throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
+                    }
 
                     $priceDetails = $this->pricingService->calculatePrice(
                         $serviceOffering,
@@ -158,6 +194,11 @@ class OrderController extends Controller
 
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
+            // Generate category sequences for the order
+            if ($order->items()->count() > 0) {
+                $order->generateCategorySequences();
+            }
+            
             // Broadcast the order created event
             event(new OrderCreated($order));
             Log::info('OrderCreated event fired', ['order_id' => $order->id]);
@@ -208,7 +249,7 @@ class OrderController extends Controller
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
             'items' => 'sometimes|array|min:1', // Allow items to be updated
-            'items.*.service_offering_id' => 'required_with:items|exists:service_offerings,id',
+            'items.*.service_offering_id' => 'required_with:items|integer',
             'items.*.quantity' => 'required_with:items|integer|min:1',
             'items.*.product_description_custom' => 'nullable|string|max:255',
             'items.*.length_meters' => 'nullable|numeric|min:0',
@@ -249,7 +290,36 @@ class OrderController extends Controller
 
                 // Process all items (existing + new)
                 foreach ($validatedData['items'] as $itemData) {
-                    $serviceOffering = ServiceOffering::findOrFail($itemData['service_offering_id']);
+                    // Try to find the service offering in regular service_offerings table first
+                    $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
+                    
+                    // If not found in regular table, try customer_product_service_offerings table
+                    if (!$serviceOffering) {
+                        $customerServiceOffering = CustomerProductServiceOffering::where('id', $itemData['service_offering_id'])
+                            ->where('customer_id', $customer->id)
+                            ->first();
+                        
+                        if ($customerServiceOffering) {
+                            // Create a temporary service offering object from customer data
+                            $serviceOffering = new ServiceOffering();
+                            $serviceOffering->id = $customerServiceOffering->id;
+                            $serviceOffering->product_type_id = $customerServiceOffering->product_type_id;
+                            $serviceOffering->service_action_id = $customerServiceOffering->service_action_id;
+                            $serviceOffering->name = $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name;
+                            $serviceOffering->description = $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description;
+                            $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
+                            $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
+                            $serviceOffering->is_active = $customerServiceOffering->is_active;
+                            
+                            // Load the relationships
+                            $serviceOffering->productType = $customerServiceOffering->productType;
+                            $serviceOffering->serviceAction = $customerServiceOffering->serviceAction;
+                        }
+                    }
+                    
+                    if (!$serviceOffering) {
+                        throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
+                    }
 
                     $priceDetails = $this->pricingService->calculatePrice(
                         $serviceOffering,
@@ -333,6 +403,11 @@ class OrderController extends Controller
             // Return the fresh resource with all relations
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
+            // Generate category sequences for the order if items were updated
+            if ($request->has('items') && $order->items()->count() > 0) {
+                $order->generateCategorySequences();
+            }
+            
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['status' => $newStatus]));
             Log::info('OrderUpdated event fired', ['order_id' => $order->id, 'new_status' => $newStatus]);
@@ -352,7 +427,7 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error updating order: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
-            return response()->json(['message' => 'Failed to update order. An internal error occurred.'], 500);
+            return response()->json(['message' => 'Failed to update order. An internal error occurred.' . $e->getMessage()], 500);
         }
     }
     /**
