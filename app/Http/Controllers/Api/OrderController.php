@@ -405,7 +405,7 @@ class OrderController extends Controller
             
             // Generate category sequences for the order if items were updated
             if ($request->has('items') && $order->items()->count() > 0) {
-                $order->generateCategorySequences();
+                $order->generateCategorySequences(true); // true for update
             }
             
             // Broadcast the order updated event

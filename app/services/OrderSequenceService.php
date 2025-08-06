@@ -12,9 +12,10 @@ class OrderSequenceService
      * Generate category-specific sequences for an order
      * 
      * @param Order $order
+     * @param bool $isUpdate Whether this is an update to an existing order
      * @return array
      */
-    public function generateOrderSequences(Order $order): array
+    public function generateOrderSequences(Order $order, bool $isUpdate = false): array
     {
         $sequences = [];
         
@@ -29,7 +30,8 @@ class OrderSequenceService
                 $itemCount = $this->getCategoryItemCount($order, $category->id);
                 
                 // Only increment if this category hasn't been incremented for this order yet
-                if (!in_array($category->id, $incrementedCategories)) {
+                // AND this is not an update (first time creating sequences)
+                if (!in_array($category->id, $incrementedCategories) && !$isUpdate) {
                     $category->incrementSequence();
                     $incrementedCategories[] = $category->id;
                 }

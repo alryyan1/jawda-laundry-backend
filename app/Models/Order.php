@@ -147,10 +147,10 @@ class Order extends Model
     /**
      * Generate category-specific sequences for this order
      */
-    public function generateCategorySequences(): void
+    public function generateCategorySequences(bool $isUpdate = false): void
     {
         $sequenceService = app(\App\Services\OrderSequenceService::class);
-        $sequences = $sequenceService->generateOrderSequences($this);
+        $sequences = $sequenceService->generateOrderSequences($this, $isUpdate);
         $this->category_sequences = $sequences;
         $this->save();
     }
