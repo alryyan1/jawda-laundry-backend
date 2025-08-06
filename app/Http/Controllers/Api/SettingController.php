@@ -99,6 +99,7 @@ class SettingController extends Controller
             $path = $request->file('logo')->store('logos', 'public');
             $logoUrl = asset('storage/' . $path);
 
+
             // Update the database with the new logo URL
             $settingsService = app(\App\Services\SettingsService::class);
             $settingsService->set('company_logo_url', $logoUrl);

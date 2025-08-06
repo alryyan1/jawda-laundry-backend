@@ -43,6 +43,15 @@ class SettingsSeeder extends Seeder
                 'is_public' => true,
             ],
             [
+                'key' => 'company_phone_2',
+                'value' => '',
+                'type' => 'string',
+                'group' => 'company',
+                'display_name' => 'Company Phone 2',
+                'description' => 'The second phone number of your company',
+                'is_public' => true,
+            ],
+            [
                 'key' => 'company_email',
                 'value' => 'contact@example.com',
                 'type' => 'string',
