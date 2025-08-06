@@ -6,11 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Services\SettingsService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-// use App\Models\Setting; // If you have a Setting model
 
 class SettingController extends Controller
 {
@@ -29,73 +26,51 @@ class SettingController extends Controller
 
     /**
      * Update application settings.
-     * This method updates the .env file. BE CAREFUL.
-     * A database approach is generally safer and more robust.
+     * This method updates the database settings.
      */
     public function update(Request $request)
     {
-
-        // Get current settings to know which keys are valid
-        $settingsService = app(\App\Services\SettingsService::class);
-        $currentSettings = $settingsService->getAll();
-        $validKeys = array_keys($currentSettings);
-
-        // Define validation rules based on expected types from config
-        $rules = [];
-        foreach ($currentSettings as $key => $value) {
-            $rule = ['nullable', 'string', 'max:255']; // Default
-            if (is_int($value)) {
-                $rule = ['nullable', 'integer', 'min:0'];
-            } elseif (is_bool($value)) {
-                $rule = ['nullable', 'boolean'];
-            } elseif ($key === 'company_email') {
-                $rule = ['nullable', 'email', 'max:255'];
-            }
-            $rules[$key] = $rule;
-        }
-
-        $validatedData = $request->validate($rules);
-
-        // --- Updating .env file ---
-        // This is a sensitive operation. Ensure proper server permissions and backups.
-        $envFilePath = base_path('.env');
-        $envFileContent = File::get($envFilePath);
-
-        foreach ($validatedData as $key => $value) {
-            if (!in_array($key, $validKeys)) continue; // Skip if key not in our defined settings
-
-            $envKey = 'APP_SETTINGS_' . strtoupper($key); // Match .env variable naming convention
-            $escapedValue = is_string($value) && (str_contains($value, ' ') || str_contains($value, '#')) ? "\"{$value}\"" : $value;
-            $escapedValue = is_null($value) ? '' : $escapedValue; // Handle null to empty string for .env
-
-            // Replace or add the line in .env
-            if (str_contains($envFileContent, "{$envKey}=")) {
-                // Update existing line
-                $envFileContent = preg_replace("/^{$envKey}=.*/m", "{$envKey}={$escapedValue}", $envFileContent);
-            } else {
-                // Add new line if it doesn't exist
-                $envFileContent .= "\n{$envKey}={$escapedValue}";
-            }
-        }
-
         try {
-            File::put($envFilePath, $envFileContent);
+            // Get current settings to know which keys are valid
+            $settingsService = app(\App\Services\SettingsService::class);
+            $currentSettings = $settingsService->getAll();
+            $validKeys = array_keys($currentSettings);
 
-            // Clear config cache so Laravel reloads the .env values
-            Artisan::call('config:clear'); // Important for changes to take effect
-            Artisan::call('config:cache');  // Recache for production (optional here, but good practice)
+            // Define validation rules based on expected types from database
+            $rules = [];
+            foreach ($currentSettings as $key => $value) {
+                $rule = ['nullable', 'string', 'max:255']; // Default
+                if (is_int($value)) {
+                    $rule = ['nullable', 'integer', 'min:0'];
+                } elseif (is_bool($value)) {
+                    $rule = ['nullable', 'boolean'];
+                } elseif ($key === 'company_email') {
+                    $rule = ['nullable', 'email', 'max:255'];
+                }
+                $rules[$key] = $rule;
+            }
 
-            // Fetch the newly updated settings from the database
-            $newSettings = $settingsService->getAll();
+            $validatedData = $request->validate($rules);
 
-            return response()->json([
-                'message' => 'Settings updated successfully. Config cache cleared.',
-                'data' => $newSettings
-            ]);
+            // Update settings in database
+            $result = $settingsService->updateMultiple($validatedData);
+
+            if ($result['success']) {
+                return response()->json([
+                    'message' => 'Settings updated successfully.',
+                    'data' => $result['updated']
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Some settings failed to update.',
+                    'errors' => $result['errors'],
+                    'updated' => $result['updated']
+                ], 400);
+            }
 
         } catch (\Exception $e) {
-            Log::error("Failed to update .env file for settings: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to update settings file on server.'], 500);
+            Log::error("Failed to update database settings: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update settings in database.'], 500);
         }
     }
 
@@ -124,24 +99,9 @@ class SettingController extends Controller
             $path = $request->file('logo')->store('logos', 'public');
             $logoUrl = asset('storage/' . $path);
 
-            // Update the .env file with the new logo URL
-            $envFilePath = base_path('.env');
-            $envFileContent = File::get($envFilePath);
-            $envKey = 'APP_SETTINGS_COMPANY_LOGO_URL';
-
-            if (str_contains($envFileContent, "{$envKey}=")) {
-                // Update existing line
-                $envFileContent = preg_replace("/^{$envKey}=.*/m", "{$envKey}=\"{$logoUrl}\"", $envFileContent);
-            } else {
-                // Add new line if it doesn't exist
-                $envFileContent .= "\n{$envKey}=\"{$logoUrl}\"";
-            }
-
-            File::put($envFilePath, $envFileContent);
-
-            // Clear config cache
-            Artisan::call('config:clear');
-            Artisan::call('config:cache');
+            // Update the database with the new logo URL
+            $settingsService = app(\App\Services\SettingsService::class);
+            $settingsService->set('company_logo_url', $logoUrl);
 
             return response()->json([
                 'message' => 'Logo uploaded successfully.',
@@ -169,20 +129,9 @@ class SettingController extends Controller
                 }
             }
 
-            // Update the .env file to remove the logo URL
-            $envFilePath = base_path('.env');
-            $envFileContent = File::get($envFilePath);
-            $envKey = 'APP_SETTINGS_COMPANY_LOGO_URL';
-
-            if (str_contains($envFileContent, "{$envKey}=")) {
-                // Remove the line
-                $envFileContent = preg_replace("/^{$envKey}=.*\n?/m", "", $envFileContent);
-                File::put($envFilePath, $envFileContent);
-            }
-
-            // Clear config cache
-            Artisan::call('config:clear');
-            Artisan::call('config:cache');
+            // Update the database to remove the logo URL
+            $settingsService = app(\App\Services\SettingsService::class);
+            $settingsService->set('company_logo_url', null);
 
             return response()->json([
                 'message' => 'Logo deleted successfully.'
