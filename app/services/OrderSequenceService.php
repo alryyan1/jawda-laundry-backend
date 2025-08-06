@@ -21,9 +21,19 @@ class OrderSequenceService
         // Get all unique categories from order items
         $categories = $this->getOrderCategories($order);
         
+        // Track which categories have been incremented for this order
+        $incrementedCategories = [];
+        
         foreach ($categories as $category) {
             if ($category->sequence_enabled && $category->sequence_prefix) {
                 $itemCount = $this->getCategoryItemCount($order, $category->id);
+                
+                // Only increment if this category hasn't been incremented for this order yet
+                if (!in_array($category->id, $incrementedCategories)) {
+                    $category->incrementSequence();
+                    $incrementedCategories[] = $category->id;
+                }
+                
                 $sequence = $this->generateSequenceForCategory($category, $itemCount);
                 $sequences[$category->id] = $sequence;
             }
@@ -66,11 +76,8 @@ class OrderSequenceService
      */
     private function generateSequenceForCategory(ProductCategory $category, int $itemCount): string
     {
-        // Increment the sequence for this category
-        $category->incrementSequence();
-        
-        // Get the next sequence number
-        $sequenceNumber = $category->getNextSequence();
+        // Get the current sequence number (already incremented in the main method)
+        $sequenceNumber = $category->sequence_prefix . str_pad($category->current_sequence, 3, '0', STR_PAD_LEFT);
         
         // Format: Z001-2 (sequence number - item count)
         return $sequenceNumber . '-' . $itemCount;
