@@ -180,11 +180,12 @@ class Order extends Model
             }
         });
 
-        static::created(function ($order) {
-            // Generate category sequences after order is created
-            if ($order->items()->count() > 0) {
-                $order->generateCategorySequences();
-            }
-        });
+        // Removed the created event for category sequences since it's handled explicitly in the controller
+        // static::created(function ($order) {
+        //     // Generate category sequences after order is created
+        //     if ($order->items()->count() > 0) {
+        //         $order->generateCategorySequences();
+        //     }
+        // });
     }
 }
