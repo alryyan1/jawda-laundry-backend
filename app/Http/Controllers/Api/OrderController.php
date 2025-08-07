@@ -555,11 +555,6 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
-        // Validate the request
-        $validated = $request->validate([
-            'total_amount' => 'nullable|numeric|min:0',
-        ]);
-
         // Check if order is already completed
         if ($order->order_complete) {
             return response()->json([
@@ -584,21 +579,14 @@ class OrderController extends Controller
             // Only set order_complete to true, don't change status or pickup_date
             $order->order_complete = true;
             
-            // Use the frontend-calculated total amount if provided, otherwise recalculate
-            if (isset($validated['total_amount'])) {
-                $order->total_amount = $validated['total_amount'];
-                Log::info('Using frontend-calculated total amount:', [
-                    'order_id' => $order->id,
-                    'frontend_total' => $validated['total_amount'],
-                ]);
-            } else {
-                // Fallback to backend recalculation if no total provided
-                $order->recalculateTotalAmountWithItemRecalculation();
-                Log::info('Using backend-calculated total amount:', [
-                    'order_id' => $order->id,
-                    'backend_total' => $order->total_amount,
-                ]);
-            }
+            // Always recalculate total amount from order items with their current quantities, widths, and lengths
+            $order->recalculateTotalAmountWithItemRecalculation();
+            
+            Log::info('Recalculated total amount from order items:', [
+                'order_id' => $order->id,
+                'new_total_amount' => $order->total_amount,
+                'items_processed' => $order->items()->count(),
+            ]);
             
             // Ensure the order is saved with the new values
             $order->save();
@@ -608,10 +596,9 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'new_total_amount' => $order->total_amount,
                 'order_complete' => $order->order_complete,
-                'total_source' => isset($validated['total_amount']) ? 'frontend' : 'backend',
             ]);
             
-            $order->logActivity("Order marked as complete. Total amount: " . $order->total_amount);
+            $order->logActivity("Order marked as complete. Total amount recalculated: " . $order->total_amount);
             
             DB::commit();
 
