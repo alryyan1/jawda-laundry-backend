@@ -24,5 +24,7 @@ Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloa
      ->name('orders.invoice.download');
 Route::get('/orders/{order}/pos-invoice-pdf', [OrderController::class, 'downloadPosInvoice'])
      ->name('orders.invoice.pos.pdf');
+Route::get('/orders/pdf/download', [OrderController::class, 'downloadOrdersListPdf'])
+     ->name('orders.pdf.download');
 
 Route::get('/reports/orders/pdf/view', [ReportController::class, 'viewOrdersReportPdf']);

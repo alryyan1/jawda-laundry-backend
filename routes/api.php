@@ -80,7 +80,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::apiResource('orders', OrderController::class);
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
-  Route::get('/orders/pdf/download', [OrderController::class, 'downloadOrdersListPdf']);
    // and POST /product-types/{product_type}/predefined-sizes
    Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)
    ->only(['index', 'store']);

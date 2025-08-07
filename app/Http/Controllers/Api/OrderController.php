@@ -1328,7 +1328,7 @@ class OrderController extends Controller
      */
     public function downloadOrdersListPdf(Request $request)
     {
-        $this->authorize('order:list');
+        // Public route - no authorization required
 
         // Build the query using the same logic as the index method
         $query = $this->buildOrderQuery($request);
