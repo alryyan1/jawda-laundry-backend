@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Pdf\PosInvoicePdf;
+use App\Pdf\OrdersListPdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
@@ -1320,6 +1321,57 @@ class OrderController extends Controller
             'categories_count' => $order->items->groupBy('serviceOffering.productType.category.id')->count(),
             'recommended_page_height_mm' => max(120, $totalHeight + 20)
         ]);
+    }
+
+    /**
+     * Download orders list as PDF
+     */
+    public function downloadOrdersListPdf(Request $request)
+    {
+        $this->authorize('order:list');
+
+        // Build the query using the same logic as the index method
+        $query = $this->buildOrderQuery($request);
+        
+        // Get all matching orders without pagination for the PDF
+        $orders = $query->with(['customer', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction'])->get();
+
+        // Instantiate the PDF class
+        $pdf = new OrdersListPdf(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
+        // Set document information
+        $pdf->SetCreator(PDF_CREATOR);
+        $pdf->SetAuthor(config('app.name'));
+        $pdf->SetTitle('Orders List Report');
+        $pdf->SetSubject('Orders List');
+
+        // Set default header/footer data
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+
+        // Set margins
+        $pdf->SetMargins(10, 40, 10);
+        $pdf->SetHeaderMargin(10);
+        $pdf->SetFooterMargin(10);
+
+        // Set font
+        $pdf->SetFont('arial', '', 10);
+
+        // Set data
+        $pdf->setOrders($orders);
+        $pdf->setFilters($request->all());
+        $pdf->setSettings([
+            'company_name' => app_setting('company_name', config('app.name')),
+            'company_address' => app_setting('company_address'),
+            'currency_symbol' => app_setting('currency_symbol', 'OMR'),
+        ]);
+
+        // Generate the PDF
+        $pdf->generate();
+
+        // Output the PDF
+        $pdf->Output('orders-list-' . date('Y-m-d-H-i-s') . '.pdf', 'I');
+        exit;
     }
 
  
