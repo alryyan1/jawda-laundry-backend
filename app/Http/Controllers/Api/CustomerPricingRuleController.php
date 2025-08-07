@@ -248,4 +248,26 @@ class CustomerPricingRuleController extends Controller
             'product_types' => $productTypes
         ]);
     }
+
+    /**
+     * Get all pricing rules for a customer (optimized for POS use)
+     * Returns all pricing rules without pagination for quick access
+     */
+    public function getAllForCustomer(Customer $customer): JsonResponse
+    {
+        $pricingRules = $customer->pricingRules()
+            ->with([
+                'serviceOffering.productType.category', 
+                'serviceOffering.serviceAction'
+            ])
+            ->orderBy('id', 'asc')
+            ->get();
+
+        return response()->json([
+            'pricing_rules' => $pricingRules,
+            'total_count' => $pricingRules->count(),
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name
+        ]);
+    }
 }

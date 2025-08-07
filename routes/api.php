@@ -184,6 +184,7 @@ Route::delete(
   // Customer Product Type Management
                 // Customer Pricing Rules
               Route::get('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'index']);
+              Route::get('/customers/{customer}/pricing-rules/all', [CustomerPricingRuleController::class, 'getAllForCustomer']);
               Route::post('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'store']);
               Route::put('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'update']);
               Route::delete('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'destroy']);
