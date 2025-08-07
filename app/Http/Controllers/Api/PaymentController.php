@@ -42,6 +42,11 @@ class PaymentController extends Controller
 
         // Dynamically get the list of allowed payment method keys from the config file.
         $allowedPaymentMethods = array_keys(app_setting('payment_methods_ar', []));
+        
+        // Fallback to default payment methods if settings are not available
+        if (empty($allowedPaymentMethods)) {
+            $allowedPaymentMethods = ['cash', 'visa', 'mastercard', 'bank_transfer', 'mada', 'store_credit', 'other'];
+        }
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
@@ -56,6 +61,9 @@ class PaymentController extends Controller
         $paymentAmount = (float) $validated['amount'];
 
         // --- Business Logic Checks ---
+        // First recalculate the order total to ensure it's accurate
+        $order->recalculateTotalAmount();
+        
         if ($paymentType === 'payment' && ($order->paid_amount + $paymentAmount) > $order->total_amount) {
             return response()->json(['message' => 'Payment amount exceeds the amount due.'], 422);
         }
@@ -66,6 +74,16 @@ class PaymentController extends Controller
         // --- Database Transaction ---
         DB::beginTransaction();
         try {
+            // Log the payment attempt
+            Log::info('Recording payment for order', [
+                'order_id' => $order->id,
+                'payment_amount' => $paymentAmount,
+                'payment_type' => $paymentType,
+                'payment_method' => $validated['method'],
+                'current_paid_amount' => $order->paid_amount,
+                'order_total_amount' => $order->total_amount,
+            ]);
+            
             // A refund is stored as a positive number but subtracted from the total paid.
             // Or stored as negative, but this approach is clearer.
             $finalAmount = $paymentType === 'refund' ? -$paymentAmount : $paymentAmount;
@@ -84,6 +102,9 @@ class PaymentController extends Controller
             $totalPaid = (float) $order->payments()->where('type', 'payment')->sum('amount');
             $totalRefunded = (float) $order->payments()->where('type', 'refund')->sum('amount');
             $order->paid_amount = $totalPaid - $totalRefunded;
+
+            // Ensure order total amount is up to date
+            $order->recalculateTotalAmount();
 
             // Update the order's payment status based on the new total
             if ($order->paid_amount >= $order->total_amount && $order->total_amount > 0) {
@@ -120,6 +141,15 @@ class PaymentController extends Controller
             
             DB::commit();
 
+            // Log successful payment
+            Log::info('Payment recorded successfully', [
+                'payment_id' => $payment->id,
+                'order_id' => $order->id,
+                'final_paid_amount' => $order->paid_amount,
+                'payment_status' => $order->payment_status,
+                'order_status' => $order->status,
+            ]);
+
             $payment->load('user');
             return new PaymentResource($payment);
 
@@ -149,6 +179,9 @@ class PaymentController extends Controller
             $totalPaid = (float) $order->payments()->where('type', 'payment')->sum('amount');
             $totalRefunded = (float) $order->payments()->where('type', 'refund')->sum('amount');
             $order->paid_amount = $totalPaid - $totalRefunded;
+
+            // Ensure order total amount is up to date
+            $order->recalculateTotalAmount();
 
             if ($order->paid_amount >= $order->total_amount) {
                 $order->payment_status = 'paid';

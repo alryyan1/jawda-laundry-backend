@@ -18,10 +18,8 @@ class LaundrySeeder extends Seeder
             LaundryCategorySeeder::class,
         ]);
         
-        // Run product type seeder after categories are created
-        $this->call([
-            LaundryProductTypeSeeder::class,
-        ]);
+        // Product types are now seeded by the main ProductTypeSeeder
+        // which imports from rain_laundry database
         
         // Run service action seeder
         $this->call([

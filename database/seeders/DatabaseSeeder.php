@@ -23,20 +23,12 @@ class DatabaseSeeder extends Seeder
             CustomerTypeSeeder::class,      // Before CustomerSeeder
             CustomerSeeder::class,
             RestaurantTableSeeder::class,
-            // ProductCategorySeeder::class,
-            // ProductTypeSeeder::class,
             PermissionSeeder::class,
-            // ServiceActionSeeder::class,
-            // ServiceOfferingSeeder::class,
             NavigationItemSeeder::class,
-            // Laundry seeders
+            // Laundry seeders (creates categories first)
             \Database\Seeders\Laundry\LaundrySeeder::class,
-            // ProductCategorySeeder::class,   // Before ProductTypeSeeder
-            // ProductTypeSeeder::class,       // Before ServiceOfferingSeeder
-            // ServiceActionSeeder::class,     // Before ServiceOfferingSeeder
-            // ServiceOfferingSeeder::class,   // Before OrderSeeder
-            // OrderSeeder::class,
-            // PermissionSeeder::class, // Add this
+            // Now seed product types after categories exist
+            ProductTypesTableSeeder::class,
             // SupplierSeeder::class,
             // Add PricingRuleSeeder if you create one
         ]);

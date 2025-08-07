@@ -26,7 +26,7 @@ return new class extends Migration
             $table->timestamps();
             
             // Ensure unique combination of customer, product type, and service offering
-            $table->unique(['customer_id', 'product_type_id', 'service_offering_id']);
+            $table->unique(['customer_id', 'product_type_id', 'service_offering_id'], 'cpso_unique');
         });
     }
 

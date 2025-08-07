@@ -17,7 +17,7 @@ class SettingsSeeder extends Seeder
             // Company Information
             [
                 'key' => 'company_name',
-                'value' => 'My Awesome Company',
+                'value' => 'زاد الرميس',
                 'type' => 'string',
                 'group' => 'company',
                 'display_name' => 'Company Name',
@@ -26,7 +26,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_address',
-                'value' => '123 Main St, Anytown, USA',
+                'value' => 'الرميس مقابل مركز النسيم الصحي',
                 'type' => 'string',
                 'group' => 'company',
                 'display_name' => 'Company Address',
@@ -35,7 +35,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_phone',
-                'value' => '+1-555-123-4567',
+                'value' => '98889761',
                 'type' => 'string',
                 'group' => 'company',
                 'display_name' => 'Company Phone',
@@ -44,7 +44,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_phone_2',
-                'value' => '',
+                'value' => '92552558',
                 'type' => 'string',
                 'group' => 'company',
                 'display_name' => 'Company Phone 2',
@@ -62,7 +62,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'company_logo_url',
-                'value' => null,
+                'value' => 'http://127.0.0.1/laundry/jawda-laundry-backend/public/storage/logos/59gydcN8h4DVDbmCHwZvMOShIVG3L7jWBhMklHyU.png',
                 'type' => 'string',
                 'group' => 'company',
                 'display_name' => 'Company Logo URL',
@@ -93,7 +93,7 @@ class SettingsSeeder extends Seeder
             // General Settings
             [
                 'key' => 'currency_symbol',
-                'value' => '$',
+                'value' => 'OMR',
                 'type' => 'string',
                 'group' => 'general',
                 'display_name' => 'Currency Symbol',
@@ -170,7 +170,7 @@ class SettingsSeeder extends Seeder
             // WhatsApp Settings
             [
                 'key' => 'whatsapp_enabled',
-                'value' => 'false',
+                'value' => 'true',
                 'type' => 'boolean',
                 'group' => 'whatsapp',
                 'display_name' => 'Enable WhatsApp',
@@ -179,7 +179,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'whatsapp_api_url',
-                'value' => '',
+                'value' => 'https://waapi.app/api/v1/instances/45517',
                 'type' => 'string',
                 'group' => 'whatsapp',
                 'display_name' => 'WhatsApp API URL',
@@ -188,7 +188,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'whatsapp_api_token',
-                'value' => '',
+                'value' => 'AZ9XyS2kVjPBpPUWldVn2PlH4SKQUo5kxKo3tW7i35a32c37',
                 'type' => 'string',
                 'group' => 'whatsapp',
                 'display_name' => 'WhatsApp API Token',
@@ -197,7 +197,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'whatsapp_notification_number',
-                'value' => '',
+                'value' => '78622990',
                 'type' => 'string',
                 'group' => 'whatsapp',
                 'display_name' => 'WhatsApp Notification Number',
@@ -262,10 +262,11 @@ class SettingsSeeder extends Seeder
             if (!$existing) {
                 DB::table('settings')->insert($setting);
             } else {
-                // Update existing setting with new columns
+                // Update existing setting with new values
                 DB::table('settings')
                     ->where('key', $setting['key'])
                     ->update([
+                        'value' => $setting['value'],
                         'type' => $setting['type'],
                         'display_name' => $setting['display_name'],
                         'description' => $setting['description'],
@@ -273,5 +274,8 @@ class SettingsSeeder extends Seeder
                     ]);
             }
         }
+        
+        // Clear settings cache after seeding to ensure fresh data
+        \App\Models\Setting::clearCache();
     }
 }

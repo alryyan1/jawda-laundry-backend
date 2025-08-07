@@ -44,12 +44,17 @@ class ProductCategoryController extends Controller
             'description' => 'nullable|string|max:1000',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'sequence_prefix' => 'nullable|string|max:10',
-            'sequence_enabled' => 'boolean',
+            'sequence_enabled' => 'nullable|in:true,false,1,0,"true","false","1","0"',
             'current_sequence' => 'integer|min:0',
         ]);
 
         try {
             $data = $validatedData;
+            
+            // Ensure sequence_enabled is properly converted to boolean
+            if (isset($data['sequence_enabled'])) {
+                $data['sequence_enabled'] = filter_var($data['sequence_enabled'], FILTER_VALIDATE_BOOLEAN);
+            }
             
             // Handle image upload
             if ($request->hasFile('image')) {
@@ -92,9 +97,10 @@ class ProductCategoryController extends Controller
             'description' => 'sometimes|nullable|string|max:1000',
             'image' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'sequence_prefix' => 'sometimes|nullable|string|max:10',
-            'sequence_enabled' => 'sometimes|boolean',
+            'sequence_enabled' => 'sometimes|nullable|in:true,false,1,0,"true","false","1","0"',
             'current_sequence' => 'sometimes|integer|min:0',
         ]);
+       
 
         // Log the request data for debugging
         Log::info('ProductCategory update request', [
@@ -106,6 +112,11 @@ class ProductCategoryController extends Controller
 
         try {
             $data = $validatedData;
+            
+            // Ensure sequence_enabled is properly converted to boolean
+            if (isset($data['sequence_enabled'])) {
+                $data['sequence_enabled'] = filter_var($data['sequence_enabled'], FILTER_VALIDATE_BOOLEAN);
+            }
             
             // Handle image upload
             if ($request->hasFile('image')) {

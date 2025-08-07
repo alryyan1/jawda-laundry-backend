@@ -182,6 +182,9 @@ class OrderController extends Controller
 
             $order->items()->createMany($orderItemsToCreate);
             
+            // Recalculate total amount from created items to ensure consistency
+            $order->recalculateTotalAmount();
+            
             // Update dining table status to occupied if the order has a dining table
             if ($order->dining_table_id) {
                 $diningTable = DiningTable::find($order->dining_table_id);
@@ -374,14 +377,21 @@ class OrderController extends Controller
                 $order->items()->delete();
                 $order->items()->createMany($orderItemsToCreate);
                 
-                // Update order total
-                $order->total_amount = $orderTotalAmount;
+                // Recalculate and update order total from items
+                $order->recalculateTotalAmount();
                 
-                $order->logActivity("Order items were updated. New total: " . $orderTotalAmount);
+                $order->logActivity("Order items were updated. New total: " . $order->total_amount);
             }
 
             // Save all changes
             $order->save();
+            
+            // Check if order_complete was set to true and recalculate total amount
+            $oldOrderComplete = $order->getOriginal('order_complete');
+            if (!$oldOrderComplete && $order->order_complete) {
+                $order->recalculateTotalAmountWithItemRecalculation();
+                $order->logActivity("Order marked as complete - total amount recalculated: " . $order->total_amount);
+            }
             
             // Debug: Log the final state after save
             Log::info('Order saved - final state:', [
@@ -536,6 +546,95 @@ class OrderController extends Controller
         }
         
         return $response;
+    }
+
+    /**
+     * Mark order as complete without changing status or generating sequences.
+     */
+    public function markOrderComplete(Request $request, Order $order)
+    {
+        $this->authorize('update', $order);
+
+        // Validate the request
+        $validated = $request->validate([
+            'total_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        // Check if order is already completed
+        if ($order->order_complete) {
+            return response()->json([
+                'message' => 'Order is already marked as complete.',
+                'order' => new OrderResource($order)
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Log the initial state
+            $oldTotal = $order->total_amount;
+            $calculatedTotal = $order->calculated_total_amount;
+            
+            Log::info('Marking order as complete - initial state:', [
+                'order_id' => $order->id,
+                'old_total_amount' => $oldTotal,
+                'calculated_total_amount' => $calculatedTotal,
+                'items_count' => $order->items()->count(),
+            ]);
+            
+            // Only set order_complete to true, don't change status or pickup_date
+            $order->order_complete = true;
+            
+            // Use the frontend-calculated total amount if provided, otherwise recalculate
+            if (isset($validated['total_amount'])) {
+                $order->total_amount = $validated['total_amount'];
+                Log::info('Using frontend-calculated total amount:', [
+                    'order_id' => $order->id,
+                    'frontend_total' => $validated['total_amount'],
+                ]);
+            } else {
+                // Fallback to backend recalculation if no total provided
+                $order->recalculateTotalAmountWithItemRecalculation();
+                Log::info('Using backend-calculated total amount:', [
+                    'order_id' => $order->id,
+                    'backend_total' => $order->total_amount,
+                ]);
+            }
+            
+            // Ensure the order is saved with the new values
+            $order->save();
+            
+            // Log the final state
+            Log::info('Order marked as complete - final state:', [
+                'order_id' => $order->id,
+                'new_total_amount' => $order->total_amount,
+                'order_complete' => $order->order_complete,
+                'total_source' => isset($validated['total_amount']) ? 'frontend' : 'backend',
+            ]);
+            
+            $order->logActivity("Order marked as complete. Total amount: " . $order->total_amount);
+            
+            DB::commit();
+
+            // Refresh the order to get the latest data from database
+            $order->refresh();
+
+            // Load relationships for response
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+
+            // Broadcast the order updated event
+            event(new OrderUpdated($order, ['order_complete' => true]));
+            Log::info('Order marked as complete', ['order_id' => $order->id]);
+
+            return response()->json([
+                'message' => 'Order marked as complete successfully.',
+                'order' => new OrderResource($order)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error marking order as complete: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to mark order as complete. An internal error occurred.'], 500);
+        }
     }
 
     /**

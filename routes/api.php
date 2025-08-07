@@ -73,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
+  Route::post('/orders/{order}/mark-complete', [OrderController::class, 'markOrderComplete']);
 
 
   Route::apiResource('orders', OrderController::class);

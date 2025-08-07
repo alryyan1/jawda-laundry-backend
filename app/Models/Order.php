@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes; // Orders are good candidates for soft deletes
 use App\Traits\LogsActivity;
+use Illuminate\Support\Facades\Log;
+use App\Services\PricingService;
 
 class Order extends Model
 {
@@ -132,7 +134,17 @@ class Order extends Model
      */
     public function getCalculatedTotalAmountAttribute(): float
     {
-        return (float) $this->items()->sum('sub_total');
+        $calculated = (float) $this->items()->sum('sub_total');
+        
+        // Debug logging
+        Log::info('Calculating total amount for order:', [
+            'order_id' => $this->id,
+            'calculated_total' => $calculated,
+            'items_count' => $this->items()->count(),
+            'items_sum' => $this->items()->sum('sub_total'),
+        ]);
+        
+        return $calculated;
     }
 
     /**
@@ -141,7 +153,48 @@ class Order extends Model
     public function recalculateTotalAmount(): void
     {
         $this->total_amount = $this->calculated_total_amount;
-        $this->save();
+        $this->saveQuietly(); // Use saveQuietly to avoid triggering the saved event
+    }
+
+    /**
+     * Recalculate total amount by recalculating each order item's subtotal
+     * This is especially important for dimension-based products
+     */
+    public function recalculateTotalAmountWithItemRecalculation(): void
+    {
+        $pricingService = app(PricingService::class);
+        $totalAmount = 0;
+
+        // Load items with their relationships
+        $this->load(['items.serviceOffering.productType', 'customer']);
+
+        foreach ($this->items as $item) {
+            // Recalculate the price for this item
+            $priceDetails = $pricingService->calculatePrice(
+                $item->serviceOffering,
+                $this->customer,
+                $item->quantity,
+                $item->length_meters,
+                $item->width_meters
+            );
+
+            // Update the item's calculated price and subtotal
+            $item->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
+            $item->sub_total = $priceDetails['sub_total'];
+            $item->saveQuietly(); // Use saveQuietly to avoid triggering events
+
+            $totalAmount += $priceDetails['sub_total'];
+        }
+
+        // Update the order's total amount
+        $this->total_amount = $totalAmount;
+        $this->saveQuietly(); // Use saveQuietly to avoid triggering the saved event
+
+        Log::info('Recalculated total amount with item recalculation:', [
+            'order_id' => $this->id,
+            'new_total_amount' => $totalAmount,
+            'items_count' => $this->items->count(),
+        ]);
     }
 
 
