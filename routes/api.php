@@ -46,7 +46,6 @@ Route::get('/table-reservations/today', [TableReservationController::class, 'tod
 
 // Public download routes (no authentication required)
 Route::get('/orders/{order}/invoice/download', [OrderController::class, 'downloadInvoice']);
-Route::get('/orders/pdf/download', [OrderController::class, 'downloadOrdersListPdf']);
 Route::get('/orders/{order}/pos-invoice-pdf', [OrderController::class, 'downloadPosInvoice']);
 Route::get('/orders/{order}/pos-invoice-height', [OrderController::class, 'getPosInvoiceHeight']);
 
@@ -81,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::apiResource('orders', OrderController::class);
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
+  Route::get('/orders/pdf/download', [OrderController::class, 'downloadOrdersListPdf']);
    // and POST /product-types/{product_type}/predefined-sizes
    Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)
    ->only(['index', 'store']);
