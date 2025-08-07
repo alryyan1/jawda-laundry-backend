@@ -1183,11 +1183,18 @@ class OrderController extends Controller
         if ($request->filled('date_from')) $query->whereDate('order_date', '>=', $request->date_from);
         if ($request->filled('date_to')) $query->whereDate('order_date', '<=', $request->date_to);
 
+        // Search by order ID (exact match)
+        if ($request->filled('order_id')) {
+            $query->where('id', $request->order_id);
+        }
+
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(fn($q) => $q->where('id', $searchTerm)
                 ->orWhere('order_number', 'LIKE', "%{$searchTerm}%")
-                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%")));
+                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%"))
+                ->orWhere('category_sequences_string', 'LIKE', "%{$searchTerm}%")
+                ->orWhereJsonContains('category_sequences', $searchTerm));
         }
 
         if ($request->filled('product_type_id')) {
