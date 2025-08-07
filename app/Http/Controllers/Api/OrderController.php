@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 use App\Models\DiningTable;
@@ -734,11 +735,27 @@ class OrderController extends Controller
             'quantity' => 'required|integer|min:1',
             'length_meters' => 'nullable|numeric|min:0',
             'width_meters' => 'nullable|numeric|min:0',
+            'order_item_id' => 'nullable|exists:order_items,id', // Optional: if provided, update the order item
         ]);
 
         try {
             $serviceOffering = ServiceOffering::findOrFail($validatedData['service_offering_id']);
             $customer = Customer::findOrFail($validatedData['customer_id']);
+            
+            // If order_item_id is provided, update the order item dimensions in the database
+            if (isset($validatedData['order_item_id'])) {
+                $orderItem = OrderItem::findOrFail($validatedData['order_item_id']);
+                $orderItem->length_meters = $validatedData['length_meters'] ?? null;
+                $orderItem->width_meters = $validatedData['width_meters'] ?? null;
+                $orderItem->save();
+                
+                Log::info('Updated order item dimensions:', [
+                    'order_item_id' => $orderItem->id,
+                    'length_meters' => $orderItem->length_meters,
+                    'width_meters' => $orderItem->width_meters,
+                ]);
+            }
+            
             $priceDetails = $this->pricingService->calculatePrice(
                 $serviceOffering,
                 $customer,
@@ -750,6 +767,71 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             Log::error("Error quoting order item: " . $e->getMessage());
             return response()->json(['message' => 'Failed to calculate price quote.'], 500);
+        }
+    }
+
+    /**
+     * Update order item dimensions
+     */
+    public function updateOrderItemDimensions(Request $request, OrderItem $orderItem)
+    {
+        $this->authorize('update', $orderItem->order);
+
+        $validatedData = $request->validate([
+            'length_meters' => 'nullable|numeric|min:0',
+            'width_meters' => 'nullable|numeric|min:0',
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            // Update the order item dimensions
+            $orderItem->length_meters = $validatedData['length_meters'] ?? null;
+            $orderItem->width_meters = $validatedData['width_meters'] ?? null;
+            $orderItem->save();
+            
+            // Recalculate the order item's subtotal using the new dimensions
+            $pricingService = app(PricingService::class);
+            $priceDetails = $pricingService->calculatePrice(
+                $orderItem->serviceOffering,
+                $orderItem->order->customer,
+                $orderItem->quantity,
+                $orderItem->length_meters,
+                $orderItem->width_meters
+            );
+            
+            // Update the order item's calculated price and subtotal
+            $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
+            $orderItem->sub_total = $priceDetails['sub_total'];
+            $orderItem->save();
+            
+            // Recalculate the order's total amount
+            $orderItem->order->recalculateTotalAmount();
+            
+            Log::info('Updated order item dimensions and recalculated totals:', [
+                'order_item_id' => $orderItem->id,
+                'order_id' => $orderItem->order->id,
+                'length_meters' => $orderItem->length_meters,
+                'width_meters' => $orderItem->width_meters,
+                'new_subtotal' => $orderItem->sub_total,
+                'new_order_total' => $orderItem->order->total_amount,
+            ]);
+            
+            DB::commit();
+            
+            // Load relationships for response
+            $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
+            
+            return response()->json([
+                'message' => 'Order item dimensions updated successfully.',
+                'order_item' => $orderItem,
+                'order_total' => $orderItem->order->total_amount,
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error updating order item dimensions: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update order item dimensions.'], 500);
         }
     }
     
