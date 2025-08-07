@@ -117,10 +117,25 @@ class SettingsController extends Controller
     public function update(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'settings' => 'required|array',
-                'settings.*' => 'required|string'
-            ]);
+            // Get current settings to know which keys are valid and their types
+            $currentSettings = $this->settingsService->getAll();
+            
+            // Build validation rules based on current setting types
+            $rules = ['settings' => 'required|array'];
+            
+            foreach ($currentSettings as $key => $value) {
+                if (is_bool($value)) {
+                    $rules["settings.{$key}"] = 'nullable|boolean';
+                } elseif (is_int($value) || is_numeric($value)) {
+                    $rules["settings.{$key}"] = 'nullable|numeric';
+                } elseif ($key === 'company_email') {
+                    $rules["settings.{$key}"] = 'nullable|email|max:255';
+                } else {
+                    $rules["settings.{$key}"] = 'nullable|string|max:255';
+                }
+            }
+
+            $validator = Validator::make($request->all(), $rules);
 
             if ($validator->fails()) {
                 return response()->json([
