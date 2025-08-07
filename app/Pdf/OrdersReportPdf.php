@@ -3,10 +3,9 @@
 namespace App\Pdf;
 
 use App\Models\Order;
-use TCPDF;
 use Exception;
 
-class OrdersReportPdf extends TCPDF
+class OrdersReportPdf extends BasePdf
 {
     protected $orders;
     protected $dateFrom;

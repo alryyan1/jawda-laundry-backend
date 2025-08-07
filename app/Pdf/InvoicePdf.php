@@ -3,9 +3,8 @@
 namespace App\Pdf;
 
 use App\Models\Order;
-use TCPDF; // <-- Use the base TCPDF class directly
 
-class InvoicePdf extends TCPDF
+class InvoicePdf extends BasePdf
 {
     protected Order $order;
     protected $companyName;
