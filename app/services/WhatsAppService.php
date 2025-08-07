@@ -23,9 +23,14 @@ class WhatsAppService
         $this->client = new GuzzleClient([
             'timeout' => 10.0, // Set a timeout for requests
         ]);
-        $this->isEnabled = Config::get('whatsapp.enabled', false);
-        $this->apiUrl = Config::get('whatsapp.api_url');
-        $this->apiToken = Config::get('whatsapp.api_token');
+        
+        // Get settings from database instead of config file
+        $settingsService = app(\App\Services\SettingsService::class);
+        $whatsappConfig = $settingsService->getWhatsAppConfig();
+        
+        $this->isEnabled = $whatsappConfig['enabled'] ?? false;
+        $this->apiUrl = $whatsappConfig['api_url'] ?? '';
+        $this->apiToken = $whatsappConfig['api_token'] ?? '';
     }
     /**
      * Checks if the service is fully configured and enabled.
@@ -221,8 +226,10 @@ class WhatsAppService
      */
     private function formatChatId(string $phoneNumber): string
     {
-        // Get the country code from config, default to Oman (968)
-        $countryCode = Config::get('app_settings.whatsapp_country_code', '968');
+        // Get the country code from database settings, default to Oman (968)
+        $settingsService = app(\App\Services\SettingsService::class);
+        $whatsappConfig = $settingsService->getWhatsAppConfig();
+        $countryCode = $whatsappConfig['country_code'] ?? '968';
         
         // Clean the phone number (remove any non-digits)
         $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
