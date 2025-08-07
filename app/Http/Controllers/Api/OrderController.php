@@ -790,7 +790,7 @@ class OrderController extends Controller
             $orderItem->width_meters = $validatedData['width_meters'] ?? null;
             $orderItem->save();
             
-            // Recalculate the order item's subtotal using the new dimensions
+            // Recalculate the order item's subtotal using the new dimensions and quantity
             $pricingService = app(PricingService::class);
             $priceDetails = $pricingService->calculatePrice(
                 $orderItem->serviceOffering,
@@ -804,6 +804,16 @@ class OrderController extends Controller
             $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
             $orderItem->sub_total = $priceDetails['sub_total'];
             $orderItem->save();
+            
+            Log::info('Updated order item dimensions with quantity consideration:', [
+                'order_item_id' => $orderItem->id,
+                'quantity' => $orderItem->quantity,
+                'length_meters' => $orderItem->length_meters,
+                'width_meters' => $orderItem->width_meters,
+                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
+                'subtotal' => $priceDetails['sub_total'],
+                'product_type' => $orderItem->serviceOffering->productType->name,
+            ]);
             
             // Recalculate the order's total amount
             $orderItem->order->recalculateTotalAmount();
@@ -832,6 +842,78 @@ class OrderController extends Controller
             DB::rollBack();
             Log::error("Error updating order item dimensions: " . $e->getMessage());
             return response()->json(['message' => 'Failed to update order item dimensions.'], 500);
+        }
+    }
+
+    /**
+     * Update order item quantity
+     */
+    public function updateOrderItemQuantity(Request $request, OrderItem $orderItem)
+    {
+        $this->authorize('update', $orderItem->order);
+
+        $validatedData = $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            // Update the order item quantity
+            $orderItem->quantity = $validatedData['quantity'];
+            $orderItem->save();
+            
+            // Recalculate the order item's subtotal using the new quantity and existing dimensions
+            $pricingService = app(PricingService::class);
+            $priceDetails = $pricingService->calculatePrice(
+                $orderItem->serviceOffering,
+                $orderItem->order->customer,
+                $orderItem->quantity,
+                $orderItem->length_meters,
+                $orderItem->width_meters
+            );
+            
+            // Update the order item's calculated price and subtotal
+            $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
+            $orderItem->sub_total = $priceDetails['sub_total'];
+            $orderItem->save();
+            
+            Log::info('Updated order item quantity with recalculation:', [
+                'order_item_id' => $orderItem->id,
+                'quantity' => $orderItem->quantity,
+                'length_meters' => $orderItem->length_meters,
+                'width_meters' => $orderItem->width_meters,
+                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
+                'subtotal' => $priceDetails['sub_total'],
+                'product_type' => $orderItem->serviceOffering->productType->name,
+            ]);
+            
+            // Recalculate the order's total amount
+            $orderItem->order->recalculateTotalAmount();
+            
+            Log::info('Updated order item quantity and recalculated totals:', [
+                'order_item_id' => $orderItem->id,
+                'order_id' => $orderItem->order->id,
+                'quantity' => $orderItem->quantity,
+                'new_subtotal' => $orderItem->sub_total,
+                'new_order_total' => $orderItem->order->total_amount,
+            ]);
+            
+            DB::commit();
+            
+            // Load relationships for response
+            $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
+            
+            return response()->json([
+                'message' => 'Order item quantity updated successfully.',
+                'order_item' => $orderItem,
+                'order_total' => $orderItem->order->total_amount,
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error updating order item quantity: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update order item quantity.'], 500);
         }
     }
     

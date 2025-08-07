@@ -169,7 +169,7 @@ class Order extends Model
         $this->load(['items.serviceOffering.productType', 'customer']);
 
         foreach ($this->items as $item) {
-            // Recalculate the price for this item
+            // Recalculate the price for this item, considering quantity
             $priceDetails = $pricingService->calculatePrice(
                 $item->serviceOffering,
                 $this->customer,
@@ -184,6 +184,16 @@ class Order extends Model
             $item->saveQuietly(); // Use saveQuietly to avoid triggering events
 
             $totalAmount += $priceDetails['sub_total'];
+            
+            Log::info('Recalculated order item:', [
+                'order_item_id' => $item->id,
+                'quantity' => $item->quantity,
+                'length_meters' => $item->length_meters,
+                'width_meters' => $item->width_meters,
+                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
+                'subtotal' => $priceDetails['sub_total'],
+                'product_type' => $item->serviceOffering->productType->name,
+            ]);
         }
 
         // Update the order's total amount
