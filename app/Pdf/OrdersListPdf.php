@@ -97,24 +97,24 @@ class OrdersListPdf extends TCPDF
     public function generate()
     {
         $this->AddPage();
-        $this->SetFont($this->font, '', 10);
+        $this->SetFont($this->font, '', 11);
 
-        // Summary section
-        $this->generateSummary();
-        
-        $this->Ln(10);
-
-        // Orders table
+        // Orders table first
         $this->generateOrdersTable();
+        
+        $this->Ln(15);
+
+        // Summary section at the bottom
+        $this->generateSummary();
 
         return $this->Output('', 'S');
     }
 
     private function generateSummary()
     {
-        $this->SetFont($this->font, 'B', 12);
-        $this->Cell(0, 8, 'Summary', 0, 1, 'L');
-        $this->SetFont($this->font, '', 10);
+        $this->SetFont($this->font, 'B', 14);
+        $this->Cell(0, 10, 'Summary', 0, 1, 'L');
+        $this->SetFont($this->font, '', 11);
         
         $totalOrders = $this->orders->count();
         $totalAmount = $this->orders->sum('total_amount');
@@ -124,50 +124,50 @@ class OrdersListPdf extends TCPDF
 
         // Create a summary table
         $this->SetFillColor(245, 245, 245);
-        $this->SetFont($this->font, 'B', 9);
+        $this->SetFont($this->font, 'B', 10);
         
-        $this->Cell(50, 8, 'Metric', 1, 0, 'C', true);
-        $this->Cell(40, 8, 'Value', 1, 1, 'C', true);
+        $this->Cell(60, 10, 'Metric', 1, 0, 'C', true);
+        $this->Cell(50, 10, 'Value', 1, 1, 'C', true);
         
-        $this->SetFont($this->font, '', 9);
-        $this->Cell(50, 6, 'Total Orders', 1, 0, 'L');
-        $this->Cell(40, 6, $totalOrders, 1, 1, 'R');
+        $this->SetFont($this->font, '', 10);
+        $this->Cell(60, 8, 'Total Orders', 1, 0, 'L');
+        $this->Cell(50, 8, $totalOrders, 1, 1, 'R');
         
-        $this->Cell(50, 6, 'Total Amount', 1, 0, 'L');
-        $this->Cell(40, 6, number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
+        $this->Cell(60, 8, 'Total Amount', 1, 0, 'L');
+        $this->Cell(50, 8, number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
         
-        $this->Cell(50, 6, 'Total Paid', 1, 0, 'L');
-        $this->Cell(40, 6, number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
+        $this->Cell(60, 8, 'Total Paid', 1, 0, 'L');
+        $this->Cell(50, 8, number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
         
-        $this->Cell(50, 6, 'Total Due', 1, 0, 'L');
-        $this->Cell(40, 6, number_format($totalDue, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
+        $this->Cell(60, 8, 'Total Due', 1, 0, 'L');
+        $this->Cell(50, 8, number_format($totalDue, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
         
-        $this->Cell(50, 6, 'Average Order', 1, 0, 'L');
-        $this->Cell(40, 6, number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
+        $this->Cell(60, 8, 'Average Order', 1, 0, 'L');
+        $this->Cell(50, 8, number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 1, 1, 'R');
     }
 
     private function generateOrdersTable()
     {
-        $this->SetFont($this->font, 'B', 12);
-        $this->Cell(0, 8, 'Orders Details', 0, 1, 'L');
+        $this->SetFont($this->font, 'B', 14);
+        $this->Cell(0, 10, 'Orders Details', 0, 1, 'L');
         
         // Table header
-        $this->SetFont($this->font, 'B', 8);
+        $this->SetFont($this->font, 'B', 9);
         $this->SetFillColor(70, 130, 180);
         $this->SetTextColor(255, 255, 255);
         
-        $this->Cell(15, 8, 'ID', 1, 0, 'C', true);
-        $this->Cell(25, 8, 'Order #', 1, 0, 'C', true);
-        $this->Cell(25, 8, 'Customer', 1, 0, 'C', true);
-        $this->Cell(20, 8, 'Date', 1, 0, 'C', true);
-        $this->Cell(20, 8, 'Status', 1, 0, 'C', true);
-        $this->Cell(15, 8, 'Items', 1, 0, 'C', true);
-        $this->Cell(25, 8, 'Total', 1, 0, 'C', true);
-        $this->Cell(25, 8, 'Paid', 1, 0, 'C', true);
-        $this->Cell(25, 8, 'Due', 1, 1, 'C', true);
+        $this->Cell(18, 9, 'ID', 1, 0, 'C', true);
+        $this->Cell(30, 9, 'Customer', 1, 0, 'C', true);
+        $this->Cell(25, 9, 'Date', 1, 0, 'C', true);
+        $this->Cell(20, 9, 'Status', 1, 0, 'C', true);
+        $this->Cell(18, 9, 'Items', 1, 0, 'C', true);
+        $this->Cell(30, 9, 'Total', 1, 0, 'C', true);
+        $this->Cell(30, 9, 'Paid', 1, 0, 'C', true);
+        $this->Cell(30, 9, 'Due', 1, 0, 'C', true);
+        $this->Cell(35, 9, 'Sequences', 1, 1, 'C', true);
 
         // Table body
-        $this->SetFont($this->font, '', 7);
+        $this->SetFont($this->font, '', 8);
         $this->SetTextColor(0, 0, 0);
         $fill = false;
         
@@ -176,21 +176,21 @@ class OrdersListPdf extends TCPDF
             if ($this->GetY() > 250) {
                 $this->AddPage();
                 // Repeat header on new page
-                $this->SetFont($this->font, 'B', 8);
+                $this->SetFont($this->font, 'B', 9);
                 $this->SetFillColor(70, 130, 180);
                 $this->SetTextColor(255, 255, 255);
                 
-                $this->Cell(15, 8, 'ID', 1, 0, 'C', true);
-                $this->Cell(25, 8, 'Order #', 1, 0, 'C', true);
-                $this->Cell(25, 8, 'Customer', 1, 0, 'C', true);
-                $this->Cell(20, 8, 'Date', 1, 0, 'C', true);
-                $this->Cell(20, 8, 'Status', 1, 0, 'C', true);
-                $this->Cell(15, 8, 'Items', 1, 0, 'C', true);
-                $this->Cell(25, 8, 'Total', 1, 0, 'C', true);
-                $this->Cell(25, 8, 'Paid', 1, 0, 'C', true);
-                $this->Cell(25, 8, 'Due', 1, 1, 'C', true);
+                $this->Cell(18, 9, 'ID', 1, 0, 'C', true);
+                $this->Cell(30, 9, 'Customer', 1, 0, 'C', true);
+                $this->Cell(25, 9, 'Date', 1, 0, 'C', true);
+                $this->Cell(20, 9, 'Status', 1, 0, 'C', true);
+                $this->Cell(18, 9, 'Items', 1, 0, 'C', true);
+                $this->Cell(30, 9, 'Total', 1, 0, 'C', true);
+                $this->Cell(30, 9, 'Paid', 1, 0, 'C', true);
+                $this->Cell(30, 9, 'Due', 1, 0, 'C', true);
+                $this->Cell(35, 9, 'Sequences', 1, 1, 'C', true);
                 
-                $this->SetFont($this->font, '', 7);
+                $this->SetFont($this->font, '', 8);
                 $this->SetTextColor(0, 0, 0);
                 $fill = false;
             }
@@ -202,15 +202,21 @@ class OrdersListPdf extends TCPDF
             $totalItems = $order->items ? $order->items->sum('quantity') : 0;
             $amountDue = $order->total_amount - $order->paid_amount;
             
-            $this->Cell(15, 6, $order->id, 1, 0, 'C', $fill);
-            $this->Cell(25, 6, $order->order_number, 1, 0, 'L', $fill);
-            $this->Cell(25, 6, $this->truncateText($customerName, 12), 1, 0, 'L', $fill);
-            $this->Cell(20, 6, $orderDate, 1, 0, 'C', $fill);
-            $this->Cell(20, 6, ucfirst($order->status), 1, 0, 'C', $fill);
-            $this->Cell(15, 6, $totalItems, 1, 0, 'C', $fill);
-            $this->Cell(25, 6, number_format($order->total_amount, 3), 1, 0, 'R', $fill);
-            $this->Cell(25, 6, number_format($order->paid_amount, 3), 1, 0, 'R', $fill);
-            $this->Cell(25, 6, number_format($amountDue, 3), 1, 1, 'R', $fill);
+            // Get category sequences
+            $sequences = '';
+            if ($order->category_sequences && is_array($order->category_sequences)) {
+                $sequences = implode(', ', $order->category_sequences);
+            }
+            
+            $this->Cell(18, 7, $order->id, 1, 0, 'C', $fill);
+            $this->Cell(30, 7, $this->truncateText($customerName, 15), 1, 0, 'L', $fill);
+            $this->Cell(25, 7, $orderDate, 1, 0, 'C', $fill);
+            $this->Cell(20, 7, ucfirst($order->status), 1, 0, 'C', $fill);
+            $this->Cell(18, 7, $totalItems, 1, 0, 'C', $fill);
+            $this->Cell(30, 7, number_format($order->total_amount, 3), 1, 0, 'R', $fill);
+            $this->Cell(30, 7, number_format($order->paid_amount, 3), 1, 0, 'R', $fill);
+            $this->Cell(30, 7, number_format($amountDue, 3), 1, 0, 'R', $fill);
+            $this->Cell(35, 7, $this->truncateText($sequences, 12), 1, 1, 'C', $fill);
             
             $fill = !$fill;
         }
@@ -222,8 +228,8 @@ class OrdersListPdf extends TCPDF
     private function generateDetailedItems()
     {
         $this->Ln(10);
-        $this->SetFont($this->font, 'B', 12);
-        $this->Cell(0, 8, 'Order Items Details', 0, 1, 'L');
+        $this->SetFont($this->font, 'B', 14);
+        $this->Cell(0, 10, 'Order Items Details', 0, 1, 'L');
         
         foreach ($this->orders as $order) {
             // Check if we need a new page
@@ -231,22 +237,22 @@ class OrdersListPdf extends TCPDF
                 $this->AddPage();
             }
             
-            $this->SetFont($this->font, 'B', 10);
+            $this->SetFont($this->font, 'B', 11);
             $this->SetFillColor(240, 240, 240);
-            $this->Cell(0, 6, 'Order #' . $order->order_number . ' - ' . ($order->customer ? $order->customer->name : 'N/A'), 1, 1, 'L', true);
+            $this->Cell(0, 7, 'Order ID: ' . $order->id . ' - ' . ($order->customer ? $order->customer->name : 'N/A'), 1, 1, 'L', true);
             
             if ($order->items && $order->items->count() > 0) {
-                $this->SetFont($this->font, 'B', 8);
+                $this->SetFont($this->font, 'B', 9);
                 $this->SetFillColor(220, 220, 220);
                 
-                $this->Cell(40, 6, 'Product Type', 1, 0, 'C', true);
-                $this->Cell(30, 6, 'Service', 1, 0, 'C', true);
-                $this->Cell(15, 6, 'Qty', 1, 0, 'C', true);
-                $this->Cell(25, 6, 'Dimensions', 1, 0, 'C', true);
-                $this->Cell(25, 6, 'Price/Unit', 1, 0, 'C', true);
-                $this->Cell(25, 6, 'Subtotal', 1, 1, 'C', true);
+                $this->Cell(45, 7, 'Product Type', 1, 0, 'C', true);
+                $this->Cell(35, 7, 'Service', 1, 0, 'C', true);
+                $this->Cell(18, 7, 'Qty', 1, 0, 'C', true);
+                $this->Cell(30, 7, 'Dimensions', 1, 0, 'C', true);
+                $this->Cell(30, 7, 'Price/Unit', 1, 0, 'C', true);
+                $this->Cell(30, 7, 'Subtotal', 1, 1, 'C', true);
                 
-                $this->SetFont($this->font, '', 7);
+                $this->SetFont($this->font, '', 8);
                 foreach ($order->items as $item) {
                     $productType = $item->serviceOffering && $item->serviceOffering->productType 
                         ? $item->serviceOffering->productType->name 
@@ -259,16 +265,16 @@ class OrdersListPdf extends TCPDF
                         $dimensions = $item->length_meters . 'm x ' . $item->width_meters . 'm';
                     }
                     
-                    $this->Cell(40, 5, $this->truncateText($productType, 15), 1, 0, 'L');
-                    $this->Cell(30, 5, $this->truncateText($serviceName, 12), 1, 0, 'L');
-                    $this->Cell(15, 5, $item->quantity, 1, 0, 'C');
-                    $this->Cell(25, 5, $dimensions, 1, 0, 'C');
-                    $this->Cell(25, 5, number_format($item->calculated_price_per_unit_item, 3), 1, 0, 'R');
-                    $this->Cell(25, 5, number_format($item->sub_total, 3), 1, 1, 'R');
+                    $this->Cell(45, 6, $this->truncateText($productType, 18), 1, 0, 'L');
+                    $this->Cell(35, 6, $this->truncateText($serviceName, 15), 1, 0, 'L');
+                    $this->Cell(18, 6, $item->quantity, 1, 0, 'C');
+                    $this->Cell(30, 6, $dimensions, 1, 0, 'C');
+                    $this->Cell(30, 6, number_format($item->calculated_price_per_unit_item, 3), 1, 0, 'R');
+                    $this->Cell(30, 6, number_format($item->sub_total, 3), 1, 1, 'R');
                 }
             } else {
                 $this->SetFont($this->font, '', 8);
-                $this->Cell(0, 6, 'No items found', 1, 1, 'C');
+                $this->Cell(0, 7, 'No items found', 1, 1, 'C');
             }
             
             $this->Ln(5);
