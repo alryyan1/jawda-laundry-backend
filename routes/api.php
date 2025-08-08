@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Core CRUD
   Route::apiResource('customers', CustomerController::class);
+  Route::post('/customers/{customer}/payment', [CustomerController::class, 'recordPayment']);
 
   Route::post('/orders/quote-item', [OrderController::class, 'quoteOrderItem']);
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);

@@ -4,14 +4,27 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Order;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use App\Http\Resources\CustomerResource;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log; // For logging errors
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
+    public function __construct()
+    {
+        // Apply permissions middleware
+        $this->middleware('can:customer:view')->only('show');
+        $this->middleware('can:customer:create')->only('store');
+        $this->middleware('can:customer:update')->only('update');
+        $this->middleware('can:customer:delete')->only('destroy');
+        $this->middleware('can:order:record-payment')->only('recordPayment');
+    }
+
     /**
      * Display a listing of the customers.
      *
@@ -115,6 +128,82 @@ class CustomerController extends Controller
         } catch (\Exception $e) {
             Log::error("Error updating customer {$customer->id}: " . $e->getMessage());
             return response()->json(['message' => 'Failed to update customer. Please try again.' , 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Record a payment for a customer.
+     * This creates a special "customer payment" order to handle customer-level payments.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Customer  $customer
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function recordPayment(Request $request, Customer $customer)
+    {
+        // Validate the payment data
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'method' => ['required', 'string', Rule::in(['cash', 'card', 'bank_transfer', 'check', 'other'])],
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Create a special "customer payment" order
+            $order = Order::create([
+                'order_number' => 'CP-' . time() . '-' . $customer->id, // Customer Payment prefix
+                'daily_order_number' => 1,
+                'customer_id' => $customer->id,
+                'user_id' => Auth::id(),
+                'status' => 'completed',
+                'order_complete' => true,
+                'order_type' => 'customer_payment',
+                'total_amount' => 0, // This is a payment order, so total is 0
+                'paid_amount' => $validated['amount'],
+                'payment_status' => 'paid',
+                'notes' => $validated['notes'] ?? 'Customer payment recorded',
+                'order_date' => now(),
+                'due_date' => now(),
+            ]);
+
+            // Create the payment record
+            $payment = Payment::create([
+                'order_id' => $order->id,
+                'user_id' => Auth::id(),
+                'amount' => $validated['amount'],
+                'method' => $validated['method'],
+                'type' => 'payment',
+                'transaction_id' => null,
+                'notes' => $validated['notes'] ?? 'Customer payment',
+                'payment_date' => now(),
+            ]);
+
+            DB::commit();
+
+            Log::info('Customer payment recorded', [
+                'customer_id' => $customer->id,
+                'order_id' => $order->id,
+                'payment_id' => $payment->id,
+                'amount' => $validated['amount'],
+                'method' => $validated['method'],
+            ]);
+
+            return response()->json([
+                'message' => 'Payment recorded successfully',
+                'data' => [
+                    'payment_id' => $payment->id,
+                    'order_id' => $order->id,
+                    'amount' => $validated['amount'],
+                    'method' => $validated['method'],
+                    'notes' => $validated['notes'] ?? null,
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error("Error recording customer payment: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to record payment. Please try again.'], 500);
         }
     }
 
