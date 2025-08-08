@@ -427,22 +427,64 @@ class ReportController extends Controller
         $request->validate([
             'date_from' => 'required|date_format:Y-m-d',
             'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'status' => 'nullable|string',
+            'search' => 'nullable|string',
+            'order_id' => 'nullable|string',
+            'customer_id' => 'nullable|string',
+            'product_type_id' => 'nullable|string',
+            'category_sequence_search' => 'nullable|string',
         ]);
 
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
         try {
-            $orders = Order::with([
+            $query = Order::with([
                 'customer',
                 'user',
                 'items.serviceOffering.productType.category',
                 'items.serviceOffering.serviceAction',
                 'payments'
             ])
-            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
-            ->orderBy('order_date', 'desc')
-            ->get();
+            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+
+            // Apply filters
+            if ($request->filled('status')) {
+                $query->where('status', $request->input('status'));
+            }
+
+            if ($request->filled('order_id')) {
+                $query->where('id', $request->input('order_id'));
+            }
+
+            if ($request->filled('customer_id')) {
+                $query->where('customer_id', $request->input('customer_id'));
+            }
+
+            if ($request->filled('product_type_id')) {
+                $query->whereHas('items.serviceOffering', function ($q) use ($request) {
+                    $q->where('product_type_id', $request->input('product_type_id'));
+                });
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('id', 'LIKE', "%{$search}%")
+                      ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                          $customerQuery->where('name', 'LIKE', "%{$search}%")
+                                       ->orWhere('phone', 'LIKE', "%{$search}%");
+                      });
+                });
+            }
+
+            // Search specifically in category sequences
+            if ($request->filled('category_sequence_search')) {
+                $searchTerm = $request->input('category_sequence_search');
+                $query->whereJsonContains('category_sequences', $searchTerm);
+            }
+
+            $orders = $query->orderBy('order_date', 'desc')->get();
 
             // Generate PDF
             $pdf = new OrdersReportPdf();
@@ -458,7 +500,7 @@ class ReportController extends Controller
 
             return response($pdfContent, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="orders-report-' . $dateFrom . '-to-' . $dateTo . '.pdf"'
+                'Content-Disposition' => 'inline; filename="orders-report-' . $dateFrom . '-to-' . $dateTo . '.pdf"'
             ]);
 
         } catch (\Exception $e) {
@@ -475,22 +517,64 @@ class ReportController extends Controller
         $request->validate([
             'date_from' => 'required|date_format:Y-m-d',
             'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'status' => 'nullable|string',
+            'search' => 'nullable|string',
+            'order_id' => 'nullable|string',
+            'customer_id' => 'nullable|string',
+            'product_type_id' => 'nullable|string',
+            'category_sequence_search' => 'nullable|string',
         ]);
 
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
         try {
-            $orders = Order::with([
+            $query = Order::with([
                 'customer',
                 'user',
                 'items.serviceOffering.productType.category',
                 'items.serviceOffering.serviceAction',
                 'payments'
             ])
-            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
-            ->orderBy('order_date', 'desc')
-            ->get();
+            ->whereBetween('order_date', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+
+            // Apply filters
+            if ($request->filled('status')) {
+                $query->where('status', $request->input('status'));
+            }
+
+            if ($request->filled('order_id')) {
+                $query->where('id', $request->input('order_id'));
+            }
+
+            if ($request->filled('customer_id')) {
+                $query->where('customer_id', $request->input('customer_id'));
+            }
+
+            if ($request->filled('product_type_id')) {
+                $query->whereHas('items.serviceOffering', function ($q) use ($request) {
+                    $q->where('product_type_id', $request->input('product_type_id'));
+                });
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('id', 'LIKE', "%{$search}%")
+                      ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                          $customerQuery->where('name', 'LIKE', "%{$search}%")
+                                       ->orWhere('phone', 'LIKE', "%{$search}%");
+                      });
+                });
+            }
+
+            // Search specifically in category sequences
+            if ($request->filled('category_sequence_search')) {
+                $searchTerm = $request->input('category_sequence_search');
+                $query->whereJsonContains('category_sequences', $searchTerm);
+            }
+
+            $orders = $query->orderBy('order_date', 'desc')->get();
 
             // Generate PDF
             $pdf = new OrdersReportPdf();

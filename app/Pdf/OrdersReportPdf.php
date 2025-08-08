@@ -3,9 +3,10 @@
 namespace App\Pdf;
 
 use App\Models\Order;
+use TCPDF;
 use Exception;
 
-class OrdersReportPdf extends BasePdf
+class OrdersReportPdf extends TCPDF
 {
     protected $orders;
     protected $dateFrom;
@@ -101,7 +102,7 @@ class OrdersReportPdf extends BasePdf
                 $this->SetFont($this->font, '', 8);
             }
 
-            $orderNumber = $order->order_number;
+            $orderNumber = $order->id;
             $orderDate = $order->order_date ? date('m/d/Y H:i', strtotime($order->order_date)) : '-';
             $amount = number_format($order->paid_amount, 3);
             $user = $order->user ? $order->user->name : '-';

@@ -253,17 +253,6 @@ class SettingsSeeder extends Seeder
                 'description' => 'The secondary color theme',
                 'is_public' => true,
             ],
-
-            // PDF Settings
-            [
-                'key' => 'show_watermark',
-                'value' => 'false',
-                'type' => 'boolean',
-                'group' => 'pdf',
-                'display_name' => 'Show Watermark on PDFs',
-                'description' => 'Enable watermark on all generated PDF documents',
-                'is_public' => false,
-            ],
         ];
 
         foreach ($settings as $setting) {

@@ -13,6 +13,7 @@
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
         "orangehill/iseed": "^3.1",
+        "phpoffice/phpspreadsheet": "^4.5",
         "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-permission": "^6.19",
         "tecnickcom/tcpdf": "^6.10"

@@ -3,9 +3,10 @@
 namespace App\Pdf;
 
 use App\Models\Order;
+use TCPDF;
 use Exception;
 
-class PosInvoicePdf extends BasePdf
+class PosInvoicePdf extends TCPDF
 {
     protected Order $order;
     protected array $settings;

@@ -2,6 +2,8 @@
 
 namespace App\Services\Pdf;
 
+use TCPDF; // Directly use the base TCPDF class
+
 // Define K_PATH_MAIN, K_PATH_URL, K_PATH_FONTS, K_PATH_IMAGES if not already defined globally or by TCPDF config
 // This is often needed when using TCPDF outside its standard integration in some frameworks.
 // However, Composer's autoloading and TCPDF's internal path resolution might handle some of these.
@@ -10,7 +12,7 @@ namespace App\Services\Pdf;
 //     define('K_PATH_IMAGES', public_path('images/pdf_assets/')); // Example for images
 // }
 
-class MyCustomTCPDF extends \App\Pdf\BasePdf
+class MyCustomTCPDF extends TCPDF
 {
     protected $companyName;
     protected $companyAddress;

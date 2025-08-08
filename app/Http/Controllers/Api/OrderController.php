@@ -13,7 +13,6 @@ use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Pdf\PosInvoicePdf;
-use App\Pdf\OrdersListPdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
@@ -1122,53 +1121,43 @@ class OrderController extends Controller
      */
     public function exportCsv(Request $request)
     {
-        $this->authorize('order:list'); // Or a new 'report:export' permission
-
         // Reuse the same query builder logic from the index method
         $query = $this->buildOrderQuery($request);
         
         // Get all matching orders without pagination for the export
-        $orders = $query->get();
+        $orders = $query->with([
+            'customer',
+            'items.serviceOffering.productType.category',
+            'items.serviceOffering.serviceAction',
+            'payments'
+        ])->get();
         
-        $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
-        $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$fileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
-        ];
-
-        $callback = function() use ($orders) {
-            $file = fopen('php://output', 'w');
-
-            // Add Header Row
-            fputcsv($file, [
-                'ID', 'Order Number', 'Customer Name', 'Customer Phone', 'Status',
-                'Order Date', 'Due Date', 'Pickup Date', 'Total Amount', 'Amount Paid', 'Amount Due'
+        try {
+            // Use the professional Excel export
+            $excelExport = new \App\Excel\OrdersExcelExport();
+            $excelExport->setOrders($orders);
+            $excelExport->setFilters($request->all());
+            $excelExport->setSettings([
+                'company_name' => app_setting('company_name', config('app.name')),
+                'company_address' => app_setting('company_address'),
+                'currency_symbol' => app_setting('currency_symbol', 'OMR'),
             ]);
 
-            // Add Data Rows
-            foreach ($orders as $order) {
-                fputcsv($file, [
-                    $order->id,
-                    $order->order_number,
-                    $order->customer->name,
-                    $order->customer->phone,
-                    $order->status,
-                    $order->order_date->format('Y-m-d H:i:s'),
-                    $order->due_date ? $order->due_date->format('Y-m-d') : '',
-                    $order->pickup_date ? $order->pickup_date->format('Y-m-d H:i:s') : '',
-                    $order->total_amount,
-                    $order->paid_amount,
-                    $order->amount_due,
-                ]);
-            }
+            $excelContent = $excelExport->generate();
+            
+            $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            
+            return response($excelContent, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+                'Expires' => '0'
+            ]);
 
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        } catch (\Exception $e) {
+            Log::error('Error exporting orders Excel: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to export Excel file'], 500);
+        }
     }
     
     /**
@@ -1193,9 +1182,13 @@ class OrderController extends Controller
             $searchTerm = $request->search;
             $query->where(fn($q) => $q->where('id', $searchTerm)
                 ->orWhere('order_number', 'LIKE', "%{$searchTerm}%")
-                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%"))
-                ->orWhere('category_sequences_string', 'LIKE', "%{$searchTerm}%")
-                ->orWhereJsonContains('category_sequences', $searchTerm));
+                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%")));
+        }
+
+        // Search specifically in category sequences
+        if ($request->filled('category_sequence_search')) {
+            $searchTerm = $request->category_sequence_search;
+            $query->whereJsonContains('category_sequences', $searchTerm);
         }
 
         if ($request->filled('product_type_id')) {
@@ -1321,57 +1314,6 @@ class OrderController extends Controller
             'categories_count' => $order->items->groupBy('serviceOffering.productType.category.id')->count(),
             'recommended_page_height_mm' => max(120, $totalHeight + 20)
         ]);
-    }
-
-    /**
-     * Download orders list as PDF
-     */
-    public function downloadOrdersListPdf(Request $request)
-    {
-        // Public route - no authorization required
-
-        // Build the query using the same logic as the index method
-        $query = $this->buildOrderQuery($request);
-        
-        // Get all matching orders without pagination for the PDF
-        $orders = $query->with(['customer', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction'])->get();
-
-        // Instantiate the PDF class
-        $pdf = new OrdersListPdf(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-
-        // Set document information
-        $pdf->SetCreator(PDF_CREATOR);
-        $pdf->SetAuthor(config('app.name'));
-        $pdf->SetTitle('Orders List Report');
-        $pdf->SetSubject('Orders List');
-
-        // Set default header/footer data
-        $pdf->setPrintHeader(true);
-        $pdf->setPrintFooter(true);
-
-        // Set margins
-        $pdf->SetMargins(10, 40, 10);
-        $pdf->SetHeaderMargin(10);
-        $pdf->SetFooterMargin(10);
-
-        // Set font
-        $pdf->SetFont('arial', '', 10);
-
-        // Set data
-        $pdf->setOrders($orders);
-        $pdf->setFilters($request->all());
-        $pdf->setSettings([
-            'company_name' => app_setting('company_name', config('app.name')),
-            'company_address' => app_setting('company_address'),
-            'currency_symbol' => app_setting('currency_symbol', 'OMR'),
-        ]);
-
-        // Generate the PDF
-        $pdf->generate();
-
-        // Output the PDF
-        $pdf->Output('orders-list-' . date('Y-m-d-H-i-s') . '.pdf', 'I');
-        exit;
     }
 
  
