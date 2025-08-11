@@ -1161,6 +1161,39 @@ class OrderController extends Controller
     }
     
     /**
+     * Get all orders for a specific date without pagination (for TodayOrdersColumn).
+     */
+    public function getTodayOrders(Request $request)
+    {
+        $request->validate([
+            'date' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $date = $request->get('date');
+        
+        $query = Order::with([
+            'customer:id,name,phone', 
+            'items.serviceOffering.productType.category', 
+            'items.serviceOffering.serviceAction', 
+            'diningTable'
+        ])->orderBy('id', 'desc');
+
+        if ($date) {
+            // Use specific date
+            $query->whereDate('created_at', $date);
+        } else {
+            // Use today's date
+            $query->whereDate('created_at', now()->toDateString());
+        }
+
+        // Get all orders without pagination
+        $orders = $query->get();
+
+        // Return as a simple array, not paginated
+        return OrderResource::collection($orders);
+    }
+
+    /**
      * Helper function to build the order query based on request filters.
      * Reused by both index() and exportCsv().
      */

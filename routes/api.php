@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/customers/{customer}/payment', [CustomerController::class, 'recordPayment']);
 
   Route::post('/orders/quote-item', [OrderController::class, 'quoteOrderItem']);
+  Route::get('/orders/today', [OrderController::class, 'getTodayOrders']);
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
