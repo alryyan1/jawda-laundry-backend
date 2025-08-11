@@ -1189,7 +1189,8 @@ class OrderController extends Controller
         // Get all orders without pagination
         $orders = $query->get();
 
-        // Return as a simple array, not wrapped in OrderResource
+        // Disable wrapping and return as a simple array
+        \Illuminate\Http\Resources\Json\JsonResource::withoutWrapping();
         return response()->json($orders);
     }
 
