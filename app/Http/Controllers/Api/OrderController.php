@@ -1189,8 +1189,8 @@ class OrderController extends Controller
         // Get all orders without pagination
         $orders = $query->get();
 
-        // Return as a simple array, not paginated
-        return OrderResource::collection($orders);
+        // Return as a simple array, not wrapped in OrderResource
+        return response()->json($orders);
     }
 
     /**
