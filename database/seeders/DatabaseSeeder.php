@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             RestaurantTableSeeder::class,
             PermissionSeeder::class,
             NavigationItemSeeder::class,
+            UserNavigationPermissionSeeder::class, // Set up navigation permissions for existing users
             // Laundry seeders (creates categories first)
             \Database\Seeders\Laundry\LaundrySeeder::class,
             // Now seed product types after categories exist

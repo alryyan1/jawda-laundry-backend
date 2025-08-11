@@ -18,7 +18,6 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'username' => $this->username,
-            'email' => $this->email,
             'role' => $this->role, // Primary display role if you keep it
             'avatar_url' => $this->avatar_url,
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,

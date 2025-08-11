@@ -644,7 +644,7 @@ class OrderController extends Controller
         try {
             // Set order_complete to false and status to cancelled
             $order->order_complete = false;
-            $order->status = 'cancelled';
+            // $order->status = 'cancelled';
             $order->pickup_date = null; // Clear pickup date for cancelled orders
             
             // Remove all payments when order is cancelled

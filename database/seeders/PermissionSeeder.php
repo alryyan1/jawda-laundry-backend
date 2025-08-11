@@ -74,9 +74,10 @@ class PermissionSeeder extends Seeder
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'web']);
         $receptionistRole->syncPermissions([
             'dashboard:view',
+            'pos:access', // Add POS access
             'customer:list', 'customer:view', 'customer:create', 'customer:update',
             'order:list', 'order:view', 'order:create', 'order:update', 'order:update-status', 'order:record-payment',
-            'expense:list', 'expense:create',
+            'expense:list', 'expense:create', 'expense:update', // Add expense permissions
             'supplier:list', 'supplier:view',
             'purchase:list', 'purchase:view', 'purchase:create',
             'settings:view-profile', 'settings:update-profile', 'settings:change-password',

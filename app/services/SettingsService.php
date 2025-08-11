@@ -167,8 +167,8 @@ class SettingsService
     {
         return [
             'enabled' => $this->get('whatsapp_enabled', false),
-            'api_url' => $this->get('whatsapp_api_url', ''),
             'api_token' => $this->get('whatsapp_api_token', ''),
+            'instance_id' => $this->get('whatsapp_instance_id', ''),
             'notification_number' => $this->get('whatsapp_notification_number', ''),
             'country_code' => $this->get('whatsapp_country_code', '968'),
         ];

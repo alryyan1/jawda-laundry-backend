@@ -10,8 +10,9 @@
         "guzzlehttp/guzzle": "*",
         "jackiedo/dotenv-editor": "^2.1",
         "laravel/framework": "^10.10",
-        "laravel/sanctum": "^3.3",
+        "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
+
         "orangehill/iseed": "^3.1",
         "phpoffice/phpspreadsheet": "^4.5",
         "pusher/pusher-php-server": "^7.2",

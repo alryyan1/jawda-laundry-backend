@@ -4,34 +4,37 @@ namespace App\Services;
 
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\RequestException;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Exception;
 
 /**
- * Service class for interacting with the waapi.app WhatsApp API.
+ * Service class for interacting with the WA Client WhatsApp API.
  */
 class WhatsAppService
 {
     protected GuzzleClient $client;
     protected ?string $apiUrl;
     protected ?string $apiToken;
+    protected ?string $instanceId;
     protected bool $isEnabled;
 
     public function __construct()
     {
         $this->client = new GuzzleClient([
-            'timeout' => 10.0, // Set a timeout for requests
+            'timeout' => 30.0, // Increased timeout for WhatsApp API
         ]);
         
-        // Get settings from database instead of config file
+        // Get settings from database
         $settingsService = app(\App\Services\SettingsService::class);
         $whatsappConfig = $settingsService->getWhatsAppConfig();
         
         $this->isEnabled = $whatsappConfig['enabled'] ?? false;
         $this->apiUrl = $whatsappConfig['api_url'] ?? '';
         $this->apiToken = $whatsappConfig['api_token'] ?? '';
+        $this->instanceId = $whatsappConfig['instance_id'] ?? '';
     }
+
     /**
      * Checks if the service is fully configured and enabled.
      *
@@ -39,63 +42,67 @@ class WhatsAppService
      */
     public function isConfigured(): bool
     {
-        return $this->isEnabled && !empty($this->apiToken) && !empty($this->apiUrl);
+        return $this->isEnabled && !empty($this->apiToken) && !empty($this->instanceId);
     }
 
- /**
+    /**
      * Send a WhatsApp message.
      *
-     * @param string $chatId The recipient's WhatsApp ID (e.g., "249991961111@c.us")
-     * @param string $message The message content.
+     * @param string $phoneNumber The recipient's phone number
+     * @param string $message The message content
+     * @return array Response status and data
      */
-    public function sendMessage(string $chatId, string $message)
+    public function sendMessage(string $phoneNumber, string $message): array
     {
-
-        // Log::info("WhatsAppService: Sending message to {$chatId}: {$message}");
-        $chatId = $this->formatChatId($chatId);
-        if (!$this->isEnabled) {
-            Log::info("WhatsAppService: Sending disabled. Message not sent to {$chatId}: {$message}");
-            return true; // Or false if you want to indicate a "failure" due to being disabled
-        }
-
-        if (empty($this->apiUrl) || empty($this->apiToken)) {
-            Log::error("WhatsAppService: API URL or Token is not configured.");
-            return [
-                'status' => 'error',
-                'message' => 'WhatsApp API is not configured.',
-                'data' => null
-            ];
-        }
-
-        if (empty($chatId)) {
-            Log::error("WhatsAppService: Chat ID is empty. Cannot send message.");
-            return [
-                'status' => 'error',
-                'message' => 'Chat ID is empty. Cannot send message.',
-                'data' => null
-            ];
-        }
-
-        // Construct the proper API endpoint for sending messages
-        $apiEndpoint = rtrim($this->apiUrl, '/') . '/client/action/send-message';
+        $phoneNumber = $this->formatPhoneNumber($phoneNumber);
         
+        if (!$this->isEnabled) {
+            Log::info("WhatsAppService: Sending disabled. Message not sent to {$phoneNumber}: {$message}");
+            return [
+                'status' => 'success',
+                'message' => 'WhatsApp is disabled, message not sent',
+                'data' => null
+            ];
+        }
+
+        if (!$this->isConfigured()) {
+            Log::error("WhatsAppService: API is not properly configured.");
+            return [
+                'status' => 'error',
+                'message' => 'WhatsApp API is not properly configured. Please check your settings.',
+                'data' => null
+            ];
+        }
+
+        if (empty($phoneNumber)) {
+            Log::error("WhatsAppService: Phone number is empty. Cannot send message.");
+            return [
+                'status' => 'error',
+                'message' => 'Phone number is empty. Cannot send message.',
+                'data' => null
+            ];
+        }
+
         try {
-            Log::info("WhatsAppService: Attempting to send message to {$chatId}", [
-                'endpoint' => $apiEndpoint,
-                'chatId' => $chatId,
-                'message' => $message
+            Log::info("WhatsAppService: Attempting to send message to {$phoneNumber}", [
+                'phone' => $phoneNumber,
+                'message' => $message,
+                'instance_id' => $this->instanceId
             ]);
             
-            $response = $this->client->request('POST', $apiEndpoint, [
+            $response = $this->client->request('POST', 'https://waclient.com/api/send', [
                 'json' => [
-                    'chatId' => $chatId,
+                    'number' => $phoneNumber,
+                    'type' => 'text',
                     'message' => $message,
+                    'instance_id' => $this->instanceId,
+                    'access_token' => $this->apiToken,
                 ],
                 'headers' => [
-                    'accept' => 'application/json',
-                    'authorization' => 'Bearer '.$this->apiToken,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
                 ],
-                'http_errors' => false, // Don't throw exceptions, handle manually
+                'http_errors' => false,
             ]);
 
             $statusCode = $response->getStatusCode();
@@ -103,21 +110,39 @@ class WhatsAppService
 
             Log::info("WhatsAppService: API Response", [
                 'statusCode' => $statusCode,
-                'responseBody' => $response,
-                'chatId' => $chatId
+                'responseBody' => $responseBody,
+                'phone' => $phoneNumber
             ]);
 
             if ($statusCode >= 200 && $statusCode < 300) {
-                Log::info("WhatsAppService: Message sent successfully to {$chatId}. Status: {$statusCode}", ['response' => $responseBody]);
-                return [
-                    'status' => 'success',
-                    'message' => 'Message sent successfully',
-                    'other'=>'ss',
-                    'api_response'=>$responseBody,
-                    'data' => $responseBody
-                ];
+                // Check the actual transmission status from WhatsApp API response
+                $transmissionStatus = $responseBody['status'] ?? null;
+                $message = $responseBody['message'] ?? null;
+                
+                // According to WA Client API docs, we need to check transmission status
+                // "Timeout" means transmission failed, not success
+                if ($transmissionStatus === 'success' && $message !== 'Timeout') {
+                    Log::info("WhatsAppService: Message sent successfully to {$phoneNumber}. Status: {$statusCode}", ['response' => $responseBody]);
+                    return [
+                        'status' => 'success',
+                        'message' => 'Message sent successfully',
+                        'data' => $responseBody
+                    ];
+                } else {
+                    Log::error("WhatsAppService: Message transmission failed to {$phoneNumber}", [
+                        'statusCode' => $statusCode,
+                        'transmissionStatus' => $transmissionStatus,
+                        'message' => $message,
+                        'response' => $responseBody
+                    ]);
+                    return [
+                        'status' => 'error',
+                        'message' => 'Message transmission failed. WhatsApp API returned: ' . ($message ?? 'Unknown error'),
+                        'data' => $responseBody
+                    ];
+                }
             } else {
-                Log::error("WhatsAppService: Failed to send message to {$chatId}. Status: {$statusCode}", ['response' => $responseBody]);
+                Log::error("WhatsAppService: Failed to send message to {$phoneNumber}. Status: {$statusCode}", ['response' => $responseBody]);
                 return [
                     'status' => 'error',
                     'message' => 'Failed to send message. API returned status: ' . $statusCode,
@@ -130,9 +155,8 @@ class WhatsAppService
                 $responseBody = $e->getResponse()->getBody()->getContents();
                 $errorMessage .= " | Response: " . $responseBody;
             }
-            Log::error("WhatsAppService: RequestException sending message to {$chatId}", [
-                'error' => $errorMessage,
-                'endpoint' => $apiEndpoint
+            Log::error("WhatsAppService: RequestException sending message to {$phoneNumber}", [
+                'error' => $errorMessage
             ]);
             return [
                 'status' => 'error',
@@ -140,9 +164,8 @@ class WhatsAppService
                 'data' => null
             ];
         } catch (\Exception $e) {
-            Log::error("WhatsAppService: Generic Exception sending message to {$chatId}", [
-                'error' => $e->getMessage(),
-                'endpoint' => $apiEndpoint
+            Log::error("WhatsAppService: Generic Exception sending message to {$phoneNumber}", [
+                'error' => $e->getMessage()
             ]);
             return [
                 'status' => 'error',
@@ -153,85 +176,382 @@ class WhatsAppService
     }
 
     /**
-     * Sends a media file encoded in Base64 via WhatsApp.
+     * Sends a media file via WhatsApp.
      *
-     * @param string $phoneNumber The recipient's phone number.
-     * @param string $base64Data The Base64 encoded string of the file content.
-     * @param string $fileName The name of the file (e.g., 'invoice.pdf').
-     * @param string|null $caption An optional caption for the media.
-     * @return array An array containing the status and API response data.
+     * @param string $phoneNumber The recipient's phone number
+     * @param string $mediaUrl The URL of the media file
+     * @param string $fileName The name of the file
+     * @param string|null $caption An optional caption for the media
+     * @return array Response status and data
      */
-    public function sendMediaBase64(string $phoneNumber, string $base64Data, string $fileName, ?string $caption = null): array
+    public function sendMedia(string $phoneNumber, string $mediaUrl, string $fileName, ?string $caption = null): array
     {
-        $phoneNumber = $this->formatChatId($phoneNumber);
+        $phoneNumber = $this->formatPhoneNumber($phoneNumber);
+        
         if (!$this->isConfigured()) {
-            return ['status' => 'error', 'message' => 'WhatsApp service is not configured or enabled in settings.'];
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured or is disabled in settings.'];
         }
 
-        $payload = [
-            'chatId' => $this->formatChatId($phoneNumber),
-            'mediaBase64' => $base64Data,
-            'mediaName' => $fileName,
-        ];
-        if ($caption) $payload['mediaCaption'] = $caption;
+        try {
+            $payload = [
+                'number' => $phoneNumber,
+                'type' => 'media',
+                'media_url' => $mediaUrl,
+                'filename' => $fileName,
+                'instance_id' => $this->instanceId,
+                'access_token' => $this->apiToken,
+            ];
+            
+            if ($caption) {
+                $payload['message'] = $caption;
+            }
 
-        return $this->sendRequest('/client/action/send-media', $payload);
+            Log::info("WhatsAppService: Sending media to {$phoneNumber}", [
+                'phone' => $phoneNumber,
+                'media_url' => $mediaUrl,
+                'filename' => $fileName,
+                'caption' => $caption,
+                'instance_id' => $this->instanceId,
+                'payload' => array_merge($payload, ['access_token' => '***hidden***'])
+            ]);
+
+            $response = $this->client->request('POST', 'https://waclient.com/api/send', [
+                'json' => $payload,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'http_errors' => false,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+
+            Log::info("WhatsAppService: Media API Response", [
+                'statusCode' => $statusCode,
+                'responseBody' => $responseBody,
+                'phone' => $phoneNumber,
+                'media_url' => $mediaUrl
+            ]);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                // Check the actual transmission status from WhatsApp API response
+                $transmissionStatus = $responseBody['status'] ?? null;
+                $message = $responseBody['message'] ?? null;
+                
+                // According to WA Client API docs, we need to check transmission status
+                // "Timeout" means transmission failed, not success
+                if ($transmissionStatus === 'success' && $message !== 'Timeout') {
+                    Log::info("WhatsAppService: Media sent successfully to {$phoneNumber}", ['response' => $responseBody]);
+                    return ['status' => 'success', 'data' => $responseBody];
+                } else {
+                    Log::error("WhatsAppService: Media transmission failed to {$phoneNumber}", [
+                        'statusCode' => $statusCode,
+                        'transmissionStatus' => $transmissionStatus,
+                        'message' => $message,
+                        'response' => $responseBody,
+                        'media_url' => $mediaUrl
+                    ]);
+                    return [
+                        'status' => 'error', 
+                        'message' => 'Media transmission failed. WhatsApp API returned: ' . ($message ?? 'Unknown error'), 
+                        'data' => $responseBody
+                    ];
+                }
+            } else {
+                Log::error("WhatsAppService: Failed to send media to {$phoneNumber}", [
+                    'statusCode' => $statusCode,
+                    'response' => $responseBody,
+                    'media_url' => $mediaUrl
+                ]);
+                return ['status' => 'error', 'message' => 'Failed to send media. API returned status: ' . $statusCode, 'data' => $responseBody];
+            }
+        } catch (\Exception $e) {
+            Log::error("WhatsAppService: Exception sending media to {$phoneNumber}", [
+                'error' => $e->getMessage(),
+                'media_url' => $mediaUrl,
+                'filename' => $fileName
+            ]);
+            return ['status' => 'error', 'message' => 'Exception: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Send media via Base64 content using Firebase Storage
+     */
+    public function sendMediaBase64($phoneNumber, $base64Content, $fileName, $caption = '')
+    {
+        try {
+            Log::info("WhatsAppService: Sending media via Base64 to {$phoneNumber}", [
+                'fileName' => $fileName,
+                'caption' => $caption,
+                'contentLength' => strlen($base64Content)
+            ]);
+
+            // Use Cloud Storage to upload and get public URL
+            $cloudStorageService = app(\App\Services\CloudStorageService::class);
+            
+            if (!$cloudStorageService->isConfigured()) {
+                Log::error("WhatsAppService: Cloud Storage not configured, falling back to local storage");
+                return $this->sendMediaBase64Local($phoneNumber, $base64Content, $fileName, $caption);
+            }
+
+            // Upload to Cloud Storage
+            $uploadResult = $cloudStorageService->uploadBase64($base64Content, $fileName);
+            
+            if ($uploadResult['status'] !== 'success') {
+                Log::error("WhatsAppService: Failed to upload to Cloud Storage", [
+                    'error' => $uploadResult['message'],
+                    'phoneNumber' => $phoneNumber
+                ]);
+                
+                // Fallback to local storage
+                return $this->sendMediaBase64Local($phoneNumber, $base64Content, $fileName, $caption);
+            }
+
+            $publicUrl = $uploadResult['url'];
+            
+            Log::info("WhatsAppService: File uploaded to Cloud Storage", [
+                'fileName' => $fileName,
+                'publicUrl' => $publicUrl,
+                'fileSize' => $uploadResult['size']
+            ]);
+
+            // Send media using the public URL
+            return $this->sendMedia($phoneNumber, $publicUrl, $fileName, $caption);
+
+        } catch (Exception $e) {
+            Log::error("WhatsAppService: Error in sendMediaBase64", [
+                'phoneNumber' => $phoneNumber,
+                'fileName' => $fileName,
+                'error' => $e->getMessage()
+            ]);
+
+            // Fallback to local storage
+            return $this->sendMediaBase64Local($phoneNumber, $base64Content, $fileName, $caption);
+        }
+    }
+
+    /**
+     * Send media via Base64 content using local storage (fallback method)
+     */
+    private function sendMediaBase64Local($phoneNumber, $base64Content, $fileName, $caption = '')
+    {
+        try {
+            // Ensure the directory exists
+            $directory = storage_path('app/public/whatsapp');
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            // Decode Base64 content
+            $fileContent = base64_decode($base64Content);
+            if ($fileContent === false) {
+                throw new Exception('Invalid Base64 content');
+            }
+
+            // Save file to local storage
+            $filePath = $directory . '/' . $fileName;
+            file_put_contents($filePath, $fileContent);
+
+            // Generate public URL using environment variable or fallback
+            $publicUrl = env('WHATSAPP_PUBLIC_URL', 'http://192.168.137.1/laundry/jawda-laundry-backend/public') . '/storage/whatsapp/' . $fileName;
+            
+            Log::info("WhatsAppService: Sending media via local storage", [
+                'phoneNumber' => $phoneNumber,
+                'fileName' => $fileName,
+                'publicUrl' => $publicUrl,
+                'fileSize' => strlen($fileContent)
+            ]);
+
+            // Send media using the public URL
+            return $this->sendMedia($phoneNumber, $publicUrl, $fileName, $caption);
+
+        } catch (Exception $e) {
+            Log::error("WhatsAppService: Error in sendMediaBase64Local", [
+                'phoneNumber' => $phoneNumber,
+                'fileName' => $fileName,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'status' => 'error',
+                'message' => 'Failed to process Base64 content: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Clean up old WhatsApp files to prevent storage bloat
+     */
+    private function cleanupOldFiles(): void
+    {
+        try {
+            $whatsappDir = storage_path('app/public/whatsapp');
+            if (!is_dir($whatsappDir)) {
+                return;
+            }
+            
+            $files = glob($whatsappDir . '/*');
+            $cutoffTime = time() - (24 * 3600); // 24 hours ago
+            
+            foreach ($files as $file) {
+                if (is_file($file) && filemtime($file) < $cutoffTime) {
+                    unlink($file);
+                    Log::info("WhatsAppService: Cleaned up old file", ['file' => basename($file)]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("WhatsAppService: Failed to cleanup old files", ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Schedule file cleanup after a specified delay
+     */
+    private function scheduleFileCleanup(string $filePath, int $delaySeconds): void
+    {
+        // In a production environment, you might want to use Laravel's job queue
+        // For now, we'll just log that cleanup should happen
+        Log::info("WhatsAppService: File cleanup scheduled", [
+            'file' => basename($filePath),
+            'cleanupTime' => date('Y-m-d H:i:s', time() + $delaySeconds)
+        ]);
+        
+        // You could implement a proper job queue here:
+        // dispatch(new CleanupWhatsAppFile($filePath))->delay(now()->addSeconds($delaySeconds));
     }
 
     /**
      * Sends a test message to the specified phone number.
      */
-    public function sendTestMessage(string $testPhoneNumber)
+    public function sendTestMessage(string $testPhoneNumber): array
     {
         $message = "This is a test message from your LaundryPro system. WhatsApp integration is working!";
         
-        $result = $this->sendMessage($testPhoneNumber, $message);
-        return $result;
-        
+        return $this->sendMessage($testPhoneNumber, $message);
     }
 
     /**
-     * Centralized method for making API requests.
+     * Check if a phone number is registered with WhatsApp
      */
-    private function sendRequest(string $endpoint, array $payload): array
+    public function checkNumber(string $phoneNumber): array
     {
-        $fullUrl = rtrim($this->apiUrl, '/') . $endpoint;
-        // return ['url' => $fullUrl, 'payload' => $payload,'status' => 'success'];
-        Log::info("WhatsApp API request to {$endpoint} was successful.", ['phone' => $payload['chatId']]);
+        $phoneNumber = $this->formatPhoneNumber($phoneNumber);
+        
+        if (!$this->isConfigured()) {
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured.'];
+        }
 
         try {
-            $response = Http::withToken($this->apiToken)
-                ->acceptJson()
-                ->asJson()
-                ->post($fullUrl, $payload);
+            $response = $this->client->request('GET', 'https://waclient.com/api/check_number', [
+                'query' => [
+                    'number' => $phoneNumber,
+                    'instance_id' => $this->instanceId,
+                    'access_token' => $this->apiToken,
+                ],
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'http_errors' => false,
+            ]);
 
-            if ($response->successful()) {
-                Log::info("WhatsApp API request to {$endpoint} was successful.", ['phone' => $payload['chatId']]);
-                return ['status' => 'success', 'data' => $response->json()];
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return ['status' => 'success', 'data' => $responseBody];
             } else {
-                $errorMessage = $response->json('message', 'API request failed with status ' . $response->status());
-                Log::error("WhatsApp API request failed.", [
-                    'endpoint' => $endpoint, 'status' => $response->status(), 'response' => $response->json() ?? $response->body()
-                ]);
-                return ['status' => 'error', 'message' => $errorMessage, 'data' => $response->json()];
+                return ['status' => 'error', 'message' => 'Failed to check number', 'data' => $responseBody];
             }
         } catch (\Exception $e) {
-            Log::critical("Exception while communicating with WhatsApp API.", ['endpoint' => $endpoint, 'message' => $e->getMessage()]);
-            return ['status' => 'error', 'message' => 'A critical communication error occurred. Check server logs.'];
+            Log::error("WhatsAppService: Exception checking number {$phoneNumber}", ['error' => $e->getMessage()]);
+            return ['status' => 'error', 'message' => 'Exception: ' . $e->getMessage()];
         }
     }
 
     /**
-     * Formats a raw phone number into the required "chatId" format.
+     * Get QR code for WhatsApp Web authentication
      */
-    private function formatChatId(string $phoneNumber): string
+    public function getQRCode(): array
+    {
+        if (!$this->isConfigured()) {
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured.'];
+        }
+
+        try {
+            $response = $this->client->request('GET', 'https://waclient.com/api/get_qrcode', [
+                'query' => [
+                    'instance_id' => $this->instanceId,
+                    'access_token' => $this->apiToken,
+                ],
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'http_errors' => false,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return ['status' => 'success', 'data' => $responseBody];
+            } else {
+                return ['status' => 'error', 'message' => 'Failed to get QR code', 'data' => $responseBody];
+            }
+        } catch (\Exception $e) {
+            Log::error("WhatsAppService: Exception getting QR code", ['error' => $e->getMessage()]);
+            return ['status' => 'error', 'message' => 'Exception: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Get pairing code for WhatsApp Web authentication
+     */
+    public function getPairingCode(string $phoneNumber): array
+    {
+        if (!$this->isConfigured()) {
+            return ['status' => 'error', 'message' => 'WhatsApp service is not configured.'];
+        }
+
+        try {
+            $response = $this->client->request('GET', 'https://waclient.com/api/get_paircode', [
+                'query' => [
+                    'phone' => $phoneNumber,
+                    'instance_id' => $this->instanceId,
+                    'access_token' => $this->apiToken,
+                ],
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'http_errors' => false,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $responseBody = json_decode($response->getBody()->getContents(), true);
+
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return ['status' => 'success', 'data' => $responseBody];
+            } else {
+                return ['status' => 'error', 'message' => 'Failed to get pairing code', 'data' => $responseBody];
+            }
+        } catch (\Exception $e) {
+            Log::error("WhatsAppService: Exception getting pairing code", ['error' => $e->getMessage()]);
+            return ['status' => 'error', 'message' => 'Exception: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Formats a raw phone number into the required format for WA Client API.
+     */
+    private function formatPhoneNumber(string $phoneNumber): string
     {
         // Get the country code from database settings, default to Oman (968)
         $settingsService = app(\App\Services\SettingsService::class);
         $whatsappConfig = $settingsService->getWhatsAppConfig();
         $countryCode = $whatsappConfig['country_code'] ?? '968';
         
-        // Clean the phone number (remove any non-digits)
+        // Clean the phone number (remove any non-digits, spaces, dashes, plus signs)
         $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
         
         // If the phone number doesn't start with the country code, add it
@@ -239,6 +559,21 @@ class WhatsAppService
             $cleanPhone = $countryCode . $cleanPhone;
         }
         
-        return $cleanPhone . '@c.us';
+        // Ensure the phone number is at least 10 digits (country code + phone)
+        if (strlen($cleanPhone) < 10) {
+            Log::warning("WhatsAppService: Phone number too short", [
+                'original' => $phoneNumber,
+                'cleaned' => $cleanPhone,
+                'length' => strlen($cleanPhone)
+            ]);
+        }
+        
+        Log::info("WhatsAppService: Phone number formatted", [
+            'original' => $phoneNumber,
+            'formatted' => $cleanPhone,
+            'countryCode' => $countryCode
+        ]);
+        
+        return $cleanPhone;
     }
 }

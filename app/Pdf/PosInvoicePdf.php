@@ -421,10 +421,13 @@ class PosInvoicePdf extends TCPDF
         // If logo was added, we don't need extra spacing
         if (!$logoAdded) {
             $this->Ln(2);
+
         }
+
+        // dd($this->settings);
         
         $this->SetFont($this->font, 'B', 14);
-        $this->Cell(0, 6, $this->getBilingualText('company_name'), 0, 1, 'C');
+        $this->Cell(0, 6, $this->settings['general_company_name'], 0, 1, 'C');
         $this->SetFont($this->font, '', 8);
         $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');
         $this->Cell(0, 4, $this->getBilingualText('company_phone'), 0, 1, 'C');

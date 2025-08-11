@@ -44,7 +44,6 @@ class UserController extends Controller // For admin management of users
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username|alpha_dash',
-            'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::defaults()],
             'role_ids' => 'sometimes|array',
             'role_ids.*' => 'integer|exists:roles,id', // Validate role IDs
@@ -55,7 +54,6 @@ class UserController extends Controller // For admin management of users
             $user = User::create([
                 'name' => $validated['name'],
                 'username' => $validated['username'],
-                'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
             ]);
 
@@ -84,7 +82,6 @@ class UserController extends Controller // For admin management of users
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'username' => ['sometimes','required','string','max:255','alpha_dash', Rule::unique('users')->ignore($user->id)],
-            'email' => ['sometimes','required','string','email','max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'confirmed', Password::defaults()], // Password optional on update
             'role_ids' => 'sometimes|array',
             'role_ids.*' => 'integer|exists:roles,id',
@@ -95,7 +92,6 @@ class UserController extends Controller // For admin management of users
             $updateData = [
                 'name' => $validated['name'] ?? $user->name, 
                 'username' => $validated['username'] ?? $user->username,
-                'email' => $validated['email'] ?? $user->email
             ];
             if (!empty($validated['password'])) {
                 $updateData['password'] = Hash::make($validated['password']);

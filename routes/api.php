@@ -171,7 +171,7 @@ Route::delete(
     
     // Navigation Management Routes
     Route::get('/navigation/user', [NavigationController::class, 'getUserNavigation']);
-    Route::apiResource('navigation', NavigationController::class)->except(['show']);
+    Route::apiResource('navigation', NavigationController::class)->except(['show'])->parameters(['navigation' => 'navigationItem']);
     Route::put('/navigation/order', [NavigationController::class, 'updateOrder']);
     Route::get('/users/{user}/navigation-permissions', [NavigationController::class, 'getUserPermissions']);
     Route::put('/users/{user}/navigation-permissions', [NavigationController::class, 'updateUserPermissions']);

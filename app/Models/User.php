@@ -24,7 +24,6 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'username',
-        'email',
         'password',
         'avatar_url', // Example: if users have avatars
       
@@ -78,6 +77,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's roles.
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(\Spatie\Permission\Models\Role::class, 'model_has_roles', 'model_id', 'role_id')
+                    ->where('model_type', User::class);
+    }
+
+    /**
      * Get all accessible navigation items for this user.
      */
     public function getAccessibleNavigationItems(): array
@@ -125,5 +133,29 @@ class User extends Authenticatable
     public function isAdminSpatie(): bool
     {
         return $this->hasRole('admin'); // Assuming 'admin' is a role name in Spatie
+    }
+
+    /**
+     * Boot method to set up navigation permissions for new users
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // When a user is created, set up default navigation permissions
+        static::created(function ($user) {
+            // Import the seeder class
+            \Database\Seeders\UserNavigationPermissionSeeder::setupDefaultNavigationForUser($user);
+        });
+
+        // When a user's role is updated, update navigation permissions
+        static::updated(function ($user) {
+            if ($user->wasChanged('roles')) {
+                // Clear existing navigation permissions
+                $user->navigationItems()->detach();
+                // Set up new navigation permissions based on current role
+                \Database\Seeders\UserNavigationPermissionSeeder::setupDefaultNavigationForUser($user);
+            }
+        });
     }
 }
