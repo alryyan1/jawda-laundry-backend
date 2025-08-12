@@ -13,17 +13,14 @@ class LaundrySeeder extends Seeder
     {
         $this->command->info('Starting laundry seeding process...');
         
-        // Run category seeder first
-        $this->call([
-            LaundryCategorySeeder::class,
-        ]);
-        
+      
         // Product types are now seeded by the main ProductTypeSeeder
         // which imports from rain_laundry database
         
         // Run service action seeder
         $this->call([
             LaundryServiceActionSeeder::class,
+            
         ]);
         
         // Run service offering seeder after both product types and service actions are created

@@ -55,7 +55,7 @@ class OrderUpdated implements ShouldBroadcast
         return [
             'order' => [
                 'id' => $this->order->id,
-                'order_number' => $this->order->order_number,
+                'id' => $this->order->id,
                 'daily_order_number' => $this->order->daily_order_number,
                 'status' => $this->order->status,
                 'total_amount' => $this->order->total_amount,

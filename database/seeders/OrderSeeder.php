@@ -71,12 +71,12 @@ class OrderSeeder extends Seeder
                 if (empty($orderItemsData)) continue; // Skip if no items somehow
 
                 $orderDate = now()->subDays(rand(0, 60));
-                $statusOptions = ['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'];
+                $statusOptions = ['pending', 'processing', 'delivered', 'completed', 'cancelled'];
                 $status = $statusOptions[array_rand($statusOptions)];
                 
                 $paidAmount = 0;
                 $paymentStatus = 'pending';
-                if ($status === 'completed' || $status === 'ready_for_pickup') {
+                if ($status === 'completed' || $status === 'delivered') {
                     if (rand(0,1)) { // 50% chance of being paid if ready/completed
                         $paidAmount = $orderTotalAmount;
                         $paymentStatus = 'paid';
@@ -88,7 +88,7 @@ class OrderSeeder extends Seeder
 
 
                 Order::create([
-                    'order_number' => 'ORD-' . strtoupper(Str::random(8)),
+                    // order_number removed - using id instead
                     'customer_id' => $customer->id,
                     'user_id' => $staffUser->id,
                     'status' => $status,

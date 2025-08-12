@@ -53,7 +53,7 @@ class DiningTableController extends Controller
                     ] : null,
                     'active_order' => $activeOrder ? [
                         'id' => $activeOrder->id,
-                        'order_number' => $activeOrder->order_number,
+                        'id' => $activeOrder->id,
                         'daily_order_number' => $activeOrder->daily_order_number,
                         'customer_name' => $activeOrder->customer->name,
                         'status' => $activeOrder->status,

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('customer_id')->constrained('customers')->onDelete('restrict'); // Prevent deleting customer with orders
             $table->foreignId('user_id')->comment('Staff member who created/processed order')->nullable()->constrained('users')->onDelete('set null');
 
-            $table->string('status')->default('pending'); // pending, processing, ready_for_pickup, completed, cancelled
+            $table->string('status')->default('pending'); // pending, processing, delivered, completed, cancelled
             $table->decimal('total_amount', 10, 2)->default(0.00);
             $table->decimal('paid_amount', 10, 2)->default(0.00);
             $table->string('payment_status')->default('pending')->comment('pending, paid, partially_paid, refunded');

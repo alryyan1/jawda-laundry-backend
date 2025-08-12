@@ -17,7 +17,7 @@ class DashboardController extends Controller
     {
         $pendingOrders = Order::where('status', 'pending')->count();
         $processingOrders = Order::where('status', 'processing')->count();
-        $readyForPickupOrders = Order::where('status', 'ready_for_pickup')->count();
+        $deliveredOrders = Order::where('status', 'delivered')->count();
         $completedTodayOrders = Order::where('status', 'completed')
                                     ->whereDate('updated_at', Carbon::today()) // Assuming updated_at reflects completion time
                                     ->count();
@@ -34,7 +34,7 @@ class DashboardController extends Controller
         return response()->json([
             'pendingOrders' => $pendingOrders,
             'processingOrders' => $processingOrders,
-            'readyForPickupOrders' => $readyForPickupOrders,
+            'deliveredOrders' => $deliveredOrders,
             'completedTodayOrders' => $completedTodayOrders,
             'cancelledOrders' => $cancelledOrders,
             'totalActiveCustomers' => $totalActiveCustomers,
@@ -163,7 +163,7 @@ class DashboardController extends Controller
                 'status_counts' => [
                     'pending' => $statusCounts->get('pending', 0),
                     'processing' => $statusCounts->get('processing', 0),
-                    'ready_for_pickup' => $statusCounts->get('ready_for_pickup', 0),
+                    'delivered' => $statusCounts->get('delivered', 0),
                     'completed' => $statusCounts->get('completed', 0),
                     'cancelled' => $statusCounts->get('cancelled', 0),
                 ],

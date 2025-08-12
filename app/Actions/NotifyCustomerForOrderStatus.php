@@ -43,7 +43,7 @@ class NotifyCustomerForOrderStatus {
             $pdf->generate();
             $pdfContent = $pdf->Output('invoice.pdf', 'S');
             $base64Pdf = base64_encode($pdfContent);
-            $fileName = 'Invoice-' . $order->order_number . '.pdf';
+            $fileName = 'Invoice-' . $order->id . '.pdf';
             
             // Send via WhatsApp service
             $this->whatsAppService->sendMediaBase64($phoneNumber, $base64Pdf, $fileName, $message);
@@ -57,7 +57,7 @@ class NotifyCustomerForOrderStatus {
     {
         $placeholders = [
             '{customer_name}' => $order->customer->name,
-            '{order_number}' => $order->order_number,
+            '{order_number}' => $order->id,
             '{order_status}' => ucwords(str_replace('_', ' ', $order->status)),
             '{total_amount}' => number_format($order->total_amount, 3),
             '{amount_due}' => number_format($order->amount_due, 3),

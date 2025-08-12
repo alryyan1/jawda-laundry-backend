@@ -67,13 +67,31 @@ class OrderSequenceService
      */
     private function getCategoryItemCount(Order $order, int $categoryId): int
     {
-        return $order->items()
+        $items = $order->items()
             ->with('serviceOffering.productType')
-            ->get()
-            ->filter(function ($item) use ($categoryId) {
-                return $item->serviceOffering->productType->product_category_id === $categoryId;
-            })
-            ->count();
+            ->get();
+            
+        $categoryItems = $items->filter(function ($item) use ($categoryId) {
+            return $item->serviceOffering->productType->product_category_id === $categoryId;
+        });
+        
+        $totalQuantity = $categoryItems->sum('quantity');
+        
+        Log::info("Category item count calculation:", [
+            'order_id' => $order->id,
+            'category_id' => $categoryId,
+            'items_count' => $categoryItems->count(),
+            'total_quantity' => $totalQuantity,
+            'items_details' => $categoryItems->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'quantity' => $item->quantity,
+                    'product_type' => $item->serviceOffering->productType->name
+                ];
+            })->toArray()
+        ]);
+        
+        return $totalQuantity;
     }
     
     /**

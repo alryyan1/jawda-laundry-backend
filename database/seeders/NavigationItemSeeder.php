@@ -120,7 +120,10 @@ class NavigationItemSeeder extends Seeder
         // Create main navigation items first
         $createdItems = [];
         foreach ($navigationItems as $item) {
-            $createdItems[$item['key']] = NavigationItem::create($item);
+            $createdItems[$item['key']] = NavigationItem::firstOrCreate(
+                ['key' => $item['key']], 
+                $item
+            );
         }
 
         // Sub-navigation items based on actual routes in index.tsx
@@ -392,7 +395,10 @@ class NavigationItemSeeder extends Seeder
 
         // Create sub-navigation items
         foreach ($subNavItems as $subItem) {
-            NavigationItem::create($subItem);
+            NavigationItem::firstOrCreate(
+                ['key' => $subItem['key']], 
+                $subItem
+            );
         }
     }
 } 

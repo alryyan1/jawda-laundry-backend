@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -38,6 +39,9 @@ class PermissionSeeder extends Seeder
             // Order Management
             'order:list', 'order:view', 'order:create', 'order:update', 'order:delete',
             'order:update-status', 'order:record-payment',
+
+            // POS Access
+            'pos:access',
 
             // Expense Management
             'expense:list', 'expense:create', 'expense:update', 'expense:delete',
@@ -107,14 +111,54 @@ class PermissionSeeder extends Seeder
         // ----------------- ASSIGN ROLES TO DEFAULT USERS -----------------
         $adminUser = User::where('email', 'admin@admin.com')->first();
         if ($adminUser) {
-            $adminUser->syncRoles(['admin']);
-            $this->command->info('Assigned "admin" role to admin@admin.com.');
+            try {
+                // Check if role is already assigned
+                $existingRole = DB::table('model_has_roles')
+                    ->where('role_id', $adminRole->id)
+                    ->where('model_type', User::class)
+                    ->where('model_id', $adminUser->id)
+                    ->first();
+                
+                if (!$existingRole) {
+                    // Manually insert the role assignment with correct model_type
+                    DB::table('model_has_roles')->insert([
+                        'role_id' => $adminRole->id,
+                        'model_type' => User::class,
+                        'model_id' => $adminUser->id,
+                    ]);
+                    $this->command->info('Assigned "admin" role to admin@admin.com.');
+                } else {
+                    $this->command->info('Admin role already assigned to admin@admin.com.');
+                }
+            } catch (\Exception $e) {
+                $this->command->warn('Could not assign admin role: ' . $e->getMessage());
+            }
         }
 
         $staffUser = User::where('email', 'staff@staff.com')->first();
         if ($staffUser) {
-            $staffUser->syncRoles(['receptionist']);
-            $this->command->info('Assigned "receptionist" role to staff@staff.com.');
+            try {
+                // Check if role is already assigned
+                $existingRole = DB::table('model_has_roles')
+                    ->where('role_id', $receptionistRole->id)
+                    ->where('model_type', User::class)
+                    ->where('model_id', $staffUser->id)
+                    ->first();
+                
+                if (!$existingRole) {
+                    // Manually insert the role assignment with correct model_type
+                    DB::table('model_has_roles')->insert([
+                        'role_id' => $receptionistRole->id,
+                        'model_type' => User::class,
+                        'model_id' => $staffUser->id,
+                    ]);
+                    $this->command->info('Assigned "receptionist" role to staff@staff.com.');
+                } else {
+                    $this->command->info('Receptionist role already assigned to staff@staff.com.');
+                }
+            } catch (\Exception $e) {
+                $this->command->warn('Could not assign receptionist role: ' . $e->getMessage());
+            }
         }
     }
 }

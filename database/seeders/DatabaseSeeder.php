@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\SettingsSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -26,10 +27,12 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             NavigationItemSeeder::class,
             UserNavigationPermissionSeeder::class, // Set up navigation permissions for existing users
-            // Laundry seeders (creates categories first)
-            \Database\Seeders\Laundry\LaundrySeeder::class,
-            // Now seed product types after categories exist
+            // Product categories and types (must come before laundry seeder)
+            ProductCategoriesTableSeeder::class,
             ProductTypesTableSeeder::class,
+            SettingsSeeder::class,
+            // Laundry seeders (creates service offerings)
+            \Database\Seeders\Laundry\LaundrySeeder::class,
             // SupplierSeeder::class,
             // Add PricingRuleSeeder if you create one
         ]);

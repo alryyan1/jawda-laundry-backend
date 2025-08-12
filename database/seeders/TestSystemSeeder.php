@@ -106,7 +106,7 @@ class TestSystemSeeder extends Seeder
 
             for ($k = 0; $k < 200; $k++) {
                 $customer = $customers->random();
-                $orderDate = fake()->dateTimeBetween('-1 year', 'now');
+                $orderDate = \Carbon\Carbon::parse(fake()->dateTimeBetween('-1 year', 'now'));
                 $itemsInOrderCount = rand(1, 10);
                 $orderItemsData = [];
                 $orderTotalAmount = 0;
@@ -139,9 +139,9 @@ class TestSystemSeeder extends Seeder
 
                 if (empty($orderItemsData)) continue;
 
-                $status = fake()->randomElement(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled']);
+                $status = fake()->randomElement(['pending', 'processing', 'delivered', 'completed', 'cancelled']);
                 $order = Order::create([
-                    'order_number' => 'ORD-' . strtoupper(Str::random(8)),
+                    // order_number removed - using id instead
                     'customer_id' => $customer->id,
                     'user_id' => $staffUsers->random()->id,
                     'status' => $status,

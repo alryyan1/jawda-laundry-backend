@@ -19,7 +19,6 @@ class Order extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'order_number',
         'daily_order_number',
         'customer_id',
         'table_id',
@@ -262,6 +261,11 @@ class Order extends Model
         static::creating(function ($order) {
             if (empty($order->daily_order_number)) {
                 $order->daily_order_number = self::generateDailyOrderNumber();
+            }
+            
+            // Set pickup_date to 3 days from now if not provided and order is not a customer payment
+            if (empty($order->pickup_date) && $order->order_type !== 'customer_payment') {
+                $order->pickup_date = now()->addDays(3);
             }
         });
 

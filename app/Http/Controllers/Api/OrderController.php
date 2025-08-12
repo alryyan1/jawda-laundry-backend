@@ -166,7 +166,6 @@ class OrderController extends Controller
             }
 
             $order = Order::create([
-                'order_number' => 'ORD-' . strtoupper(Str::random(8)),
                 'customer_id' => $customer ? $customer->id : null,
                 'user_id' => Auth::id(),
                 'status' => 'pending',
@@ -177,7 +176,6 @@ class OrderController extends Controller
                 'payment_status' => 'pending',
                 'notes' => $validatedData['notes'] ?? null,
                 'due_date' => $validatedData['due_date'] ?? null,
-                'pickup_date' => now()->addDays(3), // Set pickup date to 3 days after order creation
                 'order_date' => now(),
             ]);
 
@@ -257,7 +255,7 @@ class OrderController extends Controller
             'customer_id' => 'sometimes|exists:customers,id',
             'notes' => 'sometimes|nullable|string|max:2000',
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
-            'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])],
+            'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])],
             'order_complete' => 'sometimes|boolean',
             'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
@@ -469,7 +467,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
         $this->authorize('updateStatus', $order);
-        $validated = $request->validate(['status' => ['required', Rule::in(['pending', 'processing', 'ready_for_pickup', 'completed', 'cancelled'])]]);
+        $validated = $request->validate(['status' => ['required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])]]);
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
         $warnings = []; // Array to collect warnings
@@ -818,6 +816,12 @@ class OrderController extends Controller
             // Recalculate the order's total amount
             $orderItem->order->recalculateTotalAmount();
             
+            // Refresh the order to ensure we have the latest data
+            $orderItem->order->refresh();
+            
+            // Regenerate category sequences to reflect any changes
+            $orderItem->order->generateCategorySequences(true);
+            
             Log::info('Updated order item dimensions and recalculated totals:', [
                 'order_item_id' => $orderItem->id,
                 'order_id' => $orderItem->order->id,
@@ -825,6 +829,7 @@ class OrderController extends Controller
                 'width_meters' => $orderItem->width_meters,
                 'new_subtotal' => $orderItem->sub_total,
                 'new_order_total' => $orderItem->order->total_amount,
+                'category_sequences' => $orderItem->order->category_sequences,
             ]);
             
             DB::commit();
@@ -836,6 +841,7 @@ class OrderController extends Controller
                 'message' => 'Order item dimensions updated successfully.',
                 'order_item' => $orderItem,
                 'order_total' => $orderItem->order->total_amount,
+                'category_sequences' => $orderItem->order->category_sequences,
             ]);
             
         } catch (\Exception $e) {
@@ -891,12 +897,19 @@ class OrderController extends Controller
             // Recalculate the order's total amount
             $orderItem->order->recalculateTotalAmount();
             
+            // Refresh the order to ensure we have the latest data
+            $orderItem->order->refresh();
+            
+            // Regenerate category sequences to reflect the new quantity
+            $orderItem->order->generateCategorySequences(true);
+            
             Log::info('Updated order item quantity and recalculated totals:', [
                 'order_item_id' => $orderItem->id,
                 'order_id' => $orderItem->order->id,
                 'quantity' => $orderItem->quantity,
                 'new_subtotal' => $orderItem->sub_total,
                 'new_order_total' => $orderItem->order->total_amount,
+                'category_sequences' => $orderItem->order->category_sequences,
             ]);
             
             DB::commit();
@@ -908,6 +921,7 @@ class OrderController extends Controller
                 'message' => 'Order item quantity updated successfully.',
                 'order_item' => $orderItem,
                 'order_total' => $orderItem->order->total_amount,
+                'category_sequences' => $orderItem->order->category_sequences,
             ]);
             
         } catch (\Exception $e) {
@@ -940,7 +954,7 @@ class OrderController extends Controller
         // Set document information
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetAuthor(config('app.name'));
-        $pdf->SetTitle('Invoice ' . $order->order_number);
+        $pdf->SetTitle('Invoice ' . $order->id);
         $pdf->SetSubject('Order Invoice');
 
         // Set default header/footer data (if not already set in your custom class)
@@ -988,6 +1002,7 @@ class OrderController extends Controller
             'general_company_address' => app_setting('company_address'),
             'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
             'general_company_phone' => app_setting('company_phone'),
+            'general_company_phone_2' => app_setting('company_phone_2'),
             'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
             'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
             'company_logo_url' => app_setting('company_logo_url'),
@@ -1005,7 +1020,7 @@ class OrderController extends Controller
         $pdf->setSettings($settings);
 
         // Set document information
-        $pdf->SetTitle('Receipt ' . $order->order_number);
+        $pdf->SetTitle('Receipt ' . $order->id);
         $pdf->SetAuthor(config('app.name'));
         $pdf->setPrintHeader(false); // We can control header in generate()
         $pdf->setPrintFooter(true);  // Use our custom footer
@@ -1020,12 +1035,12 @@ class OrderController extends Controller
 
         if ($base64) {
             // Return base64 encoded PDF content
-            return $pdf->Output('receipt-'.$order->order_number.'.pdf', 'S');
+            return $pdf->Output('receipt-'.$order->id.'.pdf', 'S');
         } else {
             // Close and output PDF document
             // 'I' for inline browser display. This is best for POS printing.
             // The browser's PDF viewer will handle the print dialog.
-            $pdf->Output('receipt-'.$order->order_number.'.pdf', 'I');
+            $pdf->Output('receipt-'.$order->id.'.pdf', 'I');
             exit;
         }
     }
@@ -1053,8 +1068,8 @@ class OrderController extends Controller
         $base64Pdf = base64_encode($pdfContent);
 
         // --- 3. Send via WhatsApp Service ---
-        $fileName = 'Invoice-' . $order->order_number . '.pdf';
-        $caption = "Hello {$customer->name}, here is the invoice for your order #{$order->order_number}. Thank you!";
+        $fileName = 'Invoice-' . $order->id . '.pdf';
+        $caption = "Hello {$customer->name}, here is the invoice for your order #{$order->id}. Thank you!";
         
         // Sanitize phone number - remove '+', spaces, dashes
         $phoneNumber = preg_replace('/[^0-9]/', '', $customer->phone);
@@ -1215,7 +1230,7 @@ class OrderController extends Controller
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(fn($q) => $q->where('id', $searchTerm)
-                ->orWhere('order_number', 'LIKE', "%{$searchTerm}%")
+                ->orWhere('id', 'LIKE', "%{$searchTerm}%")
                 ->orWhereHas('customer', fn($cq) => $cq->where('name', 'LIKE', "%{$searchTerm}%")));
         }
 
@@ -1341,7 +1356,7 @@ class OrderController extends Controller
         
         return response()->json([
             'order_id' => $order->id,
-            'order_number' => $order->order_number,
+            'id' => $order->id,
             'total_height_mm' => $totalHeight,
             'height_breakdown' => $heightBreakdown,
             'items_count' => $order->items->count(),

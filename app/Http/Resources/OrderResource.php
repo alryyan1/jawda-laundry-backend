@@ -16,7 +16,6 @@ class OrderResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'order_number' => $this->order_number,
             'daily_order_number' => $this->daily_order_number,
             'customer_id' => $this->customer_id,
             'customer' => new CustomerResource($this->whenLoaded('customer')),

@@ -235,7 +235,7 @@ class OrdersExcelExport
         $row = 7;
         foreach ($this->orders as $order) {
             $ordersSheet->setCellValue('A' . $row, $order->id);
-            $ordersSheet->setCellValue('B' . $row, $order->order_number);
+            $ordersSheet->setCellValue('B' . $row, $order->id);
             $ordersSheet->setCellValue('C' . $row, $order->customer ? $order->customer->name : 'N/A');
             $ordersSheet->setCellValue('D' . $row, $order->customer ? $order->customer->phone : 'N/A');
             $ordersSheet->setCellValue('E' . $row, ucfirst($order->status));

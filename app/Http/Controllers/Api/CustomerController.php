@@ -152,7 +152,7 @@ class CustomerController extends Controller
         try {
             // Create a special "customer payment" order
             $order = Order::create([
-                'order_number' => 'CP-' . time() . '-' . $customer->id, // Customer Payment prefix
+                // Customer Payment - no order_number needed
                 'daily_order_number' => 1,
                 'customer_id' => $customer->id,
                 'user_id' => Auth::id(),

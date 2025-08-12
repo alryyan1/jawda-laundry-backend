@@ -24,7 +24,7 @@ if (!$order) {
     exit;
 }
 
-echo "<h2>Testing with Order: {$order->order_number}</h2>";
+echo "<h2>Testing with Order: {$order->id}</h2>";
 echo "<p>Customer: {$order->customer->name}</p>";
 echo "<p>Status: {$order->status}</p>";
 

@@ -198,7 +198,7 @@ return [
     'order_statuses' => [
         'pending',
         'processing', 
-        'ready_for_pickup',
+        'delivered',
         'completed',
         'cancelled'
     ],

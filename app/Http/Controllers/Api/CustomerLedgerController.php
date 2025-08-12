@@ -20,7 +20,7 @@ class CustomerLedgerController extends Controller
         // --- CORRECTED DATA FETCHING ---
         // Eager load all orders for the customer, and for each of those orders, load their payments.
         $customer->load(['orders' => function ($query) {
-            $query->with('payments')->select('id', 'customer_id', 'order_number', 'created_at', 'total_amount');
+            $query->with('payments')->select('id', 'customer_id', 'created_at', 'total_amount');
         }]);
 
         // --- Transform Orders into Ledger Entries (Debits) ---
@@ -34,7 +34,7 @@ class CustomerLedgerController extends Controller
             return [
                 'date' => $order->created_at,
                 'type' => 'order',
-                'description' => 'Order #' . $order->order_number,
+                'description' => 'Order #' . $order->id,
                 'debit' => (float) $order->total_amount,
                 'credit' => 0,
                 'reference_id' => $order->id,
@@ -53,7 +53,7 @@ class CustomerLedgerController extends Controller
                 if ($payment->type === 'refund') {
                     $description = 'Refund';
                 }
-                $description .= ' for Order #' . $order->order_number;
+                                    $description .= ' for Order #' . $order->id;
 
                 return [
                     'date' => $payment->created_at,
