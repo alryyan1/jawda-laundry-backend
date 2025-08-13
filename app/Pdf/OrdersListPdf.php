@@ -231,15 +231,14 @@ class OrdersListPdf extends TCPDF
         $this->SetTextColor(255, 255, 255);
         $this->SetDrawColor(41, 128, 185);
         
-        $this->Cell(20, 10, 'ID', 1, 0, 'C', true);
-        $this->Cell(40, 10, 'Customer', 1, 0, 'C', true);
-        $this->Cell(30, 10, 'Date', 1, 0, 'C', true);
-        $this->Cell(25, 10, 'Status', 1, 0, 'C', true);
-        $this->Cell(20, 10, 'Items', 1, 0, 'C', true);
-        $this->Cell(35, 10, 'Total', 1, 0, 'C', true);
-        $this->Cell(35, 10, 'Paid', 1, 0, 'C', true);
-        $this->Cell(35, 10, 'Due', 1, 0, 'C', true);
-        $this->Cell(45, 10, 'Sequences', 1, 1, 'C', true);
+        $this->Cell(25, 10, 'ID', 1, 0, 'C', true);
+        $this->Cell(50, 10, 'Customer', 1, 0, 'C', true);
+        $this->Cell(35, 10, 'Date', 1, 0, 'C', true);
+        $this->Cell(25, 10, 'Items', 1, 0, 'C', true);
+        $this->Cell(40, 10, 'Total', 1, 0, 'C', true);
+        $this->Cell(40, 10, 'Paid', 1, 0, 'C', true);
+        $this->Cell(40, 10, 'Due', 1, 0, 'C', true);
+        $this->Cell(55, 10, 'Sequences', 1, 1, 'C', true);
 
         // Table body with professional styling
         $this->SetFont($this->font, '', 8);
@@ -257,15 +256,14 @@ class OrdersListPdf extends TCPDF
                 $this->SetTextColor(255, 255, 255);
                 $this->SetDrawColor(41, 128, 185);
                 
-                $this->Cell(20, 10, 'ID', 1, 0, 'C', true);
-                $this->Cell(40, 10, 'Customer', 1, 0, 'C', true);
-                $this->Cell(30, 10, 'Date', 1, 0, 'C', true);
-                $this->Cell(25, 10, 'Status', 1, 0, 'C', true);
-                $this->Cell(20, 10, 'Items', 1, 0, 'C', true);
-                $this->Cell(35, 10, 'Total', 1, 0, 'C', true);
-                $this->Cell(35, 10, 'Paid', 1, 0, 'C', true);
-                $this->Cell(35, 10, 'Due', 1, 0, 'C', true);
-                $this->Cell(45, 10, 'Sequences', 1, 1, 'C', true);
+                $this->Cell(25, 10, 'ID', 1, 0, 'C', true);
+                $this->Cell(50, 10, 'Customer', 1, 0, 'C', true);
+                $this->Cell(35, 10, 'Date', 1, 0, 'C', true);
+                $this->Cell(25, 10, 'Items', 1, 0, 'C', true);
+                $this->Cell(40, 10, 'Total', 1, 0, 'C', true);
+                $this->Cell(40, 10, 'Paid', 1, 0, 'C', true);
+                $this->Cell(40, 10, 'Due', 1, 0, 'C', true);
+                $this->Cell(55, 10, 'Sequences', 1, 1, 'C', true);
                 
                 $this->SetFont($this->font, '', 8);
                 $this->SetTextColor(52, 73, 94);
@@ -287,15 +285,14 @@ class OrdersListPdf extends TCPDF
                 $sequences = implode(', ', $order->category_sequences);
             }
             
-            $this->Cell(20, 8, $order->id, 1, 0, 'C', $fill);
-            $this->Cell(40, 8, $this->truncateText($customerName, 20), 1, 0, 'L', $fill);
-            $this->Cell(30, 8, $orderDate, 1, 0, 'C', $fill);
-            $this->Cell(25, 8, $this->getStatusBadge($order->status), 1, 0, 'C', $fill);
-            $this->Cell(20, 8, $totalItems, 1, 0, 'C', $fill);
-            $this->Cell(35, 8, number_format($order->total_amount, 3), 1, 0, 'R', $fill);
-            $this->Cell(35, 8, number_format($order->paid_amount, 3), 1, 0, 'R', $fill);
-            $this->Cell(35, 8, number_format($amountDue, 3), 1, 0, 'R', $fill);
-            $this->Cell(45, 8, $this->truncateText($sequences, 18), 1, 1, 'C', $fill);
+            $this->Cell(25, 8, $order->id, 1, 0, 'C', $fill);
+            $this->Cell(50, 8, $this->truncateText($customerName, 25), 1, 0, 'C', $fill);
+            $this->Cell(35, 8, $orderDate, 1, 0, 'C', $fill);
+            $this->Cell(25, 8, $totalItems, 1, 0, 'C', $fill);
+            $this->Cell(40, 8, number_format($order->total_amount, 3), 1, 0, 'C', $fill);
+            $this->Cell(40, 8, number_format($order->paid_amount, 3), 1, 0, 'C', $fill);
+            $this->Cell(40, 8, number_format($amountDue, 3), 1, 0, 'C', $fill);
+            $this->Cell(55, 8, $this->truncateText($sequences, 25), 1, 1, 'C', $fill);
             
             $fill = !$fill;
         }
