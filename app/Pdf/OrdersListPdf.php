@@ -407,8 +407,8 @@ class OrdersListPdf extends TCPDF
         $topMargin = $this->tMargin;
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
         
-        // Ensure proper spacing after the first table
-        $this->Ln(10);
+        // Add new page for delivered orders table
+        $this->AddPage('L');
         
         // Table heading for delivered orders
         $this->SetFillColor(255, 248, 220); // Light orange background
