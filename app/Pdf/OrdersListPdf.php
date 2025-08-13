@@ -136,13 +136,8 @@ class OrdersListPdf extends TCPDF
         $this->AddPage('L');
         $this->SetFont($this->font, '', 11);
 
-        // Orders table first
+        // Only show orders table
         $this->generateOrdersTable();
-        
-        $this->Ln(15);
-
-        // Summary section at the bottom
-        $this->generateSummary();
 
         return $this->Output('', 'S');
     }
@@ -216,35 +211,42 @@ class OrdersListPdf extends TCPDF
 
     private function generateOrdersTable()
     {
-        // Section header with background
-        $this->SetFillColor(52, 73, 94);
-        $this->SetTextColor(255, 255, 255);
-        $this->SetFont($this->font, 'B', 14);
-        $this->Cell(0, 12, '  Orders Overview', 0, 1, 'L', true);
+        // Calculate available width (page width minus left and right margins)
+        $pageWidth = $this->GetPageWidth();
+        $leftMargin = $this->lMargin;
+        $rightMargin = $this->rMargin;
+        $availableWidth = $pageWidth - $leftMargin - $rightMargin;
         
-        $this->SetTextColor(0, 0, 0);
-        $this->Ln(5);
-        
-        // Professional table header
+        // Simple table header without colors
         $this->SetFont($this->font, 'B', 9);
-        $this->SetFillColor(41, 128, 185);
-        $this->SetTextColor(255, 255, 255);
-        $this->SetDrawColor(41, 128, 185);
+        $this->SetTextColor(0, 0, 0);
+        $this->SetDrawColor(0, 0, 0);
         
-        $this->Cell(25, 10, 'ID', 1, 0, 'C', true);
-        $this->Cell(50, 10, 'Customer', 1, 0, 'C', true);
-        $this->Cell(35, 10, 'Date', 1, 0, 'C', true);
-        $this->Cell(25, 10, 'Items', 1, 0, 'C', true);
-        $this->Cell(40, 10, 'Total', 1, 0, 'C', true);
-        $this->Cell(40, 10, 'Paid', 1, 0, 'C', true);
-        $this->Cell(40, 10, 'Due', 1, 0, 'C', true);
-        $this->Cell(55, 10, 'Sequences', 1, 1, 'C', true);
+        // Calculate column widths based on available space
+        $colWidths = [
+            'id' => $availableWidth * 0.08,      // 8% of available width
+            'customer' => $availableWidth * 0.20, // 20% of available width
+            'date' => $availableWidth * 0.12,     // 12% of available width
+            'items' => $availableWidth * 0.08,    // 8% of available width
+            'total' => $availableWidth * 0.15,    // 15% of available width
+            'paid' => $availableWidth * 0.15,     // 15% of available width
+            'due' => $availableWidth * 0.12,      // 12% of available width
+            'sequences' => $availableWidth * 0.10  // 10% of available width
+        ];
+        
+        $this->Cell($colWidths['id'], 10, 'ID', 1, 0, 'C', false);
+        $this->Cell($colWidths['customer'], 10, 'Customer', 1, 0, 'C', false);
+        $this->Cell($colWidths['date'], 10, 'Date', 1, 0, 'C', false);
+        $this->Cell($colWidths['items'], 10, 'Items', 1, 0, 'C', false);
+        $this->Cell($colWidths['total'], 10, 'Total', 1, 0, 'C', false);
+        $this->Cell($colWidths['paid'], 10, 'Paid', 1, 0, 'C', false);
+        $this->Cell($colWidths['due'], 10, 'Due', 1, 0, 'C', false);
+        $this->Cell($colWidths['sequences'], 10, 'Sequences', 1, 1, 'C', false);
 
-        // Table body with professional styling
+        // Table body with simple styling
         $this->SetFont($this->font, '', 8);
-        $this->SetTextColor(52, 73, 94);
-        $this->SetDrawColor(200, 200, 200);
-        $fill = false;
+        $this->SetTextColor(0, 0, 0);
+        $this->SetDrawColor(0, 0, 0);
         
         foreach ($this->orders as $order) {
             // Check if we need a new page
@@ -252,28 +254,23 @@ class OrdersListPdf extends TCPDF
                 $this->AddPage('L');
                 // Repeat header on new page
                 $this->SetFont($this->font, 'B', 9);
-                $this->SetFillColor(41, 128, 185);
-                $this->SetTextColor(255, 255, 255);
-                $this->SetDrawColor(41, 128, 185);
+                $this->SetTextColor(0, 0, 0);
+                $this->SetDrawColor(0, 0, 0);
                 
-                $this->Cell(25, 10, 'ID', 1, 0, 'C', true);
-                $this->Cell(50, 10, 'Customer', 1, 0, 'C', true);
-                $this->Cell(35, 10, 'Date', 1, 0, 'C', true);
-                $this->Cell(25, 10, 'Items', 1, 0, 'C', true);
-                $this->Cell(40, 10, 'Total', 1, 0, 'C', true);
-                $this->Cell(40, 10, 'Paid', 1, 0, 'C', true);
-                $this->Cell(40, 10, 'Due', 1, 0, 'C', true);
-                $this->Cell(55, 10, 'Sequences', 1, 1, 'C', true);
+                $this->Cell($colWidths['id'], 10, 'ID', 1, 0, 'C', false);
+                $this->Cell($colWidths['customer'], 10, 'Customer', 1, 0, 'C', false);
+                $this->Cell($colWidths['date'], 10, 'Date', 1, 0, 'C', false);
+                $this->Cell($colWidths['items'], 10, 'Items', 1, 0, 'C', false);
+                $this->Cell($colWidths['total'], 10, 'Total', 1, 0, 'C', false);
+                $this->Cell($colWidths['paid'], 10, 'Paid', 1, 0, 'C', false);
+                $this->Cell($colWidths['due'], 10, 'Due', 1, 0, 'C', false);
+                $this->Cell($colWidths['sequences'], 10, 'Sequences', 1, 1, 'C', false);
                 
                 $this->SetFont($this->font, '', 8);
-                $this->SetTextColor(52, 73, 94);
-                $this->SetDrawColor(200, 200, 200);
-                $fill = false;
+                $this->SetTextColor(0, 0, 0);
+                $this->SetDrawColor(0, 0, 0);
             }
 
-            // Professional alternating row colors
-            $this->SetFillColor($fill ? 248 : 255, $fill ? 249 : 255, $fill ? 250 : 255);
-            
             $customerName = $order->customer ? $order->customer->name : 'N/A';
             $orderDate = $order->order_date ? date('m/d/Y', strtotime($order->order_date)) : '-';
             $totalItems = $order->items ? $order->items->sum('quantity') : 0;
@@ -285,20 +282,15 @@ class OrdersListPdf extends TCPDF
                 $sequences = implode(', ', $order->category_sequences);
             }
             
-            $this->Cell(25, 8, $order->id, 1, 0, 'C', $fill);
-            $this->Cell(50, 8, $this->truncateText($customerName, 25), 1, 0, 'C', $fill);
-            $this->Cell(35, 8, $orderDate, 1, 0, 'C', $fill);
-            $this->Cell(25, 8, $totalItems, 1, 0, 'C', $fill);
-            $this->Cell(40, 8, number_format($order->total_amount, 3), 1, 0, 'C', $fill);
-            $this->Cell(40, 8, number_format($order->paid_amount, 3), 1, 0, 'C', $fill);
-            $this->Cell(40, 8, number_format($amountDue, 3), 1, 0, 'C', $fill);
-            $this->Cell(55, 8, $this->truncateText($sequences, 25), 1, 1, 'C', $fill);
-            
-            $fill = !$fill;
+            $this->Cell($colWidths['id'], 8, $order->id, 1, 0, 'C', false);
+            $this->Cell($colWidths['customer'], 8, $this->truncateText($customerName, 30), 1, 0, 'C', false);
+            $this->Cell($colWidths['date'], 8, $orderDate, 1, 0, 'C', false);
+            $this->Cell($colWidths['items'], 8, $totalItems, 1, 0, 'C', false);
+            $this->Cell($colWidths['total'], 8, number_format($order->total_amount, 3), 1, 0, 'C', false);
+            $this->Cell($colWidths['paid'], 8, number_format($order->paid_amount, 3), 1, 0, 'C', false);
+            $this->Cell($colWidths['due'], 8, number_format($amountDue, 3), 1, 0, 'C', false);
+            $this->Cell($colWidths['sequences'], 8, $this->truncateText($sequences, 30), 1, 1, 'C', false);
         }
-        
-        // Add detailed items section for each order
-        $this->generateDetailedItems();
     }
 
     private function generateDetailedItems()
