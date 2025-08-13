@@ -142,7 +142,17 @@ class OrdersListPdf extends TCPDF
         $pageWidth = $this->GetPageWidth();
         $leftMargin = $this->lMargin;
         $rightMargin = $this->rMargin;
+        $topMargin = $this->tMargin;
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+        
+        // Calculate proper top margin for summary (same as other pages)
+        $headerHeight = 35;
+        $currentY = $this->GetY();
+        $requiredY = $topMargin + $headerHeight + 10; // 10mm spacing after header
+        
+        if ($currentY < $requiredY) {
+            $this->SetY($requiredY);
+        }
         
         // Summary section with light background
         $this->SetFillColor(248, 249, 250); // Light gray background
