@@ -52,6 +52,7 @@ Route::get('/orders/{order}/pos-invoice-height', [OrderController::class, 'getPo
 // Public report PDF routes (no authentication required)
 Route::get('/reports/orders/pdf', [ReportController::class, 'exportOrdersReportPdf']);
 Route::get('/reports/orders/pdf/view', [ReportController::class, 'viewOrdersReportPdf']);
+Route::get('/reports/orders/list-pdf', [ReportController::class, 'exportOrdersListPdf']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

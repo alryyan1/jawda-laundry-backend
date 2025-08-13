@@ -481,7 +481,8 @@ class ReportController extends Controller
             // Search specifically in category sequences
             if ($request->filled('category_sequence_search')) {
                 $searchTerm = $request->input('category_sequence_search');
-                $query->whereJsonContains('category_sequences', $searchTerm);
+                // Use JSON_EXTRACT and LIKE for partial matching within JSON values (works with MariaDB)
+                $query->whereRaw("JSON_EXTRACT(category_sequences, '$.*') LIKE ?", ['%' . $searchTerm . '%']);
             }
 
             $orders = $query->orderBy('order_date', 'desc')->get();
@@ -597,6 +598,104 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             Log::error('Error viewing orders report PDF: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to view report'], 500);
+        }
+    }
+
+    /**
+     * Export orders list as PDF (for OrdersListPage)
+     */
+    public function exportOrdersListPdf(Request $request)
+    {
+        $request->validate([
+            'status' => 'nullable|string',
+            'search' => 'nullable|string',
+            'order_id' => 'nullable|string',
+            'customer_id' => 'nullable|string',
+            'product_type_id' => 'nullable|string',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
+            'category_sequence_search' => 'nullable|string',
+        ]);
+
+        try {
+            $query = Order::with([
+                'customer',
+                'user',
+                'items.serviceOffering.productType.category',
+                'items.serviceOffering.serviceAction',
+                'payments'
+            ]);
+
+            // Apply filters
+            if ($request->filled('status')) {
+                $query->where('status', $request->input('status'));
+            }
+
+            if ($request->filled('order_id')) {
+                $query->where('id', $request->input('order_id'));
+            }
+
+            if ($request->filled('customer_id')) {
+                $query->where('customer_id', $request->input('customer_id'));
+            }
+
+            if ($request->filled('product_type_id')) {
+                $query->whereHas('items.serviceOffering', function ($q) use ($request) {
+                    $q->where('product_type_id', $request->input('product_type_id'));
+                });
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('id', 'LIKE', "%{$search}%")
+                      ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                          $customerQuery->where('name', 'LIKE', "%{$search}%")
+                                       ->orWhere('phone', 'LIKE', "%{$search}%");
+                      });
+                });
+            }
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('order_date', '>=', $request->input('date_from'));
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('order_date', '<=', $request->input('date_to'));
+            }
+
+            // Search specifically in category sequences
+            if ($request->filled('category_sequence_search')) {
+                $searchTerm = $request->input('category_sequence_search');
+                // Use JSON_EXTRACT and LIKE for partial matching within JSON values (works with MariaDB)
+                $query->whereRaw("JSON_EXTRACT(category_sequences, '$.*') LIKE ?", ['%' . $searchTerm . '%']);
+            }
+
+            $orders = $query->orderBy('order_date', 'desc')->get();
+
+            // Generate PDF
+            $pdf = new OrdersReportPdf();
+            $pdf->setOrders($orders);
+            $pdf->setDateRange(
+                $request->input('date_from', now()->format('Y-m-d')),
+                $request->input('date_to', now()->format('Y-m-d'))
+            );
+            $pdf->setSettings([
+                'company_name' => app_setting('company_name', config('app.name')),
+                'company_address' => app_setting('company_address'),
+                'currency_symbol' => app_setting('currency_symbol', '$'),
+            ]);
+
+            $pdfContent = $pdf->generate();
+
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="orders-list-' . now()->format('Y-m-d') . '.pdf"'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting orders list PDF: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to export orders list'], 500);
         }
     }
 }
