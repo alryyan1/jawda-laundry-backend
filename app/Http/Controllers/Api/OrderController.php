@@ -467,7 +467,10 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
         $this->authorize('updateStatus', $order);
-        $validated = $request->validate(['status' => ['required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])]]);
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])],
+            'delivered_date' => ['nullable', 'date']
+        ]);
         $oldStatus = $order->status;
         $newStatus = $validated['status'];
         $warnings = []; // Array to collect warnings
@@ -479,6 +482,11 @@ class OrderController extends Controller
                 if ($newStatus === 'completed') {
                     if (!$order->pickup_date) $order->pickup_date = now();
                     $order->order_complete = true;
+                } elseif ($newStatus === 'delivered') {
+                    // Set delivered_date to current date if not provided
+                    if (!$order->delivered_date) {
+                        $order->delivered_date = $validated['delivered_date'] ?? now();
+                    }
                 } elseif ($newStatus === 'cancelled') {
                     $order->order_complete = false;
                 }

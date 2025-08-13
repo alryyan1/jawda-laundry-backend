@@ -36,6 +36,7 @@ class Order extends Model
         'order_date',
         'due_date',
         'pickup_date',
+        'delivered_date',       // Date when order was delivered
         'delivery_address',     // Ensure this is here if used
         'whatsapp_text_sent',
         'whatsapp_pdf_sent',
@@ -52,6 +53,7 @@ class Order extends Model
         'order_date' => 'datetime',
         'due_date' => 'datetime',
         'pickup_date' => 'datetime',
+        'delivered_date' => 'datetime',
         'order_complete' => 'boolean',
         'whatsapp_text_sent' => 'boolean',
         'whatsapp_pdf_sent' => 'boolean',

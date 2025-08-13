@@ -1,4 +1,3 @@
-```php
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -25,6 +24,7 @@ return new class extends Migration
             $table->timestamp('order_date')->useCurrent();
             $table->timestamp('due_date')->nullable();
             $table->timestamp('pickup_date')->nullable();
+            $table->timestamp('delivered_date')->nullable();
             $table->text('delivery_address')->nullable();
 
             $table->timestamps();
