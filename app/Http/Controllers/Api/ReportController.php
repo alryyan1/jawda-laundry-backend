@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Pdf\OrdersReportPdf;
+use App\Pdf\OrdersListPdf;
 
 class ReportController extends Controller
 {
@@ -674,12 +675,18 @@ class ReportController extends Controller
             $orders = $query->orderBy('order_date', 'desc')->get();
 
             // Generate PDF
-            $pdf = new OrdersReportPdf();
+            $pdf = new OrdersListPdf();
             $pdf->setOrders($orders);
-            $pdf->setDateRange(
-                $request->input('date_from', now()->format('Y-m-d')),
-                $request->input('date_to', now()->format('Y-m-d'))
-            );
+            $pdf->setFilters([
+                'date_from' => $request->input('date_from'),
+                'date_to' => $request->input('date_to'),
+                'status' => $request->input('status'),
+                'search' => $request->input('search'),
+                'order_id' => $request->input('order_id'),
+                'customer_id' => $request->input('customer_id'),
+                'product_type_id' => $request->input('product_type_id'),
+                'category_sequence_search' => $request->input('category_sequence_search'),
+            ]);
             $pdf->setSettings([
                 'company_name' => app_setting('company_name', config('app.name')),
                 'company_address' => app_setting('company_address'),
