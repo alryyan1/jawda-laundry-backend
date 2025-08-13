@@ -253,9 +253,9 @@ class OrdersListPdf extends TCPDF
                 $fill = false;
             }
 
-            // Set alternating row colors with sky blue and skip styling
+            // Set alternating row colors with lighter sky blue and skip styling
             if ($fill) {
-                $this->SetFillColor(135, 206, 235); // Sky blue for alternating rows
+                $this->SetFillColor(167, 230, 245); // 50% lighter sky blue for alternating rows
             } else {
                 $this->SetFillColor(255, 255, 255); // White for other rows (no styling)
             }
