@@ -249,10 +249,19 @@ class OrdersListPdf extends TCPDF
         $pageWidth = $this->GetPageWidth();
         $leftMargin = $this->lMargin;
         $rightMargin = $this->rMargin;
+        $topMargin = $this->tMargin;
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
         
-        // Account for top margin - add more space after header
-        $this->Ln(5);
+        // Calculate proper top margin for orders table
+        // Header takes about 35mm (company name + address + report title + filters)
+        // Add some spacing after header
+        $headerHeight = 35;
+        $currentY = $this->GetY();
+        $requiredY = $topMargin + $headerHeight + 10; // 10mm spacing after header
+        
+        if ($currentY < $requiredY) {
+            $this->SetY($requiredY);
+        }
         
         // Table heading with light background and borders
         $this->SetFillColor(240, 248, 255); // Light blue background
@@ -395,7 +404,11 @@ class OrdersListPdf extends TCPDF
         $pageWidth = $this->GetPageWidth();
         $leftMargin = $this->lMargin;
         $rightMargin = $this->rMargin;
+        $topMargin = $this->tMargin;
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+        
+        // Ensure proper spacing after the first table
+        $this->Ln(10);
         
         // Table heading for delivered orders
         $this->SetFillColor(255, 248, 220); // Light orange background
