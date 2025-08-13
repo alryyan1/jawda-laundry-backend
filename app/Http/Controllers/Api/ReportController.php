@@ -20,7 +20,7 @@ class ReportController extends Controller
         // Protect all report methods with a specific permission.
         // You can get more granular later (e.g., report:view-financial vs. report:view-operational).
         // Exclude PDF methods from permission checks to allow public access
-        $this->middleware('can:report:view-financial')->except(['exportOrdersReportPdf', 'viewOrdersReportPdf']);
+        $this->middleware('can:report:view-financial')->except(['exportOrdersReportPdf', 'viewOrdersReportPdf', 'exportOrdersListPdf']);
     }
 
     /**
