@@ -113,77 +113,55 @@ class OrdersListPdf extends TCPDF
         $this->AddPage('L');
         $this->SetFont($this->font, '', 11);
 
-        // Only show orders table
+        // Add summary at top
+        $this->generateSummary();
+        
+        // Add some space after summary
+        $this->Ln(10);
+
+        // Show orders table with heading
         $this->generateOrdersTable();
 
         return $this->Output('', 'S');
     }
 
+
+
     private function generateSummary()
     {
-        // Section header with background
-        $this->SetFillColor(52, 73, 94);
-        $this->SetTextColor(255, 255, 255);
+        // Calculate available width
+        $pageWidth = $this->GetPageWidth();
+        $leftMargin = $this->lMargin;
+        $rightMargin = $this->rMargin;
+        $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+        
+        // Summary section with light background
+        $this->SetFillColor(248, 249, 250); // Light gray background
+        $this->Rect($leftMargin, $this->GetY(), $availableWidth, 25, 'F');
+        
+        // Summary title
         $this->SetFont($this->font, 'B', 14);
-        $this->Cell(0, 12, '  Executive Summary', 0, 1, 'L', true);
+        $this->SetTextColor(52, 73, 94);
+        $this->Cell(0, 8, 'Summary', 0, 1, 'L');
         
-        $this->SetTextColor(0, 0, 0);
-        $this->Ln(5);
-        
+        // Calculate summary data
         $totalOrders = $this->orders->count();
         $totalAmount = $this->orders->sum('total_amount');
         $totalPaid = $this->orders->sum('paid_amount');
         $totalDue = $totalAmount - $totalPaid;
         $averageOrderValue = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
-
-        // Create professional summary cards
-        $this->createSummaryCard('Total Orders', $totalOrders, 'orders', 20);
-        $this->createSummaryCard('Total Revenue', number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 'revenue', 80);
-        $this->createSummaryCard('Total Paid', number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 'paid', 140);
-        $this->createSummaryCard('Outstanding', number_format($totalDue, 3) . ' ' . $this->currencySymbol, 'due', 200);
-        $this->createSummaryCard('Average Order', number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 'avg', 260);
         
-        $this->Ln(15);
-    }
-    
-    private function createSummaryCard($title, $value, $type, $x)
-    {
-        $cardWidth = 55;
-        $cardHeight = 25;
+        // Summary details
+        $this->SetFont($this->font, '', 10);
+        $this->SetTextColor(0, 0, 0);
         
-        // Card background
-        $this->SetFillColor(248, 249, 250);
-        $this->SetDrawColor(200, 200, 200);
-        $this->Rect($x, $this->GetY(), $cardWidth, $cardHeight, 'DF');
+        $this->Cell($availableWidth * 0.2, 6, 'Total Orders: ' . $totalOrders, 0, 0, 'L');
+        $this->Cell($availableWidth * 0.2, 6, 'Total Amount: ' . number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
+        $this->Cell($availableWidth * 0.2, 6, 'Total Paid: ' . number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
+        $this->Cell($availableWidth * 0.2, 6, 'Outstanding: ' . number_format($totalDue, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
+        $this->Cell($availableWidth * 0.2, 6, 'Average Order: ' . number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
         
-        // Title
-        $this->SetFont($this->font, 'B', 8);
-        $this->SetTextColor(52, 73, 94);
-        $this->SetXY($x + 2, $this->GetY() + 2);
-        $this->Cell($cardWidth - 4, 6, $title, 0, 0, 'C');
-        
-        // Value
-        $this->SetFont($this->font, 'B', 10);
-        $this->SetTextColor(41, 128, 185);
-        $this->SetXY($x + 2, $this->GetY() + 8);
-        $this->Cell($cardWidth - 4, 8, $value, 0, 0, 'C');
-        
-        // Icon or indicator
-        $this->SetFillColor($this->getCardColor($type));
-        $this->SetXY($x + 2, $this->GetY() + 16);
-        $this->Cell(3, 3, '', 0, 0, 'L', true);
-    }
-    
-    private function getCardColor($type)
-    {
-        switch ($type) {
-            case 'orders': return [46, 204, 113]; // Green
-            case 'revenue': return [52, 152, 219]; // Blue
-            case 'paid': return [155, 89, 182]; // Purple
-            case 'due': return [231, 76, 60]; // Red
-            case 'avg': return [241, 196, 15]; // Yellow
-            default: return [149, 165, 166]; // Gray
-        }
+        $this->Ln(5);
     }
 
     private function generateOrdersTable()
@@ -195,7 +173,16 @@ class OrdersListPdf extends TCPDF
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
         
         // Account for top margin - add more space after header
-        $this->Ln(15);
+        $this->Ln(5);
+        
+        // Table heading with light background and borders
+        $this->SetFillColor(240, 248, 255); // Light blue background
+        $this->SetDrawColor(0, 0, 0);
+        $this->SetFont($this->font, 'B', 12);
+        $this->SetTextColor(0, 0, 0);
+        $this->Cell($availableWidth, 10, 'Orders Table', 1, 1, 'C', true);
+        
+        $this->Ln(2);
         
         // Simple table header without colors
         $this->SetFont($this->font, 'B', 11);
