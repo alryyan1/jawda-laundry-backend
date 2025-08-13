@@ -516,10 +516,10 @@ class OrdersListPdf extends TCPDF
         
         // Apply date filters if provided
         if (!empty($this->filters['date_from'])) {
-            $query->where('order_date', '>=', $this->filters['date_from']);
+            $query->whereDate('order_date', '>=', $this->filters['date_from']);
         }
         if (!empty($this->filters['date_to'])) {
-            $query->where('order_date', '<=', $this->filters['date_to']);
+            $query->whereDate('order_date', '<=', $this->filters['date_to']);
         }
         
         return $query->get();
