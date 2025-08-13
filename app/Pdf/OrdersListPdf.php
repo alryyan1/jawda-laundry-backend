@@ -49,6 +49,9 @@ class OrdersListPdf extends TCPDF
         $this->SetFont($this->font, 'B', 12);
         $this->Cell(0, 6, 'Orders List Report', 0, 1, 'C');
         
+        // Add filters display in clean way
+        $this->addCleanFiltersDisplay();
+        
         // Add some space after header
         $this->Ln(10);
     }
@@ -122,10 +125,7 @@ class OrdersListPdf extends TCPDF
         // Show delivered orders table
         $this->generateDeliveredOrdersTable();
         
-        // Add some space after table
-        $this->Ln(10);
-
-        // Add summary at bottom with vertical layout
+        // Add summary on new page
         $this->generateSummary();
 
         return $this->Output('', 'S');
@@ -135,6 +135,9 @@ class OrdersListPdf extends TCPDF
 
     private function generateSummary()
     {
+        // Add new page for summary
+        $this->AddPage('L');
+        
         // Calculate available width
         $pageWidth = $this->GetPageWidth();
         $leftMargin = $this->lMargin;
@@ -146,26 +149,61 @@ class OrdersListPdf extends TCPDF
         $this->Rect($leftMargin, $this->GetY(), $availableWidth, 60, 'F');
         
         // Summary title
-        $this->SetFont($this->font, 'B', 14);
+        $this->SetFont($this->font, 'B', 16);
         $this->SetTextColor(52, 73, 94);
-        $this->Cell(0, 8, 'Summary', 0, 1, 'L');
+        $this->Cell(0, 10, 'Orders Comparison Summary', 0, 1, 'C');
         
-        // Calculate summary data
-        $totalOrders = $this->orders->count();
-        $totalAmount = $this->orders->sum('total_amount');
-        $totalPaid = $this->orders->sum('paid_amount');
-        $totalDue = $totalAmount - $totalPaid;
-        $averageOrderValue = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
+        $this->Ln(5);
         
-        // Summary details in vertical layout
-        $this->SetFont($this->font, '', 10);
+        // Get delivered orders for comparison
+        $deliveredOrders = $this->getDeliveredOrders();
+        
+        // Calculate summary data for new orders
+        $newOrders = $this->orders->where('status', '!=', 'delivered');
+        $newOrdersCount = $newOrders->count();
+        $newOrdersAmount = $newOrders->sum('total_amount');
+        $newOrdersPaid = $newOrders->sum('paid_amount');
+        $newOrdersDue = $newOrdersAmount - $newOrdersPaid;
+        $newOrdersAverage = $newOrdersCount > 0 ? $newOrdersAmount / $newOrdersCount : 0;
+        
+        // Calculate summary data for delivered orders
+        $deliveredOrdersCount = $deliveredOrders->count();
+        $deliveredOrdersAmount = $deliveredOrders->sum('total_amount');
+        $deliveredOrdersPaid = $deliveredOrders->sum('paid_amount');
+        $deliveredOrdersDue = $deliveredOrdersAmount - $deliveredOrdersPaid;
+        $deliveredOrdersAverage = $deliveredOrdersCount > 0 ? $deliveredOrdersAmount / $deliveredOrdersCount : 0;
+        
+        // Create comparison table
+        $this->SetFont($this->font, 'B', 12);
         $this->SetTextColor(0, 0, 0);
         
-        $this->Cell(0, 6, 'Total Orders: ' . $totalOrders, 0, 1, 'L');
-        $this->Cell(0, 6, 'Total Amount: ' . number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Total Paid: ' . number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Outstanding: ' . number_format($totalDue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Average Order: ' . number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
+        // Table header
+        $this->Cell($availableWidth * 0.25, 8, 'Metric', 1, 0, 'C', true);
+        $this->Cell($availableWidth * 0.375, 8, 'New Orders', 1, 0, 'C', true);
+        $this->Cell($availableWidth * 0.375, 8, 'Delivered Orders', 1, 1, 'C', true);
+        
+        // Table data
+        $this->SetFont($this->font, '', 10);
+        
+        $this->Cell($availableWidth * 0.25, 8, 'Total Orders', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.375, 8, $newOrdersCount, 1, 0, 'C');
+        $this->Cell($availableWidth * 0.375, 8, $deliveredOrdersCount, 1, 1, 'C');
+        
+        $this->Cell($availableWidth * 0.25, 8, 'Total Amount', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersAmount, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
+        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersAmount, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        
+        $this->Cell($availableWidth * 0.25, 8, 'Total Paid', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersPaid, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
+        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        
+        $this->Cell($availableWidth * 0.25, 8, 'Outstanding', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersDue, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
+        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersDue, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        
+        $this->Cell($availableWidth * 0.25, 8, 'Average Order', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersAverage, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
+        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersAverage, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
         
         $this->Ln(5);
     }
@@ -192,12 +230,14 @@ class OrdersListPdf extends TCPDF
             $this->SetY($requiredY);
         }
         
-        // Table heading with light background and borders
-        $this->SetFillColor(240, 248, 255); // Light blue background
-        $this->SetDrawColor(0, 0, 0);
+        // Table heading as side heading with underline
         $this->SetFont($this->font, 'B', 14);
         $this->SetTextColor(0, 0, 0);
-        $this->Cell($availableWidth, 10, 'New Orders', 1, 1, 'C', true);
+        $this->Cell(0, 8, 'New Orders', 0, 1, 'L');
+        
+        // Underline
+        $this->SetDrawColor(0, 0, 0);
+        $this->Line($this->lMargin, $this->GetY(), $this->GetPageWidth() - $this->rMargin, $this->GetY());
         
         $this->Ln(5);
         
@@ -348,12 +388,14 @@ class OrdersListPdf extends TCPDF
             $this->SetY($requiredY);
         }
         
-        // Table heading for delivered orders
-        $this->SetFillColor(255, 248, 220); // Light orange background
-        $this->SetDrawColor(0, 0, 0);
+        // Table heading for delivered orders as side heading with underline
         $this->SetFont($this->font, 'B', 14);
         $this->SetTextColor(0, 0, 0);
-        $this->Cell($availableWidth, 10, 'Delivered Orders', 1, 1, 'C', true);
+        $this->Cell(0, 8, 'Delivered Orders', 0, 1, 'L');
+        
+        // Underline
+        $this->SetDrawColor(0, 0, 0);
+        $this->Line($this->lMargin, $this->GetY(), $this->GetPageWidth() - $this->rMargin, $this->GetY());
         
         $this->Ln(5);
         
@@ -482,14 +524,14 @@ class OrdersListPdf extends TCPDF
         $this->SetFillColor(255, 220, 180); // Light orange for delivered totals
         $this->SetDrawColor(0, 0, 0);
         
-        $this->Cell($colWidths['id'], 5, 'TOTAL', 1, 0, 'C', true);
-        $this->Cell($colWidths['customer'], 5, '', 1, 0, 'C', true);
-        $this->Cell($colWidths['date'], 5, '', 1, 0, 'C', true);
-        $this->Cell($colWidths['items'], 5, $totalItems, 1, 0, 'C', true);
-        $this->Cell($colWidths['total'], 5, number_format($totalAmount, 3), 1, 0, 'C', true);
-        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 1, 0, 'C', true);
-        $this->Cell($colWidths['due'], 5, number_format($totalDue, 3), 1, 0, 'C', true);
-        $this->Cell($colWidths['sequences'], 5, '', 1, 1, 'C', true);
+        $this->Cell($colWidths['id'], 5, 'TOTAL', 'TB', 0, 'C', true);
+        $this->Cell($colWidths['customer'], 5, '', 'TB', 0, 'C', true);
+        $this->Cell($colWidths['date'], 5, '', 'TB', 0, 'C', true);
+        $this->Cell($colWidths['items'], 5, $totalItems, 'TB', 0, 'C', true);
+        $this->Cell($colWidths['total'], 5, number_format($totalAmount, 3), 'TB', 0, 'C', true);
+        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 'TB', 0, 'C', true);
+        $this->Cell($colWidths['due'], 5, number_format($totalDue, 3), 'TB', 0, 'C', true);
+        $this->Cell($colWidths['sequences'], 5, '', 'TB', 1, 'C', true);
     }
 
     private function generateDetailedItems()
@@ -592,6 +634,45 @@ class OrdersListPdf extends TCPDF
             return $text;
         }
         return substr($text, 0, $maxLength - 3) . '...';
+    }
+    
+    private function addCleanFiltersDisplay()
+    {
+        $filterText = [];
+        
+        if (!empty($this->filters['date_from']) && !empty($this->filters['date_to'])) {
+            $filterText[] = 'Date: ' . $this->filters['date_from'] . ' to ' . $this->filters['date_to'];
+        }
+        
+        if (!empty($this->filters['status'])) {
+            $filterText[] = 'Status: ' . ucfirst($this->filters['status']);
+        }
+        
+        if (!empty($this->filters['search'])) {
+            $filterText[] = 'Search: ' . $this->filters['search'];
+        }
+        
+        if (!empty($this->filters['order_id'])) {
+            $filterText[] = 'Order ID: ' . $this->filters['order_id'];
+        }
+        
+        if (!empty($this->filters['customer_id'])) {
+            $filterText[] = 'Customer ID: ' . $this->filters['customer_id'];
+        }
+        
+        if (!empty($this->filters['product_type_id'])) {
+            $filterText[] = 'Product Type: ' . $this->filters['product_type_id'];
+        }
+        
+        if (!empty($this->filters['category_sequence_search'])) {
+            $filterText[] = 'Category Seq: ' . $this->filters['category_sequence_search'];
+        }
+        
+        if (!empty($filterText)) {
+            $this->SetFont($this->font, '', 9);
+            $this->SetTextColor(128, 128, 128);
+            $this->Cell(0, 4, 'Filters: ' . implode(' | ', $filterText), 0, 1, 'C');
+        }
     }
     
     private function addDeliveredSummary($deliveredOrders)
