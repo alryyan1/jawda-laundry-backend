@@ -153,6 +153,16 @@ class OrdersExcelExport
         $this->worksheet->getStyle($cell)->getFont()->setBold(true)->setSize(10);
         $this->worksheet->getStyle($cell . '1')->getFont()->setBold(true)->setSize(12);
         $this->worksheet->getStyle($cell . '1')->getFont()->setColor($this->getCardColor($type));
+        
+        // Apply borders to the card
+        $this->worksheet->getStyle($cell . ':' . $cell . '1')->applyFromArray([
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => 'BDC3C7'],
+                ],
+            ],
+        ]);
     }
 
     private function createStatusBreakdownTable($statusBreakdown, $startCell)
