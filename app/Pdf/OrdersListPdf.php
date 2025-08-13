@@ -113,14 +113,14 @@ class OrdersListPdf extends TCPDF
         $this->AddPage('L');
         $this->SetFont($this->font, '', 11);
 
-        // Add summary at top
-        $this->generateSummary();
+        // Show orders table with heading first
+        $this->generateOrdersTable();
         
-        // Add some space after summary
+        // Add some space after table
         $this->Ln(10);
 
-        // Show orders table with heading
-        $this->generateOrdersTable();
+        // Add summary at bottom with vertical layout
+        $this->generateSummary();
 
         return $this->Output('', 'S');
     }
@@ -137,7 +137,7 @@ class OrdersListPdf extends TCPDF
         
         // Summary section with light background
         $this->SetFillColor(248, 249, 250); // Light gray background
-        $this->Rect($leftMargin, $this->GetY(), $availableWidth, 25, 'F');
+        $this->Rect($leftMargin, $this->GetY(), $availableWidth, 60, 'F');
         
         // Summary title
         $this->SetFont($this->font, 'B', 14);
@@ -151,15 +151,15 @@ class OrdersListPdf extends TCPDF
         $totalDue = $totalAmount - $totalPaid;
         $averageOrderValue = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
         
-        // Summary details
+        // Summary details in vertical layout
         $this->SetFont($this->font, '', 10);
         $this->SetTextColor(0, 0, 0);
         
-        $this->Cell($availableWidth * 0.2, 6, 'Total Orders: ' . $totalOrders, 0, 0, 'L');
-        $this->Cell($availableWidth * 0.2, 6, 'Total Amount: ' . number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
-        $this->Cell($availableWidth * 0.2, 6, 'Total Paid: ' . number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
-        $this->Cell($availableWidth * 0.2, 6, 'Outstanding: ' . number_format($totalDue, 3) . ' ' . $this->currencySymbol, 0, 0, 'L');
-        $this->Cell($availableWidth * 0.2, 6, 'Average Order: ' . number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
+        $this->Cell(0, 6, 'Total Orders: ' . $totalOrders, 0, 1, 'L');
+        $this->Cell(0, 6, 'Total Amount: ' . number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
+        $this->Cell(0, 6, 'Total Paid: ' . number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
+        $this->Cell(0, 6, 'Outstanding: ' . number_format($totalDue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
+        $this->Cell(0, 6, 'Average Order: ' . number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
         
         $this->Ln(5);
     }
