@@ -36,75 +36,52 @@ class OrdersListPdf extends TCPDF
 
     public function Header()
     {
-        // Professional header with background
-        $this->SetFillColor(41, 128, 185);
-        $this->Rect(0, 0, $this->GetPageWidth(), 35, 'F');
-        
-        // Company header
-        $this->SetFont($this->font, 'B', 20);
-        $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 12, $this->companyName, 0, 1, 'C');
-        
-        $this->SetFont($this->font, '', 11);
-        if ($this->companyAddress) {
-            $this->Cell(0, 7, $this->companyAddress, 0, 1, 'C');
-        }
-        
-        // Report title with subtitle
+        // Simple header without background
         $this->SetFont($this->font, 'B', 16);
-        $this->Cell(0, 8, 'Orders List Report', 0, 1, 'C');
-        
-        // Reset text color for content
         $this->SetTextColor(0, 0, 0);
+        $this->Cell(0, 8, $this->companyName, 0, 1, 'C');
         
-        // Report metadata section
-        $this->Ln(8);
-        $this->SetFillColor(248, 249, 250);
-        $this->Rect(10, 40, $this->GetPageWidth() - 20, 20, 'F');
-        
-        $this->SetFont($this->font, 'B', 10);
-        $this->SetTextColor(52, 73, 94);
-        $this->Cell(30, 6, 'Generated:', 0, 0, 'L');
-        $this->SetFont($this->font, '', 10);
-        $this->Cell(60, 6, date('F j, Y \a\t g:i A'), 0, 0, 'L');
-        
-        $this->SetFont($this->font, 'B', 10);
-        $this->Cell(30, 6, 'Report Type:', 0, 0, 'L');
-        $this->SetFont($this->font, '', 10);
-        $this->Cell(60, 6, 'Orders Summary & Details', 0, 1, 'L');
-        
-        // Show active filters
-        $filterText = $this->getFilterText();
-        if ($filterText) {
-            $this->SetFont($this->font, 'B', 10);
-            $this->Cell(30, 6, 'Filters:', 0, 0, 'L');
+        if ($this->companyAddress) {
             $this->SetFont($this->font, '', 10);
-            $this->Cell(0, 6, $filterText, 0, 1, 'L');
+            $this->Cell(0, 6, $this->companyAddress, 0, 1, 'C');
         }
         
-        $this->Ln(8);
+        $this->SetFont($this->font, 'B', 12);
+        $this->Cell(0, 6, 'Orders List Report', 0, 1, 'C');
+        
+        // Add some space after header
+        $this->Ln(10);
     }
 
     public function Footer()
     {
         $this->SetY(-20);
         
+        // Calculate footer width (page width minus left and right margins)
+        $pageWidth = $this->GetPageWidth();
+        $leftMargin = $this->lMargin;
+        $rightMargin = $this->rMargin;
+        $footerWidth = $pageWidth - $leftMargin - $rightMargin;
+        
         // Footer line
         $this->SetDrawColor(200, 200, 200);
-        $this->Line(10, $this->GetY() - 5, $this->GetPageWidth() - 10, $this->GetY() - 5);
+        $this->Line($leftMargin, $this->GetY() - 5, $pageWidth - $rightMargin, $this->GetY() - 5);
         
         // Footer content
         $this->SetFont($this->font, '', 9);
         $this->SetTextColor(128, 128, 128);
         
+        // Calculate column widths for footer
+        $colWidth = $footerWidth / 3;
+        
         // Left side - Company info
-        $this->Cell(100, 8, $this->companyName . ' - Orders Report', 0, 0, 'L');
+        $this->Cell($colWidth, 8, $this->companyName . ' - Orders Report', 0, 0, 'L');
         
         // Center - Page info
-        $this->Cell(100, 8, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'C');
+        $this->Cell($colWidth, 8, 'Page ' . $this->getAliasNumPage() . ' of ' . $this->getAliasNbPages(), 0, 0, 'C');
         
         // Right side - Date
-        $this->Cell(100, 8, 'Generated: ' . date('M j, Y'), 0, 1, 'R');
+        $this->Cell($colWidth, 8, 'Generated: ' . date('M j, Y'), 0, 1, 'R');
     }
 
     private function getFilterText()
@@ -216,6 +193,9 @@ class OrdersListPdf extends TCPDF
         $leftMargin = $this->lMargin;
         $rightMargin = $this->rMargin;
         $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+        
+        // Account for top margin - add some space after header
+        $this->Ln(5);
         
         // Simple table header without colors
         $this->SetFont($this->font, 'B', 9);
