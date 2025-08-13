@@ -1237,7 +1237,8 @@ class OrderController extends Controller
         // Search specifically in category sequences
         if ($request->filled('category_sequence_search')) {
             $searchTerm = $request->category_sequence_search;
-            $query->whereJsonContains('category_sequences', $searchTerm);
+            // Use JSON_EXTRACT and LIKE for partial matching within JSON values (works with MariaDB)
+            $query->whereRaw("JSON_EXTRACT(category_sequences, '$.*') LIKE ?", ['%' . $searchTerm . '%']);
         }
 
         if ($request->filled('product_type_id')) {
