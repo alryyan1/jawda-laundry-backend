@@ -21,6 +21,7 @@ class UserNavigationPermissionSeeder extends Seeder
         
         // Get roles
         $adminRole = Role::where('name', 'admin')->first();
+        $staffRole = Role::where('name', 'staff')->first();
         $receptionistRole = Role::where('name', 'receptionist')->first();
         $processorRole = Role::where('name', 'processor')->first();
         $deliveryRole = Role::where('name', 'delivery')->first();
@@ -32,7 +33,7 @@ class UserNavigationPermissionSeeder extends Seeder
                 'dashboard', 'pos', 'orders', 'customers', 'services', 'dining', 
                 'expenses', 'purchases', 'suppliers', 'reports', 'admin',
                 // All sub-items
-                'orders_list', 'orders_new', 'orders_kanban',
+                'orders_list',
                 'customers_list', 'customers_new',
                 'services_offerings', 'services_menu', 'services_categories', 'services_types', 'services_actions',
                 'expenses_list', 'expenses_categories',
@@ -40,22 +41,29 @@ class UserNavigationPermissionSeeder extends Seeder
                 'reports_sales', 'reports_costs', 'reports_orders', 'reports_daily_revenue', 'reports_daily_costs', 'reports_detailed',
                 'admin_users', 'admin_roles', 'admin_navigation', 'admin_restaurant_tables', 'admin_settings'
             ],
+            'staff' => [
+                // Staff gets access to POS, Orders, and Expenses only
+                'pos', 'orders', 'expenses',
+                // Sub-items for these main items
+                'orders_list',
+                'expenses_list'
+            ],
             'receptionist' => [
                 // Receptionist gets access to POS, Orders, and Expenses only
                 'pos', 'orders', 'expenses',
                 // Sub-items for these main items
-                'orders_list', 'orders_new', 'orders_kanban',
+                'orders_list',
                 'expenses_list'
             ],
             'processor' => [
                 // Processor gets access to Orders only
                 'orders',
-                'orders_list', 'orders_kanban'
+                'orders_list'
             ],
             'delivery' => [
                 // Delivery gets access to Orders only
                 'orders',
-                'orders_list', 'orders_kanban'
+                'orders_list'
             ]
         ];
 
@@ -117,7 +125,7 @@ class UserNavigationPermissionSeeder extends Seeder
             'admin' => [
                 'dashboard', 'pos', 'orders', 'customers', 'services', 'dining', 
                 'expenses', 'purchases', 'suppliers', 'reports', 'admin',
-                'orders_list', 'orders_new', 'orders_kanban',
+                'orders_list',
                 'customers_list', 'customers_new',
                 'services_offerings', 'services_menu', 'services_categories', 'services_types', 'services_actions',
                 'expenses_list', 'expenses_categories',
@@ -125,18 +133,23 @@ class UserNavigationPermissionSeeder extends Seeder
                 'reports_sales', 'reports_costs', 'reports_orders', 'reports_daily_revenue', 'reports_daily_costs', 'reports_detailed',
                 'admin_users', 'admin_roles', 'admin_navigation', 'admin_restaurant_tables', 'admin_settings'
             ],
+            'staff' => [
+                'pos', 'orders', 'expenses',
+                'orders_list',
+                'expenses_list'
+            ],
             'receptionist' => [
                 'pos', 'orders', 'expenses',
-                'orders_list', 'orders_new', 'orders_kanban',
+                'orders_list',
                 'expenses_list'
             ],
             'processor' => [
                 'orders',
-                'orders_list', 'orders_kanban'
+                'orders_list'
             ],
             'delivery' => [
                 'orders',
-                'orders_list', 'orders_kanban'
+                'orders_list'
             ]
         ];
 

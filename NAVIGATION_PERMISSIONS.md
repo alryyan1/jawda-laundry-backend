@@ -16,16 +16,16 @@ The navigation permissions system controls which navigation items (menu items) e
 - **Access**: POS, Orders, Expenses
 - **Includes**: 
   - POS main page
-  - Orders (All Orders, New Order, Kanban Board)
+  - Orders (All Orders)
   - Expenses (All Expenses)
 
 ### Processor Role (Washer/Ironer)
 - **Access**: Orders only
-- **Includes**: Orders (All Orders, Kanban Board)
+- **Includes**: Orders (All Orders)
 
 ### Delivery Role
 - **Access**: Orders only
-- **Includes**: Orders (All Orders, Kanban Board)
+- **Includes**: Orders (All Orders)
 
 ## How It Works
 

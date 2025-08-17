@@ -167,32 +167,32 @@ class SettingsSeeder extends Seeder
                 'is_public' => true,
             ],
 
-            // WhatsApp Settings
+            // WhatsApp Settings (UltraMsg Only)
             [
                 'key' => 'whatsapp_enabled',
                 'value' => 'true',
                 'type' => 'boolean',
                 'group' => 'whatsapp',
                 'display_name' => 'Enable WhatsApp',
-                'description' => 'Enable WhatsApp notifications',
+                'description' => 'Enable WhatsApp notifications using UltraMsg API',
                 'is_public' => false,
             ],
             [
-                'key' => 'whatsapp_instance_id',
-                'value' => '68968AFE5FF3D',
+                'key' => 'ultramsg_token',
+                'value' => 'b6ght2y2ff7rbha6',
                 'type' => 'string',
                 'group' => 'whatsapp',
-                'display_name' => 'WhatsApp Instance ID',
-                'description' => 'The WhatsApp Instance ID from WA Client',
+                'display_name' => 'UltraMsg Token',
+                'description' => 'Your UltraMsg API token',
                 'is_public' => false,
             ],
             [
-                'key' => 'whatsapp_api_token',
-                'value' => '68968ae964aac',
+                'key' => 'ultramsg_instance_id',
+                'value' => 'instance139458',
                 'type' => 'string',
                 'group' => 'whatsapp',
-                'display_name' => 'WhatsApp Access Token',
-                'description' => 'The WhatsApp Access Token from WA Client',
+                'display_name' => 'UltraMsg Instance ID',
+                'description' => 'Your UltraMsg instance ID',
                 'is_public' => false,
             ],
             [

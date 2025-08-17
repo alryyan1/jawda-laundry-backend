@@ -58,8 +58,14 @@ class UserController extends Controller // For admin management of users
             ]);
 
             if (!empty($validated['role_ids'])) {
-                $rolesToAssign = Role::whereIn('id', $validated['role_ids'])->pluck('name');
-                $user->syncRoles($rolesToAssign);
+                $roles = Role::whereIn('id', $validated['role_ids'])->get();
+                foreach ($roles as $role) {
+                    DB::table('model_has_roles')->insert([
+                        'role_id' => $role->id,
+                        'model_id' => $user->id,
+                        'model_type' => User::class,
+                    ]);
+                }
             }
             DB::commit();
             $user->load('roles:id,name');
@@ -99,8 +105,20 @@ class UserController extends Controller // For admin management of users
             $user->update($updateData);
 
             if ($request->has('role_ids')) { // Allows sending empty array to remove all roles
-                $rolesToAssign = Role::whereIn('id', $validated['role_ids'] ?? [])->pluck('name');
-                $user->syncRoles($rolesToAssign);
+                // First remove all existing roles
+                DB::table('model_has_roles')->where('model_id', $user->id)->where('model_type', User::class)->delete();
+                
+                // Then add the new roles
+                if (!empty($validated['role_ids'])) {
+                    $roles = Role::whereIn('id', $validated['role_ids'])->get();
+                    foreach ($roles as $role) {
+                        DB::table('model_has_roles')->insert([
+                            'role_id' => $role->id,
+                            'model_id' => $user->id,
+                            'model_type' => User::class,
+                        ]);
+                    }
+                }
             }
             DB::commit();
             $user->load('roles:id,name');

@@ -1054,7 +1054,7 @@ class OrderController extends Controller
     }
     
     /**
-     * Generates an invoice PDF and sends it via WhatsApp.
+     * Generates an invoice PDF and sends it via WhatsApp using UltraMsg API.
      */
     public function sendWhatsappInvoice(Order $order, WhatsAppService $whatsAppService)
     {
@@ -1069,33 +1069,53 @@ class OrderController extends Controller
             return response()->json(['message' => 'Customer phone number is missing.'], 400);
         }
 
-        // --- 1. Generate the PDF using the refactored method ---
-        $pdfContent = $this->downloadPosInvoice($order, true); // true for base64
+        try {
+            // --- 1. Generate the PDF using the refactored method ---
+            $pdfContent = $this->downloadPosInvoice($order, true); // true for base64
 
-        // --- 2. Base64 Encode the PDF Content ---
-        $base64Pdf = base64_encode($pdfContent);
+            // --- 2. Base64 Encode the PDF Content for UltraMsg ---
+            $base64Pdf = base64_encode($pdfContent);
+            $fileName = 'Invoice-' . $order->id . '.pdf';
+            $caption = "Hello {$customer->name}, here is the invoice for your order #{$order->id}. Thank you!";
 
-        // --- 3. Send via WhatsApp Service ---
-        $fileName = 'Invoice-' . $order->id . '.pdf';
-        $caption = "Hello {$customer->name}, here is the invoice for your order #{$order->id}. Thank you!";
-        
-        // Sanitize phone number - remove '+', spaces, dashes
-        $phoneNumber = preg_replace('/[^0-9]/', '', $customer->phone);
+            // --- 3. Send via WhatsApp Service using UltraMsg document API with base64 ---
+            // Create data URL for UltraMsg
+            $dataUrl = "data:application/pdf;base64,{$base64Pdf}";
+            
+            // Use the customer's phone number directly - WhatsAppService will format it
+            $result = $whatsAppService->sendMedia($customer->phone, $dataUrl, $fileName, $caption);
 
-        $result = $whatsAppService->sendMediaBase64($phoneNumber, $base64Pdf, $fileName, $caption);
+            // --- 4. Return Response to Frontend ---
+            if ($result['status'] === 'success') {
+                // Update the tracking field
+                $order->update(['whatsapp_pdf_sent' => true]);
+                // Optionally log this action
+                $order->logActivity("Invoice sent to customer via WhatsApp (UltraMsg).");
+                return response()->json(['message' => 'Invoice sent successfully via WhatsApp!']);
+            } else {
+                Log::error("WhatsApp invoice sending failed", [
+                    'order_id' => $order->id,
+                    'customer_phone' => $customer->phone,
+                    'result' => $result
+                ]);
+                
+                return response()->json([
+                    'message' => 'Failed to send WhatsApp invoice.',
+                    'details' => $result['message'] ?? 'Unknown API error.',
+                    'api_response' => $result['data'] ?? null
+                ], 500);
+            }
 
-        // --- 4. Return Response to Frontend ---
-        if ($result['status'] === 'success') {
-            // Update the tracking field
-            $order->update(['whatsapp_pdf_sent' => true]);
-            // Optionally log this action
-            $order->logActivity("Invoice sent to customer via WhatsApp.");
-            return response()->json(['message' => 'Invoice sent successfully via WhatsApp!']);
-        } else {
+        } catch (\Exception $e) {
+            Log::error("Exception in sendWhatsappInvoice", [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'message' => 'Failed to send WhatsApp invoice.',
-                'details' => $result['message'] ?? 'Unknown API error.',
-                'api_response' => $result['data'] ?? null
+                'details' => 'Exception: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1120,10 +1140,8 @@ class OrderController extends Controller
             return response()->json(['message' => 'Customer phone number is missing.'], 400);
         }
 
-        // Sanitize phone number - remove '+', spaces, dashes
-        $phoneNumber = preg_replace('/[^0-9]/', '', $customer->phone);
-
-        $result = $whatsAppService->sendMessage($phoneNumber, $validated['message']);
+        // Use the customer's phone number directly - WhatsAppService will format it
+        $result = $whatsAppService->sendMessage($customer->phone, $validated['message']);
 
         if ($result['status'] === 'success') {
             // Update the tracking field

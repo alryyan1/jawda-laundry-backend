@@ -74,6 +74,17 @@ class PermissionSeeder extends Seeder
         $adminRole->givePermissionTo(Permission::all()); // Admin gets all permissions
         $this->command->info('Admin role created and assigned all permissions.');
 
+        // ---- Staff Role ----
+        $staffRole = Role::firstOrCreate(['name' => 'staff', 'guard_name' => 'web']);
+        $staffRole->syncPermissions([
+            'dashboard:view',
+            'pos:access', // Add POS access
+            'order:list', 'order:view', 'order:create', 'order:update', 'order:update-status', 'order:record-payment',
+            'expense:list', 'expense:create', 'expense:update', // Add expense permissions
+            'settings:view-profile', 'settings:update-profile', 'settings:change-password',
+        ]);
+        $this->command->info('Staff role created and permissions assigned.');
+
         // ---- Receptionist Role ----
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'web']);
         $receptionistRole->syncPermissions([
@@ -140,7 +151,7 @@ class PermissionSeeder extends Seeder
             try {
                 // Check if role is already assigned
                 $existingRole = DB::table('model_has_roles')
-                    ->where('role_id', $receptionistRole->id)
+                    ->where('role_id', $staffRole->id)
                     ->where('model_type', User::class)
                     ->where('model_id', $staffUser->id)
                     ->first();
@@ -148,16 +159,16 @@ class PermissionSeeder extends Seeder
                 if (!$existingRole) {
                     // Manually insert the role assignment with correct model_type
                     DB::table('model_has_roles')->insert([
-                        'role_id' => $receptionistRole->id,
+                        'role_id' => $staffRole->id,
                         'model_type' => User::class,
                         'model_id' => $staffUser->id,
                     ]);
-                    $this->command->info('Assigned "receptionist" role to staff@staff.com.');
+                    $this->command->info('Assigned "staff" role to staff@staff.com.');
                 } else {
-                    $this->command->info('Receptionist role already assigned to staff@staff.com.');
+                    $this->command->info('Staff role already assigned to staff@staff.com.');
                 }
             } catch (\Exception $e) {
-                $this->command->warn('Could not assign receptionist role: ' . $e->getMessage());
+                $this->command->warn('Could not assign staff role: ' . $e->getMessage());
             }
         }
     }

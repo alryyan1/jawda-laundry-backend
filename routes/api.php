@@ -32,6 +32,8 @@ use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\CustomerPriceListController;
 use App\Http\Controllers\Api\CustomerPricingRuleController;
 use App\Http\Controllers\Api\SettingsController;
+use App\Http\Controllers\Api\UserMainNavController;
+use App\Http\Controllers\Api\UltraMsgController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -135,6 +137,14 @@ Route::delete(
     Route::get('/whatsapp-templates', [WhatsappTemplateController::class, 'index']);
     Route::post('/whatsapp-templates', [WhatsappTemplateController::class, 'store']);
     Route::put('/whatsapp-templates/{whatsappTemplate}', [WhatsappTemplateController::class, 'update']);
+    
+    // UltraMsg WhatsApp API Routes
+    Route::post('/ultramsg/send-message', [UltraMsgController::class, 'sendMessage']);
+    Route::post('/ultramsg/send-media', [UltraMsgController::class, 'sendMedia']);
+    Route::post('/ultramsg/send-document', [UltraMsgController::class, 'sendDocument']);
+    Route::get('/ultramsg/instance-info', [UltraMsgController::class, 'getInstanceInfo']);
+    Route::get('/ultramsg/chat-history', [UltraMsgController::class, 'getChatHistory']);
+    Route::post('/ultramsg/send-test', [UltraMsgController::class, 'sendTestMessage']);
     Route::apiResource('customer-types', CustomerTypeController::class);
     
     // Restaurant Table Management
@@ -177,6 +187,10 @@ Route::delete(
     Route::put('/navigation/order', [NavigationController::class, 'updateOrder']);
     Route::get('/users/{user}/navigation-permissions', [NavigationController::class, 'getUserPermissions']);
     Route::put('/users/{user}/navigation-permissions', [NavigationController::class, 'updateUserPermissions']);
+
+    // User Main Navigation Routes
+    Route::apiResource('user-main-navs', UserMainNavController::class);
+    Route::post('/user-main-navs/reorder', [UserMainNavController::class, 'reorder']);
 
 
 

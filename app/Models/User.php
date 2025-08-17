@@ -77,6 +77,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's custom main navigation items.
+     */
+    public function userMainNavs()
+    {
+        return $this->hasMany(UserMainNav::class)->active()->ordered();
+    }
+
+    /**
      * Get the user's roles.
      */
     public function roles(): BelongsToMany

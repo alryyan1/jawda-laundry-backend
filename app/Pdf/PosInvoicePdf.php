@@ -502,13 +502,13 @@ class PosInvoicePdf extends TCPDF
                 }
                 
                 // Display category name
-                $this->SetFont($this->font, 'B', 9);
-                $this->SetTextColor(100, 100, 100); // Gray color for category name
+                $this->SetFont($this->font, 'B', 11);
+                // $this->SetTextColor(100, 100, 100); // Gray color for category name
                 $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             } else {
                 // Regular category without sequence
-                $this->SetFont($this->font, 'B', 9);
-                $this->SetTextColor(100, 100, 100); // Gray color for regular categories
+                $this->SetFont($this->font, 'B', 11);
+                // $this->SetTextColor(100, 100, 100); // Gray color for regular categories
                 $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             }
             

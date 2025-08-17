@@ -62,47 +62,20 @@ class NavigationItemSeeder extends Seeder
                 'permissions' => ['service:view']
             ],
             [
-                'key' => 'dining',
-                'title' => ['en' => 'Section Management', 'ar' => 'إدارة الأقسام'],
-                'icon' => 'UtensilsCrossed',
-                'route' => '/dining',
-                'sort_order' => 6,
-                'is_default' => true,
-                'permissions' => ['dining:view']
-            ],
-            [
                 'key' => 'expenses',
                 'title' => ['en' => 'Expenses', 'ar' => 'المصروفات'],
                 'icon' => 'Receipt',
                 'route' => null, // Parent item - no direct route
-                'sort_order' => 7,
+                'sort_order' => 6,
                 'is_default' => true,
                 'permissions' => ['expense:view']
-            ],
-            [
-                'key' => 'purchases',
-                'title' => ['en' => 'Purchases', 'ar' => 'المشتريات'],
-                'icon' => 'Package',
-                'route' => null, // Parent item - no direct route
-                'sort_order' => 8,
-                'is_default' => true,
-                'permissions' => ['purchase:view']
-            ],
-            [
-                'key' => 'suppliers',
-                'title' => ['en' => 'Suppliers', 'ar' => 'الموردين'],
-                'icon' => 'Truck',
-                'route' => '/suppliers',
-                'sort_order' => 9,
-                'is_default' => true,
-                'permissions' => ['supplier:view']
             ],
             [
                 'key' => 'reports',
                 'title' => ['en' => 'Reports', 'ar' => 'التقارير'],
                 'icon' => 'BarChart3',
                 'route' => '/reports', // Main reports page
-                'sort_order' => 10,
+                'sort_order' => 7,
                 'is_default' => true,
                 'permissions' => ['report:view']
             ],
@@ -111,7 +84,7 @@ class NavigationItemSeeder extends Seeder
                 'title' => ['en' => 'Administration', 'ar' => 'الإدارة'],
                 'icon' => 'Shield',
                 'route' => null, // Parent item - no direct route
-                'sort_order' => 11,
+                'sort_order' => 8,
                 'is_default' => true,
                 'permissions' => ['admin:access']
             ]
@@ -149,16 +122,6 @@ class NavigationItemSeeder extends Seeder
                 'is_default' => true,
                 'permissions' => ['order:create']
             ],
-            [
-                'key' => 'orders_kanban',
-                'title' => ['en' => 'Kanban Board', 'ar' => 'لوحة كانبان'],
-                'icon' => 'Kanban',
-                'route' => '/orders/kanban',
-                'parent_id' => $createdItems['orders']->id,
-                'sort_order' => 3,
-                'is_default' => true,
-                'permissions' => ['order:view']
-            ],
             
             // Customers sub-items (path: "customers/*")
             [
@@ -182,34 +145,14 @@ class NavigationItemSeeder extends Seeder
                 'permissions' => ['customer:create']
             ],
             
-            // Services sub-items (service-offerings, admin/product-*)
-            [
-                'key' => 'services_offerings',
-                'title' => ['en' => 'Service Offerings', 'ar' => 'عروض الخدمة'],
-                'icon' => 'Package',
-                'route' => '/service-offerings',
-                'parent_id' => $createdItems['services']->id,
-                'sort_order' => 1,
-                'is_default' => true,
-                'permissions' => ['service:view']
-            ],
-            [
-                'key' => 'services_menu',
-                'title' => ['en' => 'Menu', 'ar' => 'القائمة'],
-                'icon' => 'MenuBook',
-                'route' => '/menu',
-                'parent_id' => $createdItems['services']->id,
-                'sort_order' => 2,
-                'is_default' => true,
-                'permissions' => ['service:view']
-            ],
+            // Services sub-items (admin/product-*)
             [
                 'key' => 'services_categories',
                 'title' => ['en' => 'Product Categories', 'ar' => 'فئات المنتجات'],
                 'icon' => 'Grid3x3',
                 'route' => '/admin/product-categories',
                 'parent_id' => $createdItems['services']->id,
-                'sort_order' => 3,
+                'sort_order' => 1,
                 'is_default' => true,
                 'permissions' => ['product-category:view']
             ],
@@ -219,7 +162,7 @@ class NavigationItemSeeder extends Seeder
                 'icon' => 'Tags',
                 'route' => '/admin/product-types',
                 'parent_id' => $createdItems['services']->id,
-                'sort_order' => 4,
+                'sort_order' => 2,
                 'is_default' => true,
                 'permissions' => ['product-type:view']
             ],
@@ -229,7 +172,7 @@ class NavigationItemSeeder extends Seeder
                 'icon' => 'Zap',
                 'route' => '/admin/service-actions',
                 'parent_id' => $createdItems['services']->id,
-                'sort_order' => 5,
+                'sort_order' => 3,
                 'is_default' => true,
                 'permissions' => ['service-action:view']
             ],
@@ -254,28 +197,6 @@ class NavigationItemSeeder extends Seeder
                 'sort_order' => 2,
                 'is_default' => true,
                 'permissions' => ['expense-category:view']
-            ],
-            
-            // Purchases sub-items (path: "purchases/*")
-            [
-                'key' => 'purchases_list',
-                'title' => ['en' => 'All Purchases', 'ar' => 'جميع المشتريات'],
-                'icon' => 'Package',
-                'route' => '/purchases',
-                'parent_id' => $createdItems['purchases']->id,
-                'sort_order' => 1,
-                'is_default' => true,
-                'permissions' => ['purchase:view']
-            ],
-            [
-                'key' => 'purchases_new',
-                'title' => ['en' => 'New Purchase', 'ar' => 'مشتريات جديدة'],
-                'icon' => 'Plus',
-                'route' => '/purchases/new',
-                'parent_id' => $createdItems['purchases']->id,
-                'sort_order' => 2,
-                'is_default' => true,
-                'permissions' => ['purchase:create']
             ],
             
             // Reports sub-items (path: "reports/*")
@@ -372,22 +293,12 @@ class NavigationItemSeeder extends Seeder
                 'permissions' => ['navigation:view']
             ],
             [
-                'key' => 'admin_restaurant_tables',
-                'title' => ['en' => 'Restaurant Tables', 'ar' => 'طاولات المطعم'],
-                'icon' => 'Table',
-                'route' => '/admin/restaurant-tables',
-                'parent_id' => $createdItems['admin']->id,
-                'sort_order' => 4,
-                'is_default' => true,
-                'permissions' => ['restaurant-table:view']
-            ],
-            [
                 'key' => 'admin_settings',
                 'title' => ['en' => 'System Settings', 'ar' => 'إعدادات النظام'],
                 'icon' => 'Settings',
                 'route' => '/settings',
                 'parent_id' => $createdItems['admin']->id,
-                'sort_order' => 5,
+                'sort_order' => 4,
                 'is_default' => true,
                 'permissions' => ['setting:manage']
             ]

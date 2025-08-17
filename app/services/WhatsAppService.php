@@ -30,9 +30,11 @@ class WhatsAppService
         $whatsappConfig = $settingsService->getWhatsAppConfig();
         
         $this->isEnabled = $whatsappConfig['enabled'] ?? false;
-        $this->apiUrl = $whatsappConfig['api_url'] ?? '';
-        $this->apiToken = $whatsappConfig['api_token'] ?? '';
-        $this->instanceId = $whatsappConfig['instance_id'] ?? '';
+        
+        // Use UltraMsg exclusively
+        $this->apiToken = $whatsappConfig['ultramsg_token'] ?? '';
+        $this->instanceId = $whatsappConfig['ultramsg_instance_id'] ?? '';
+        $this->apiUrl = "https://api.ultramsg.com/{$this->instanceId}";
     }
 
     /**
@@ -43,6 +45,30 @@ class WhatsAppService
     public function isConfigured(): bool
     {
         return $this->isEnabled && !empty($this->apiToken) && !empty($this->instanceId);
+    }
+
+    /**
+     * Get the API token (for testing purposes)
+     */
+    public function getApiToken(): ?string
+    {
+        return $this->apiToken;
+    }
+
+    /**
+     * Get the instance ID (for testing purposes)
+     */
+    public function getInstanceId(): ?string
+    {
+        return $this->instanceId;
+    }
+
+    /**
+     * Get the API URL (for testing purposes)
+     */
+    public function getApiUrl(): ?string
+    {
+        return $this->apiUrl;
     }
 
     /**
@@ -90,20 +116,20 @@ class WhatsAppService
                 'instance_id' => $this->instanceId
             ]);
             
-            $response = $this->client->request('POST', 'https://waclient.com/api/send', [
-                'json' => [
-                    'number' => $phoneNumber,
-                    'type' => 'text',
-                    'message' => $message,
-                    'instance_id' => $this->instanceId,
-                    'access_token' => $this->apiToken,
-                ],
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => false,
-            ]);
+            // Use UltraMsg API exclusively
+            $params = [
+                'token' => $this->apiToken,
+                'to' => $phoneNumber,
+                'body' => $message
+            ];
+            
+            $headers = [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ];
+            
+            $options = ['form_params' => $params];
+            $guzzleRequest = new \GuzzleHttp\Psr7\Request('POST', "{$this->apiUrl}/messages/chat", $headers);
+            $response = $this->client->sendAsync($guzzleRequest, $options)->wait();
 
             $statusCode = $response->getStatusCode();
             $responseBody = json_decode($response->getBody()->getContents(), true);
@@ -115,32 +141,13 @@ class WhatsAppService
             ]);
 
             if ($statusCode >= 200 && $statusCode < 300) {
-                // Check the actual transmission status from WhatsApp API response
-                $transmissionStatus = $responseBody['status'] ?? null;
-                $message = $responseBody['message'] ?? null;
-                
-                // According to WA Client API docs, we need to check transmission status
-                // "Timeout" means transmission failed, not success
-                if ($transmissionStatus === 'success' && $message !== 'Timeout') {
-                    Log::info("WhatsAppService: Message sent successfully to {$phoneNumber}. Status: {$statusCode}", ['response' => $responseBody]);
-                    return [
-                        'status' => 'success',
-                        'message' => 'Message sent successfully',
-                        'data' => $responseBody
-                    ];
-                } else {
-                    Log::error("WhatsAppService: Message transmission failed to {$phoneNumber}", [
-                        'statusCode' => $statusCode,
-                        'transmissionStatus' => $transmissionStatus,
-                        'message' => $message,
-                        'response' => $responseBody
-                    ]);
-                    return [
-                        'status' => 'error',
-                        'message' => 'Message transmission failed. WhatsApp API returned: ' . ($message ?? 'Unknown error'),
-                        'data' => $responseBody
-                    ];
-                }
+                // UltraMsg API response handling
+                Log::info("WhatsAppService: Message sent successfully to {$phoneNumber}. Status: {$statusCode}", ['response' => $responseBody]);
+                return [
+                    'status' => 'success',
+                    'message' => 'Message sent successfully',
+                    'data' => $responseBody
+                ];
             } else {
                 Log::error("WhatsAppService: Failed to send message to {$phoneNumber}. Status: {$statusCode}", ['response' => $responseBody]);
                 return [
@@ -193,36 +200,33 @@ class WhatsAppService
         }
 
         try {
-            $payload = [
-                'number' => $phoneNumber,
-                'type' => 'media',
-                'media_url' => $mediaUrl,
-                'filename' => $fileName,
-                'instance_id' => $this->instanceId,
-                'access_token' => $this->apiToken,
-            ];
-            
-            if ($caption) {
-                $payload['message'] = $caption;
-            }
-
             Log::info("WhatsAppService: Sending media to {$phoneNumber}", [
                 'phone' => $phoneNumber,
                 'media_url' => $mediaUrl,
                 'filename' => $fileName,
                 'caption' => $caption,
-                'instance_id' => $this->instanceId,
-                'payload' => array_merge($payload, ['access_token' => '***hidden***'])
+                'instance_id' => $this->instanceId
             ]);
 
-            $response = $this->client->request('POST', 'https://waclient.com/api/send', [
-                'json' => $payload,
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => false,
-            ]);
+            // Use UltraMsg API for document sending (for PDFs)
+            $params = [
+                'token' => $this->apiToken,
+                'to' => $phoneNumber,
+                'document' => $mediaUrl,
+                'filename' => $fileName
+            ];
+            
+            if ($caption) {
+                $params['caption'] = $caption;
+            }
+
+            $headers = [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ];
+            
+            $options = ['form_params' => $params];
+            $guzzleRequest = new \GuzzleHttp\Psr7\Request('POST', "{$this->apiUrl}/messages/document", $headers);
+            $response = $this->client->sendAsync($guzzleRequest, $options)->wait();
 
             $statusCode = $response->getStatusCode();
             $responseBody = json_decode($response->getBody()->getContents(), true);
@@ -235,29 +239,8 @@ class WhatsAppService
             ]);
 
             if ($statusCode >= 200 && $statusCode < 300) {
-                // Check the actual transmission status from WhatsApp API response
-                $transmissionStatus = $responseBody['status'] ?? null;
-                $message = $responseBody['message'] ?? null;
-                
-                // According to WA Client API docs, we need to check transmission status
-                // "Timeout" means transmission failed, not success
-                if ($transmissionStatus === 'success' && $message !== 'Timeout') {
-                    Log::info("WhatsAppService: Media sent successfully to {$phoneNumber}", ['response' => $responseBody]);
-                    return ['status' => 'success', 'data' => $responseBody];
-                } else {
-                    Log::error("WhatsAppService: Media transmission failed to {$phoneNumber}", [
-                        'statusCode' => $statusCode,
-                        'transmissionStatus' => $transmissionStatus,
-                        'message' => $message,
-                        'response' => $responseBody,
-                        'media_url' => $mediaUrl
-                    ]);
-                    return [
-                        'status' => 'error', 
-                        'message' => 'Media transmission failed. WhatsApp API returned: ' . ($message ?? 'Unknown error'), 
-                        'data' => $responseBody
-                    ];
-                }
+                Log::info("WhatsAppService: Media sent successfully to {$phoneNumber}", ['response' => $responseBody]);
+                return ['status' => 'success', 'data' => $responseBody];
             } else {
                 Log::error("WhatsAppService: Failed to send media to {$phoneNumber}", [
                     'statusCode' => $statusCode,
@@ -444,17 +427,19 @@ class WhatsAppService
         }
 
         try {
-            $response = $this->client->request('GET', 'https://waclient.com/api/check_number', [
-                'query' => [
-                    'number' => $phoneNumber,
-                    'instance_id' => $this->instanceId,
-                    'access_token' => $this->apiToken,
-                ],
-                'headers' => [
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => false,
-            ]);
+            // Use UltraMsg API for checking number
+            $params = [
+                'token' => $this->apiToken,
+                'to' => $phoneNumber
+            ];
+
+            $headers = [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ];
+            
+            $options = ['form_params' => $params];
+            $guzzleRequest = new \GuzzleHttp\Psr7\Request('POST', "{$this->apiUrl}/messages/chat", $headers);
+            $response = $this->client->sendAsync($guzzleRequest, $options)->wait();
 
             $statusCode = $response->getStatusCode();
             $responseBody = json_decode($response->getBody()->getContents(), true);
@@ -480,16 +465,18 @@ class WhatsAppService
         }
 
         try {
-            $response = $this->client->request('GET', 'https://waclient.com/api/get_qrcode', [
-                'query' => [
-                    'instance_id' => $this->instanceId,
-                    'access_token' => $this->apiToken,
-                ],
-                'headers' => [
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => false,
-            ]);
+            // Use UltraMsg API for getting instance status
+            $params = [
+                'token' => $this->apiToken
+            ];
+
+            $headers = [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ];
+            
+            $options = ['form_params' => $params];
+            $guzzleRequest = new \GuzzleHttp\Psr7\Request('GET', "{$this->apiUrl}/instance/status", $headers);
+            $response = $this->client->sendAsync($guzzleRequest, $options)->wait();
 
             $statusCode = $response->getStatusCode();
             $responseBody = json_decode($response->getBody()->getContents(), true);
@@ -515,17 +502,19 @@ class WhatsAppService
         }
 
         try {
-            $response = $this->client->request('GET', 'https://waclient.com/api/get_paircode', [
-                'query' => [
-                    'phone' => $phoneNumber,
-                    'instance_id' => $this->instanceId,
-                    'access_token' => $this->apiToken,
-                ],
-                'headers' => [
-                    'Accept' => 'application/json',
-                ],
-                'http_errors' => false,
-            ]);
+            // Use UltraMsg API for getting pairing code
+            $params = [
+                'token' => $this->apiToken,
+                'phone' => $phoneNumber
+            ];
+
+            $headers = [
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ];
+            
+            $options = ['form_params' => $params];
+            $guzzleRequest = new \GuzzleHttp\Psr7\Request('POST', "{$this->apiUrl}/messages/chat", $headers);
+            $response = $this->client->sendAsync($guzzleRequest, $options)->wait();
 
             $statusCode = $response->getStatusCode();
             $responseBody = json_decode($response->getBody()->getContents(), true);
@@ -542,7 +531,7 @@ class WhatsAppService
     }
 
     /**
-     * Formats a raw phone number into the required format for WA Client API.
+     * Formats a raw phone number into the required format for UltraMsg API.
      */
     private function formatPhoneNumber(string $phoneNumber): string
     {
@@ -568,12 +557,15 @@ class WhatsAppService
             ]);
         }
         
+        // Format for UltraMsg API: add + prefix
+        $formattedPhone = '+' . $cleanPhone;
+        
         Log::info("WhatsAppService: Phone number formatted", [
             'original' => $phoneNumber,
-            'formatted' => $cleanPhone,
+            'formatted' => $formattedPhone,
             'countryCode' => $countryCode
         ]);
         
-        return $cleanPhone;
+        return $formattedPhone;
     }
 }
