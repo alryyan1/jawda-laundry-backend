@@ -13,12 +13,7 @@ class RoleController extends Controller
 {
     public function __construct()
     {
-        // Protect all methods in this controller
-        $this->middleware('can:role_view_any')->only('index');
-        $this->middleware('can:role_view')->only('show');
-        $this->middleware('can:role_create')->only('store');
-        $this->middleware('can:role_update')->only('update');
-        $this->middleware('can:role_delete')->only('destroy');
+        // Authorization middleware removed
     }
 
     public function index(Request $request)

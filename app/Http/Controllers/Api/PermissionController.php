@@ -9,8 +9,7 @@ class PermissionController extends Controller
 {
      public function __construct()
     {
-        // Protect all methods in this controller
-        $this->middleware('can:permission_view_any')->only('index');
+        // Authorization middleware removed
     }
 
     public function index(Request $request)

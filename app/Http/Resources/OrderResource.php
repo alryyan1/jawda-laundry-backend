@@ -39,6 +39,8 @@ class OrderResource extends JsonResource
             'order_date' => $this->order_date ? $this->order_date->toIso8601String() : null,
             'due_date' => $this->due_date ? $this->due_date->toIso8601String() : null,
             'pickup_date' => $this->pickup_date ? $this->pickup_date->toIso8601String() : null,
+            'delivered_date' => $this->delivered_date ? $this->delivered_date->toIso8601String() : null,
+            'completed_at' => $this->completed_at ? $this->completed_at->toIso8601String() : null,
             'delivery_address' => $this->delivery_address,
             'items' => OrderItemResource::collection($this->whenLoaded('items')), // Collection of OrderItemResource
             'payments' => PaymentResource::collection($this->whenLoaded('payments')), // Collection of PaymentResource
@@ -48,6 +50,11 @@ class OrderResource extends JsonResource
                
             // أضف هذا الحقل. سيتم تضمينه فقط إذا كان موجودًا في كائن الطلب.
             'overdue_days' => $this->when(isset($this->overdue_days), (int) $this->overdue_days),
+            'whatsapp_pdf_sent' => $this->whatsapp_pdf_sent,
+            'whatsapp_text_sent' => $this->whatsapp_text_sent,
+            'received' => $this->received,
+            'received_at' => $this->received_at ? $this->received_at->toIso8601String() : null,
+            'order_receive_message_sent' => $this->order_receive_message_sent,
         ];
     }
 }

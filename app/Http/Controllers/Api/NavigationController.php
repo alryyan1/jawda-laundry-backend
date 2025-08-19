@@ -17,7 +17,7 @@ class NavigationController extends Controller
      */
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', NavigationItem::class);
+        // Authorization check removed
 
         // Get all navigation items
         $allItems = NavigationItem::ordered()->get();
@@ -87,7 +87,7 @@ class NavigationController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorize('create', NavigationItem::class);
+        // Authorization check removed
 
         $validated = $request->validate([
             'key' => 'required|string|unique:navigation_items|max:255',
@@ -128,7 +128,7 @@ class NavigationController extends Controller
      */
     public function update(Request $request, NavigationItem $navigationItem): JsonResponse
     {
-        $this->authorize('update', $navigationItem);
+        // Authorization check removed
 
         $validated = $request->validate([
             'key' => ['sometimes', 'string', 'max:255', Rule::unique('navigation_items')->ignore($navigationItem->id)],
@@ -172,7 +172,7 @@ class NavigationController extends Controller
      */
     public function destroy(NavigationItem $navigationItem): JsonResponse
     {
-        $this->authorize('delete', $navigationItem);
+        // Authorization check removed
 
         if ($navigationItem->is_default) {
             return response()->json([
@@ -192,7 +192,7 @@ class NavigationController extends Controller
      */
     public function updateUserPermissions(Request $request, User $user): JsonResponse
     {
-        $this->authorize('manageUserNavigation', User::class);
+        // Authorization check removed
 
         $validated = $request->validate([
             'navigation_permissions' => 'required|array',
@@ -223,7 +223,7 @@ class NavigationController extends Controller
      */
     public function getUserPermissions(User $user): JsonResponse
     {
-        $this->authorize('viewUserNavigation', $user);
+        // Authorization check removed
 
         $allNavigationItems = NavigationItem::active()->ordered()->get();
         $userPermissions = $user->navigationItems()->get()->keyBy('id');
@@ -251,7 +251,7 @@ class NavigationController extends Controller
      */
     public function updateOrder(Request $request): JsonResponse
     {
-        $this->authorize('update', NavigationItem::class);
+        // Authorization check removed
 
         $validated = $request->validate([
             'items' => 'required|array',

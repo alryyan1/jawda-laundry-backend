@@ -37,14 +37,7 @@ class OrderController extends Controller
         // Remove inventory service dependency
         // $this->inventoryService = $inventoryService;
 
-        // Apply Spatie permissions middleware
-        $this->middleware('can:order:list')->only('index');
-        $this->middleware('can:order:view')->only('show');
-        $this->middleware('can:order:create')->only(['store', 'quoteOrderItem']);
-        $this->middleware('can:order:update')->only('update');
-        $this->middleware('can:order:update-status')->only('updateStatus');
-        $this->middleware('can:order:record-payment')->only('recordPayment');
-        $this->middleware('can:order:delete')->only('destroy');
+        // Authorization middleware removed
     }
 
      // Refactor the index method to use the helper
@@ -241,7 +234,7 @@ class OrderController extends Controller
      */
     public function update(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
-        $this->authorize('update', $order);
+        // Authorization check removed
 
         // Debug: Log the incoming request data
         Log::info('Order update request data:', [
@@ -257,7 +250,6 @@ class OrderController extends Controller
             'due_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => ['sometimes', 'required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])],
             'order_complete' => 'sometimes|boolean',
-            'pickup_date' => 'sometimes|nullable|date_format:Y-m-d H:i:s', // Expects a full datetime string from frontend
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
             'items' => 'sometimes|array|min:1', // Allow items to be updated
             'items.*.service_offering_id' => 'required_with:items|integer',
@@ -283,23 +275,14 @@ class OrderController extends Controller
             'validated_order_complete' => $validatedData['order_complete'] ?? null,
         ]);
 
-        // If status changed to 'completed' and no pickup date was explicitly provided, set it to now.
-        if ($oldStatus !== 'completed' && $newStatus === 'completed' && !$request->has('pickup_date')) {
-            $order->pickup_date = now();
-        }
-        
         // Handle order_complete based on status changes
         if ($oldStatus !== 'completed' && $newStatus === 'completed') {
             $order->order_complete = true;
+            $order->completed_at = now();
             Log::info('Setting order_complete to true for order:', ['order_id' => $order->id]);
         } elseif ($newStatus === 'cancelled') {
             $order->order_complete = false;
             Log::info('Setting order_complete to false for cancelled order:', ['order_id' => $order->id]);
-        }
-        
-        // If status changed to something else, clear the pickup date unless it was explicitly sent.
-        if ($newStatus !== 'completed' && !$request->has('pickup_date')) {
-             $order->pickup_date = null;
         }
 
         DB::beginTransaction();
@@ -425,9 +408,7 @@ class OrderController extends Controller
                 $notifier->execute($order);
             }
 
-            if ($request->has('pickup_date')) {
-                 $order->logActivity("Pickup date was updated.");
-            }
+            // Pickup date is fixed on creation and should not change afterwards
 
             DB::commit();
 
@@ -466,7 +447,7 @@ class OrderController extends Controller
      */
     public function updateStatus(Request $request, Order $order, NotifyCustomerForOrderStatus $notifier)
     {
-        $this->authorize('updateStatus', $order);
+        // Authorization check removed
         $validated = $request->validate([
             'status' => ['required', Rule::in(['pending', 'processing', 'delivered', 'completed', 'cancelled'])],
             'delivered_date' => ['nullable', 'date']
@@ -480,8 +461,9 @@ class OrderController extends Controller
             try {
                 $order->status = $newStatus;
                 if ($newStatus === 'completed') {
-                    if (!$order->pickup_date) $order->pickup_date = now();
+                    // Do not change pickup_date here; it is fixed on creation
                     $order->order_complete = true;
+                    if (!$order->completed_at) $order->completed_at = now();
                 } elseif ($newStatus === 'delivered') {
                     // Set delivered_date to current date if not provided
                     if (!$order->delivered_date) {
@@ -556,16 +538,16 @@ class OrderController extends Controller
     }
 
     /**
-     * Mark order as complete without changing status or generating sequences.
+     * Mark order as received and recalculate total amount from order items.
      */
-    public function markOrderComplete(Request $request, Order $order)
+    public function markOrderReceived(Request $request, Order $order)
     {
-        $this->authorize('update', $order);
+        // Authorization check removed
 
-        // Check if order is already completed
-        if ($order->order_complete) {
+        // Check if order is already received
+        if ($order->received) {
             return response()->json([
-                'message' => 'Order is already marked as complete.',
+                'message' => 'Order is already marked as received.',
                 'order' => new OrderResource($order)
             ], 400);
         }
@@ -576,15 +558,16 @@ class OrderController extends Controller
             $oldTotal = $order->total_amount;
             $calculatedTotal = $order->calculated_total_amount;
             
-            Log::info('Marking order as complete - initial state:', [
+            Log::info('Marking order as received - initial state:', [
                 'order_id' => $order->id,
                 'old_total_amount' => $oldTotal,
                 'calculated_total_amount' => $calculatedTotal,
                 'items_count' => $order->items()->count(),
             ]);
             
-            // Only set order_complete to true, don't change status or pickup_date
-            $order->order_complete = true;
+            // Set received to true and set received_at timestamp
+            $order->received = true;
+            $order->received_at = now();
             
             // Always recalculate total amount from order items with their current quantities, widths, and lengths
             $order->recalculateTotalAmountWithItemRecalculation();
@@ -599,13 +582,14 @@ class OrderController extends Controller
             $order->save();
             
             // Log the final state
-            Log::info('Order marked as complete - final state:', [
+            Log::info('Order marked as received - final state:', [
                 'order_id' => $order->id,
                 'new_total_amount' => $order->total_amount,
-                'order_complete' => $order->order_complete,
+                'received' => $order->received,
+                'received_at' => $order->received_at,
             ]);
             
-            $order->logActivity("Order marked as complete. Total amount recalculated: " . $order->total_amount);
+            $order->logActivity("Order marked as received. Total amount recalculated: " . $order->total_amount);
             
             DB::commit();
 
@@ -616,40 +600,44 @@ class OrderController extends Controller
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
 
             // Broadcast the order updated event
-            event(new OrderUpdated($order, ['order_complete' => true]));
-            Log::info('Order marked as complete', ['order_id' => $order->id]);
+            event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
+            Log::info('Order marked as received', ['order_id' => $order->id]);
+
+            // Auto-send receive order message if enabled
+            $this->sendReceiveOrderMessage($order);
 
             return response()->json([
-                'message' => 'Order marked as complete successfully.',
+                'message' => 'Order marked as received successfully.',
                 'order' => new OrderResource($order)
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Error marking order as complete: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to mark order as complete. An internal error occurred.'], 500);
+            Log::error("Error marking order as received: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to mark order as received. An internal error occurred.'], 500);
         }
     }
 
     /**
-     * Cancel a completed order by setting order_complete to false.
+     * Cancel a received order by setting received to false.
      */
     public function cancelOrder(Order $order, NotifyCustomerForOrderStatus $notifier)
     {
-        $this->authorize('update', $order);
+        // Authorization check removed
 
-        // Check if order is completed (can only cancel completed orders)
-        if (!$order->order_complete) {
+        // Check if order is received (can only cancel received orders)
+        if (!$order->received) {
             return response()->json([
-                'message' => 'Only completed orders can be cancelled.',
+                'message' => 'Only received orders can be cancelled.',
                 'order' => new OrderResource($order)
             ], 400);
         }
 
         DB::beginTransaction();
         try {
-            // Set order_complete to false and status to cancelled
-            $order->order_complete = false;
+            // Set received to false and clear received_at timestamp
+            $order->received = false;
+            $order->received_at = null;
             // $order->status = 'cancelled';
             $order->pickup_date = null; // Clear pickup date for cancelled orders
             
@@ -781,7 +769,7 @@ class OrderController extends Controller
      */
     public function updateOrderItemDimensions(Request $request, OrderItem $orderItem)
     {
-        $this->authorize('update', $orderItem->order);
+        // Authorization check removed
 
         $validatedData = $request->validate([
             'length_meters' => 'nullable|numeric|min:0',
@@ -864,7 +852,7 @@ class OrderController extends Controller
      */
     public function updateOrderItemQuantity(Request $request, OrderItem $orderItem)
     {
-        $this->authorize('update', $orderItem->order);
+        // Authorization check removed
 
         $validatedData = $request->validate([
             'quantity' => 'required|integer|min:1',
@@ -944,47 +932,50 @@ class OrderController extends Controller
      */
     public function downloadInvoice(Order $order)
     {
-        // $this->authorize('view', $order); // Check permission using Spatie/Policies
+        // $this->authorize('view', $order);
 
         // Eager load all necessary data for the invoice
         $order->load(['customer', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
 
-        // Instantiate your custom PDF class
+        // Create PDF with professional header/footer and branding
         $pdf = new InvoicePdf(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-
-        // Pass data to the PDF class
         $pdf->setOrder($order);
         $pdf->setCompanyDetails(
             app_setting('company_name', config('app.name')),
-            app_setting('company_address') . "\nPhone: " . app_setting('company_phone')
+            app_setting('company_address')
         );
+        $pdf->setSettings([
+            'general_company_name' => app_setting('company_name', config('app.name')),
+            'general_company_name_ar' => app_setting('company_name_ar', ''),
+            'general_company_address' => app_setting('company_address'),
+            'general_company_address_ar' => app_setting('company_address_ar', ''),
+            'general_company_phone' => app_setting('company_phone'),
+            'general_company_phone_2' => app_setting('company_phone_2'),
+            'company_logo_url' => app_setting('company_logo_url'),
+            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
+            'language' => app_setting('pdf_language', 'en'),
+        ]);
 
-        // Set document information
+        // Meta
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetAuthor(config('app.name'));
         $pdf->SetTitle('Invoice ' . $order->id);
         $pdf->SetSubject('Order Invoice');
 
-        // Set default header/footer data (if not already set in your custom class)
+        // Layout
         $pdf->setPrintHeader(true);
         $pdf->setPrintFooter(true);
-
-        // Set margins
-        $pdf->SetMargins(5, 38, 5); // Left, Top, Right
-        $pdf->SetHeaderMargin(5);
-        $pdf->SetFooterMargin(10);
-
-
-        // Set font
+        $pdf->SetMargins(10, 45, 10);
+        $pdf->SetHeaderMargin(6);
+        $pdf->SetFooterMargin(12);
         $pdf->SetFont('arial', '', 10);
 
-        // Call your custom generate method which builds the PDF
+        // Build PDF
         $pdf->generate();
 
-        // Close and output PDF document
-        // 'I' for inline browser display, 'D' for download
-        $pdf->Output('invoice-'.$order->id.'.pdf', 'I');
-        exit; // TCPDF's output can sometimes interfere with Laravel's response cycle. exit() is a safeguard.
+        // Stream to browser
+        $pdf->Output('invoice-' . $order->id . '.pdf', 'I');
+        exit;
     }
      /**
      * Generate and download a PDF invoice formatted for a POS thermal printer.
@@ -1058,7 +1049,7 @@ class OrderController extends Controller
      */
     public function sendWhatsappInvoice(Order $order, WhatsAppService $whatsAppService)
     {
-        $this->authorize('view', $order); // Or a specific 'order:send-invoice' permission
+        // Authorization check removed
 
         if (!$whatsAppService->isConfigured()) {
             return response()->json(['message' => 'WhatsApp API is not configured.'], 400);
@@ -1125,7 +1116,7 @@ class OrderController extends Controller
      */
     public function sendWhatsappMessage(Request $request, Order $order, WhatsAppService $whatsAppService)
     {
-        $this->authorize('view', $order);
+        // Authorization check removed
 
         $validated = $request->validate([
             'message' => 'required|string|max:1000'
@@ -1278,6 +1269,12 @@ class OrderController extends Controller
         if ($request->boolean('today')) {
             $query->whereDate('created_at', now()->toDateString());
         }
+
+        // Filter for incomplete orders only (where completed_at is null)
+        if ($request->boolean('show_only_incomplete')) {
+            $query->whereNull('completed_at');
+        }
+        
         return $query;
     }
 
@@ -1359,7 +1356,7 @@ class OrderController extends Controller
      */
     public function getPosInvoiceHeight(Order $order)
     {
-        $this->authorize('view', $order);
+        // Authorization check removed
         
         $order->load(['customer', 'user', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
         
@@ -1390,6 +1387,79 @@ class OrderController extends Controller
             'categories_count' => $order->items->groupBy('serviceOffering.productType.category.id')->count(),
             'recommended_page_height_mm' => max(120, $totalHeight + 20)
         ]);
+    }
+
+    /**
+     * Send receive order message via WhatsApp if enabled in settings
+     */
+    private function sendReceiveOrderMessage(Order $order)
+    {
+        try {
+            // Check if customer has phone number
+            if (!$order->customer || !$order->customer->phone) {
+                Log::info("Cannot send receive order message: Customer has no phone number", [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer?->id
+                ]);
+                return;
+            }
+
+            // Check if auto-send receive order message is enabled
+            $settingsService = app(\App\Services\SettingsService::class);
+            $autoSendReceiveMessage = $settingsService->get('pos_auto_send_receive_order_message', false);
+            
+            if (!$autoSendReceiveMessage) {
+                Log::info("Auto-send receive order message is disabled", ['order_id' => $order->id]);
+                return;
+            }
+
+            // Get company name for the message
+            $companyName = app_setting('company_name', config('app.name'));
+            
+            // Create the receive order message
+            $message = "🎉 *Order Received Successfully!*\n\n";
+            $message .= "Dear *{$order->customer->name}*,\n\n";
+            $message .= "Thank you for choosing *{$companyName}*! We have successfully received your order.\n\n";
+            $message .= "📋 *Order Details:*\n";
+            $message .= "• Order #: *{$order->id}*\n";
+            $message .= "• Received Date: *" . now()->format('d/m/Y H:i') . "*\n";
+            $message .= "• Total Items: *" . $order->items->sum('quantity') . "*\n";
+            $message .= "• Total Amount: *" . number_format($order->total_amount, 3) . " OMR*\n\n";
+            $message .= "🔄 *What's Next:*\n";
+            $message .= "We will start processing your order immediately. You will receive updates on the progress.\n\n";
+            $message .= "📞 *Contact Us:*\n";
+            $message .= "If you have any questions, please don't hesitate to contact us.\n\n";
+            $message .= "Thank you for your trust in our services! 🙏";
+
+            // Send the message via WhatsApp
+            $whatsappService = app(\App\Services\WhatsAppService::class);
+            $result = $whatsappService->sendMessage($order->customer->phone, $message);
+
+            if ($result['status'] === 'success') {
+                // Update order to mark that receive message was sent
+                $order->order_receive_message_sent = true;
+                $order->save();
+                
+                Log::info("Receive order message sent successfully", [
+                    'order_id' => $order->id,
+                    'customer_phone' => $order->customer->phone,
+                    'result' => $result
+                ]);
+            } else {
+                Log::error("Failed to send receive order message", [
+                    'order_id' => $order->id,
+                    'customer_phone' => $order->customer->phone,
+                    'error' => $result['message']
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Error sending receive order message", [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 
  

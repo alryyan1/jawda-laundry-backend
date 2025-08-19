@@ -37,9 +37,13 @@ class Order extends Model
         'due_date',
         'pickup_date',
         'delivered_date',       // Date when order was delivered
+        'completed_at',         // Date when order was completed
         'delivery_address',     // Ensure this is here if used
         'whatsapp_text_sent',
         'whatsapp_pdf_sent',
+        'received',             // Track if order was received
+        'received_at',          // When order was received
+        'order_receive_message_sent', // Track if receive message was sent
     ];
     
     /**
@@ -54,9 +58,13 @@ class Order extends Model
         'due_date' => 'datetime',
         'pickup_date' => 'datetime',
         'delivered_date' => 'datetime',
+        'completed_at' => 'datetime',
         'order_complete' => 'boolean',
         'whatsapp_text_sent' => 'boolean',
         'whatsapp_pdf_sent' => 'boolean',
+        'received' => 'boolean',
+        'received_at' => 'datetime',
+        'order_receive_message_sent' => 'boolean',
         'category_sequences' => 'array',
     ];
 

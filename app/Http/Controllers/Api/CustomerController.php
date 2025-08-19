@@ -17,12 +17,7 @@ class CustomerController extends Controller
 {
     public function __construct()
     {
-        // Apply permissions middleware
-        $this->middleware('can:customer:view')->only('show');
-        $this->middleware('can:customer:create')->only('store');
-        $this->middleware('can:customer:update')->only('update');
-        $this->middleware('can:customer:delete')->only('destroy');
-        $this->middleware('can:order:record-payment')->only('recordPayment');
+        // Authorization middleware removed
     }
 
     /**

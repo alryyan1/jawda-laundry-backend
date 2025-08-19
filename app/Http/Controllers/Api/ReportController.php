@@ -18,10 +18,7 @@ class ReportController extends Controller
 {
     public function __construct()
     {
-        // Protect all report methods with a specific permission.
-        // You can get more granular later (e.g., report:view-financial vs. report:view-operational).
-        // Exclude PDF methods from permission checks to allow public access
-        $this->middleware('can:report:view-financial')->except(['exportOrdersReportPdf', 'viewOrdersReportPdf', 'exportOrdersListPdf']);
+        // Authorization middleware removed
     }
 
     /**
@@ -201,7 +198,7 @@ class ReportController extends Controller
      */
     public function overduePickupOrders(Request $request)
     {
-        $this->authorize('report:view-operational');
+        // Authorization check removed
 
         $query = Order::with('customer:id,name,phone')
             ->whereNotNull('pickup_date') // يجب أن يكون لها تاريخ استلام محدد

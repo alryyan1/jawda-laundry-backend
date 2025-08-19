@@ -117,7 +117,7 @@ class DashboardController extends Controller
      */
     public function todaySummary(Request $request)
     {
-        $this->authorize('dashboard:view'); // Or a more specific permission
+        // Authorization check removed
         $user = Auth::user();
         $today = Carbon::today();
 

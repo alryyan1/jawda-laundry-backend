@@ -13,11 +13,7 @@ class SupplierController extends Controller
 {
     public function __construct()
     {
-        // Protect methods using Spatie permissions. Define these in your seeder.
-        $this->middleware('can:supplier:list')->only('index', 'all');
-        $this->middleware('can:supplier:create')->only('store');
-        $this->middleware('can:supplier:update')->only('update');
-        $this->middleware('can:supplier:delete')->only('destroy');
+        // Authorization middleware removed
     }
 
     /**

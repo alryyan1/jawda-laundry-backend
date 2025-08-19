@@ -233,6 +233,24 @@ class SettingsSeeder extends Seeder
                 'description' => 'Show products in list format instead of grid',
                 'is_public' => false,
             ],
+            [
+                'key' => 'pos_auto_send_whatsapp_invoice',
+                'value' => 'false',
+                'type' => 'boolean',
+                'group' => 'pos',
+                'display_name' => 'Auto Send WhatsApp Invoice',
+                'description' => 'Automatically send PDF invoice via WhatsApp when order is completed',
+                'is_public' => false,
+            ],
+            [
+                'key' => 'pos_auto_send_whatsapp_text',
+                'value' => 'false',
+                'type' => 'boolean',
+                'group' => 'pos',
+                'display_name' => 'Auto Send WhatsApp Text',
+                'description' => 'Automatically send WhatsApp text message when order is completed',
+                'is_public' => false,
+            ],
 
             // Theme Settings
             [

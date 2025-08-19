@@ -183,6 +183,8 @@ class SettingsService
         return [
             'auto_show_pdf' => $this->get('pos_auto_show_pdf', false),
             'show_products_as_list' => $this->get('pos_show_products_as_list', false),
+            'auto_send_whatsapp_invoice' => $this->get('pos_auto_send_whatsapp_invoice', false),
+            'auto_send_whatsapp_text' => $this->get('pos_auto_send_whatsapp_text', false),
         ];
     }
 

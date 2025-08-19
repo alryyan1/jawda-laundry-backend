@@ -17,10 +17,7 @@ class PurchaseController extends Controller
 
     public function __construct()
     {
-        $this->middleware('can:purchase:list')->only('index');
-        $this->middleware('can:purchase:create')->only('store');
-        $this->middleware('can:purchase:update')->only('update');
-        $this->middleware('can:purchase:delete')->only('destroy');
+        // Authorization middleware removed
     }
 
     /**

@@ -7,7 +7,7 @@ use App\Http\Resources\WhatsappTemplateResource;
 
 class WhatsappTemplateController extends Controller {
     public function __construct() {
-        $this->middleware('can:settings:manage-application'); // Protected by a general admin permission
+        // Authorization middleware removed
     }
     
     public function index() {

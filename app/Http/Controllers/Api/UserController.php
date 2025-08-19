@@ -17,12 +17,7 @@ class UserController extends Controller // For admin management of users
 {
     public function __construct()
     {
-        $this->middleware('can:user_view_any')->only('index');
-        $this->middleware('can:user_view')->only('show');
-        $this->middleware('can:user_create')->only('store');
-        $this->middleware('can:user_update')->only('update');
-        $this->middleware('can:user_delete')->only('destroy');
-        $this->middleware('can:user_assign_roles')->only(['assignRoles', 'update']); // Assuming update might also change roles
+        // Authorization middleware removed
     }
 
     public function index(Request $request)

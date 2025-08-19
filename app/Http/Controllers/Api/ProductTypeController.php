@@ -224,7 +224,7 @@ class ProductTypeController extends Controller
  
     public function createAllOfferings(ProductType $productType)
     {
-        $this->authorize('update', $productType); // Or a more specific permission like 'service_offering_manage'
+        // Authorization check removed
 
         // Find which Service Actions already have an offering for this Product Type
         $existingActionIds = ServiceOffering::where('product_type_id', $productType->id)

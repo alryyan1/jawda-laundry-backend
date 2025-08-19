@@ -10,9 +10,7 @@ class CustomerLedgerController extends Controller
 {
     public function __construct()
     {
-        // A customer's financial data should be protected.
-        // This could be a financial or high-level receptionist permission.
-        $this->middleware('can:customer:view-ledger');
+        // Authorization middleware removed
     }
 
     public function show(Customer $customer)

@@ -16,11 +16,7 @@ class PaymentController extends Controller
 {
     public function __construct()
     {
-        // Protect these actions with permissions
-        $this->middleware('can:order:record-payment')->only('store');
-        $this->middleware('can:order:view')->only('index');
-        // Deleting payments should be highly restricted, e.g., to admins only
-        $this->middleware('can:admin-only-or-similar')->only('destroy'); // Define this gate or use a role check
+        // Authorization middleware removed
     }
 
     /**
@@ -28,7 +24,7 @@ class PaymentController extends Controller
      */
     public function index(Order $order)
     {
-        $this->authorize('view', $order); // Ensure user can view the parent order
+        // Authorization check removed
         $payments = $order->payments()->with('user:id,name')->get();
         return PaymentResource::collection($payments);
     }
@@ -38,7 +34,7 @@ class PaymentController extends Controller
      */
     public function store(Request $request, Order $order)
     {
-        $this->authorize('recordPayment', $order); // From OrderPolicy
+        // Authorization check removed
 
         // Dynamically get the list of allowed payment method keys from the config file.
         $allowedPaymentMethods = array_keys(app_setting('payment_methods_ar', []));
@@ -165,7 +161,7 @@ class PaymentController extends Controller
      */
     public function destroy(Order $order, Payment $payment)
     {
-        $this->authorize('delete', $payment); // Requires a PaymentPolicy
+        // Authorization check removed
 
         if ($payment->order_id !== $order->id) {
             return response()->json(['message' => 'Payment does not belong to this order.'], 422);

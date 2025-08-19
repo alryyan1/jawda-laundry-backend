@@ -16,12 +16,7 @@ class ExpenseController extends Controller
      */
     public function __construct()
     {
-        // Protect methods using Spatie permissions.
-        // Make sure these permissions are defined in your PermissionSeeder.
-        $this->middleware('can:expense:list')->only('index', 'getCategories');
-        $this->middleware('can:expense:create')->only('store');
-        $this->middleware('can:expense:update')->only('update');
-        $this->middleware('can:expense:delete')->only('destroy');
+        // Authorization middleware removed
     }
 
     /**
@@ -81,7 +76,7 @@ class ExpenseController extends Controller
      */
     public function show(Expense $expense)
     {
-        $this->authorize('view', $expense); // Optional: if there's a policy for viewing specific expenses
+        // Authorization check removed
         $expense->load('user');
         return new ExpenseResource($expense);
     }

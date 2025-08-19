@@ -8,7 +8,7 @@ use App\Http\Resources\PredefinedSizeResource;
 
 class PredefinedSizeController extends Controller {
     public function __construct() {
-        $this->middleware('can:service-admin:manage'); // Protected by general service admin permission
+        // Authorization middleware removed
     }
 
     // List all predefined sizes for a specific product type
