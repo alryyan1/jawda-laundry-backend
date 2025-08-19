@@ -219,8 +219,8 @@ class SettingsService
     public function getAppBranding(): array
     {
         return [
-            'name' => $this->get('app_name', 'Jawda Laundry'),
-            'description' => $this->get('app_description', 'LAUNDRY MANAGEMENT SYSTEM'),
+            'name' => $this->get('app_name', 'Jawda Restaurant'),
+            'description' => $this->get('app_description', 'RESTAURANT MANAGEMENT SYSTEM'),
         ];
     }
 

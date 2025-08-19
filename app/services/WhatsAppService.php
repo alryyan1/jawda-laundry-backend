@@ -410,7 +410,7 @@ class WhatsAppService
      */
     public function sendTestMessage(string $testPhoneNumber): array
     {
-        $message = "This is a test message from your LaundryPro system. WhatsApp integration is working!";
+        $message = "This is a test message from your RestaurantPro system. WhatsApp integration is working!";
         
         return $this->sendMessage($testPhoneNumber, $message);
     }

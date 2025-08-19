@@ -409,7 +409,7 @@ class UltraMsgService
      */
     public function sendTestMessage(string $testPhoneNumber): array
     {
-        $testMessage = "🧪 This is a test message from your LaundryPro system using UltraMsg API. If you receive this, your WhatsApp integration is working correctly! 📱";
+        $testMessage = "🧪 This is a test message from your RestaurantPro system using UltraMsg API. If you receive this, your WhatsApp integration is working correctly! 📱";
         
         return $this->sendMessage($testPhoneNumber, $testMessage);
     }

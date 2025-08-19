@@ -1,6 +1,6 @@
 # Navigation Permissions System
 
-This document explains how the navigation permissions system works in the Jawda Laundry application.
+This document explains how the navigation permissions system works in the Jawda Restaurant application.
 
 ## Overview
 

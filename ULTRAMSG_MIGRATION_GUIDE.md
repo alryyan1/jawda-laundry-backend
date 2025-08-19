@@ -1,6 +1,6 @@
 # UltraMsg WhatsApp API Integration
 
-This guide explains the UltraMsg WhatsApp API integration in your LaundryPro system.
+This guide explains the UltraMsg WhatsApp API integration in your RestaurantPro system.
 
 ## Overview
 

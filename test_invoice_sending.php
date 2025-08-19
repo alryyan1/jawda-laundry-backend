@@ -35,7 +35,7 @@ echo "Test Phone Number: {$testPhoneNumber}\n\n";
 // Test 1: Send a simple text message
 echo "Test 1: Sending Text Message\n";
 echo "-----------------------------\n";
-$result = $whatsAppService->sendMessage($testPhoneNumber, 'Test message from LaundryPro system - UltraMsg integration test');
+        $result = $whatsAppService->sendMessage($testPhoneNumber, 'Test message from RestaurantPro system - UltraMsg integration test');
 echo "Result: " . json_encode($result, JSON_PRETTY_PRINT) . "\n\n";
 
 // Test 2: Send a test document (PDF)
@@ -46,13 +46,13 @@ echo "------------------------------\n";
 $testPdfContent = base64_encode('Test PDF content - this is not a real PDF but for testing purposes');
 $testPdfUrl = "data:application/pdf;base64,{$testPdfContent}";
 
-$result = $whatsAppService->sendMedia($testPhoneNumber, $testPdfUrl, 'test-document.pdf', 'Test document from LaundryPro system');
+        $result = $whatsAppService->sendMedia($testPhoneNumber, $testPdfUrl, 'test-document.pdf', 'Test document from RestaurantPro system');
 echo "Result: " . json_encode($result, JSON_PRETTY_PRINT) . "\n\n";
 
 // Test 3: Test the sendMediaBase64 method
 echo "Test 3: Sending Base64 Document\n";
 echo "--------------------------------\n";
-$result = $whatsAppService->sendMediaBase64($testPhoneNumber, $testPdfContent, 'test-base64-document.pdf', 'Test base64 document from LaundryPro system');
+        $result = $whatsAppService->sendMediaBase64($testPhoneNumber, $testPdfContent, 'test-base64-document.pdf', 'Test base64 document from RestaurantPro system');
 echo "Result: " . json_encode($result, JSON_PRETTY_PRINT) . "\n\n";
 
 echo "All tests completed!\n";

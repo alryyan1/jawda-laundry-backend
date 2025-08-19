@@ -84,7 +84,7 @@ class PosInvoicePdf extends TCPDF
     {
         $this->translations = [
             'company_name' => [
-                'en' => $this->settings['general_company_name'] ?? 'LaundryPro',
+                'en' => $this->settings['general_company_name'] ?? 'RestaurantPro',
                 'ar' => $this->settings['general_company_name_ar'] ?? 'لوندرى برو'
             ],
             'company_address' => [

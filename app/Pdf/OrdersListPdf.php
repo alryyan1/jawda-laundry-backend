@@ -29,7 +29,7 @@ class OrdersListPdf extends TCPDF
     public function setSettings(array $settings)
     {
         $this->settings = $settings;
-        $this->companyName = $settings['company_name'] ?? 'Laundry Service';
+        $this->companyName = $settings['company_name'] ?? 'Restaurant Service';
         $this->companyAddress = $settings['company_address'] ?? '';
         $this->currencySymbol = $settings['currency_symbol'] ?? 'OMR';
     }

@@ -21,7 +21,7 @@ class CustomerSeeder extends Seeder
 
         // Create default customer
         Customer::firstOrCreate(
-            ['email' => 'default@laundry.com'],
+            ['email' => 'default@restaurant.com'],
             [
                 'name' => 'Default Customer',
                 'phone' => '000-0000',

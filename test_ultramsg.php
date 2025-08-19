@@ -21,7 +21,7 @@ function testSendMessage($baseUrl, $phoneNumber) {
     
     $data = [
         'to' => $phoneNumber,
-        'body' => 'Hello from UltraMsg API! This is a test message from your LaundryPro system.'
+        'body' => 'Hello from UltraMsg API! This is a test message from your RestaurantPro system.'
     ];
     
     $response = makeRequest($baseUrl . '/ultramsg/send-message', 'POST', $data);

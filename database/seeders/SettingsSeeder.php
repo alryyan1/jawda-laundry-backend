@@ -73,7 +73,7 @@ class SettingsSeeder extends Seeder
             // App Branding
             [
                 'key' => 'app_name',
-                'value' => 'Jawda Laundry',
+                'value' => 'Jawda Restaurant',
                 'type' => 'string',
                 'group' => 'app',
                 'display_name' => 'App Name',
@@ -82,7 +82,7 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'key' => 'app_description',
-                'value' => 'LAUNDRY MANAGEMENT SYSTEM',
+                'value' => 'RESTAURANT MANAGEMENT SYSTEM',
                 'type' => 'string',
                 'group' => 'app',
                 'display_name' => 'App Description',

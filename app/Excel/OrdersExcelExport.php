@@ -74,12 +74,12 @@ class OrdersExcelExport
     private function setDocumentProperties()
     {
         $this->spreadsheet->getProperties()
-            ->setCreator($this->settings['company_name'] ?? 'Laundry System')
-            ->setLastModifiedBy($this->settings['company_name'] ?? 'Laundry System')
+                            ->setCreator($this->settings['company_name'] ?? 'Restaurant System')
+                ->setLastModifiedBy($this->settings['company_name'] ?? 'Restaurant System')
             ->setTitle('Orders Report')
             ->setSubject('Orders Export Report')
             ->setDescription('Professional orders export report with detailed analysis')
-            ->setKeywords('orders, laundry, report, export')
+                            ->setKeywords('orders, restaurant, report, export')
             ->setCategory('Reports');
     }
 
@@ -89,7 +89,7 @@ class OrdersExcelExport
         
         // Company header
         $this->worksheet->mergeCells('A1:H1');
-        $this->worksheet->setCellValue('A1', $this->settings['company_name'] ?? 'Laundry Service');
+        $this->worksheet->setCellValue('A1', $this->settings['company_name'] ?? 'Restaurant Service');
         $this->applyHeaderStyle('A1:H1');
         
         $this->worksheet->mergeCells('A2:H2');
@@ -201,7 +201,7 @@ class OrdersExcelExport
         
         // Company header
         $ordersSheet->mergeCells('A1:N1');
-        $ordersSheet->setCellValue('A1', $this->settings['company_name'] ?? 'Laundry Service');
+        $ordersSheet->setCellValue('A1', $this->settings['company_name'] ?? 'Restaurant Service');
         $this->applyHeaderStyle('A1:N1', $ordersSheet);
         
         // Report title
@@ -321,7 +321,7 @@ class OrdersExcelExport
         
         // Company header
         $itemsSheet->mergeCells('A1:K1');
-        $itemsSheet->setCellValue('A1', $this->settings['company_name'] ?? 'Laundry Service');
+        $itemsSheet->setCellValue('A1', $this->settings['company_name'] ?? 'Restaurant Service');
         $this->applyHeaderStyle('A1:K1', $itemsSheet);
         
         // Report title
