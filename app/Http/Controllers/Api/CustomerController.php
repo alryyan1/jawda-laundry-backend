@@ -29,7 +29,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $query = Customer::withCount('orders')
-                         ->with('customerType') // Eager load customer type
+                         ->with(['managedBy']) // Eager load managed by user
                          ->latest();
 
         if ($request->filled('search')) {

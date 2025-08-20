@@ -35,7 +35,7 @@ class PricingService
         // Eager load necessary relationships if they haven't been loaded already.
         $offering->loadMissing(['productType', 'pricingRules']);
         if ($customer) {
-            $customer->loadMissing('customerType');
+            $customer->loadMissing('pricingRules');
         }
 
         $productType = $offering->productType;

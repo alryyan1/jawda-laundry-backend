@@ -31,7 +31,8 @@ class CustomerProductTypeController extends Controller
                 'customer' => [
                     'id' => $customer->id,
                     'name' => $customer->name,
-                    'customer_type' => $customer->customerType,
+                    'phone' => $customer->phone,
+                    'email' => $customer->email,
                 ],
                 'product_types' => $customerProductTypes->map(function ($cpt) {
                     return [

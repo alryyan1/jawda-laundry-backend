@@ -17,21 +17,18 @@ class CustomerResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'email' => $this->email,
+            'car_plate_number' => $this->car_plate_number,
             'phone' => $this->phone,
+            'email' => $this->email,
             'address' => $this->address,
             'notes' => $this->notes,
-            'customer_type_id' => $this->customer_type_id,
-            'customerType' => new CustomerTypeResource($this->whenLoaded('customerType')),
-            'user_id' => $this->user_id, // Staff who created/manages
-            'managedBy' => new UserResource($this->whenLoaded('managedBy')), // Relationship name from Customer model
-            'registered_date' => $this->created_at ? $this->created_at->toIso8601String() : null,
-            'total_orders' => $this->whenCounted('orders'),
-            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
-            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
+            'user_id' => $this->user_id,
+            'managedBy' => new UserResource($this->whenLoaded('managedBy')),
+            'registered_date' => $this->registered_date,
+            'total_orders' => $this->total_orders,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
             'is_default' => $this->is_default,
-            // You can add a link to their orders if needed:
-            // 'orders_link' => $this->when(Auth::check(), route('api.orders.index', ['customer_id' => $this->id])),
         ];
     }
 }

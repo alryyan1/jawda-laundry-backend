@@ -20,8 +20,6 @@ class PricingRuleResource extends JsonResource
             'serviceOffering' => new ServiceOfferingResource($this->whenLoaded('serviceOffering')),
             'customer_id' => $this->customer_id,
             'customer' => new CustomerResource($this->whenLoaded('customer')),
-            'customer_type_id' => $this->customer_type_id,
-            'customerType' => new CustomerTypeResource($this->whenLoaded('customerType')),
             'price' => $this->price !== null ? (float) $this->price : null,
             'price_per_sq_meter' => $this->price_per_sq_meter !== null ? (float) $this->price_per_sq_meter : null,
             'valid_from' => $this->valid_from ? $this->valid_from->toDateString() : null, // Y-m-d

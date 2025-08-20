@@ -225,7 +225,7 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
+        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         return new OrderResource($order);
     }
       /**

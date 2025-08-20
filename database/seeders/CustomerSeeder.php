@@ -24,11 +24,11 @@ class CustomerSeeder extends Seeder
             ['email' => 'default@restaurant.com'],
             [
                 'name' => 'Default Customer',
-                'phone' => '000-0000',
+                'car_plate_number' => null,
+                'phone' => '+1234567890',
+                'email' => 'default@restaurant.com',
                 'address' => 'Default Address',
-                'user_id' => $staffUser?->id,
-                'customer_type_id' => $individualType?->id,
-                'notes' => 'Default customer for system operations.',
+                'notes' => 'Default customer for system operations',
                 'is_default' => true,
             ]
         );

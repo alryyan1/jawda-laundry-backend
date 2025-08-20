@@ -104,7 +104,8 @@ class CustomerPriceListController extends Controller
                 'customer' => [
                     'id' => $customer->id,
                     'name' => $customer->name,
-                    'customer_type' => $customer->customerType,
+                    'phone' => $customer->phone,
+                    'email' => $customer->email,
                 ],
                 'price_list' => $serviceOfferings,
                 'total_items' => $serviceOfferings->count(),
