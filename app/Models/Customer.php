@@ -17,9 +17,9 @@ class Customer extends Model
      */
     protected $fillable = [
         'name',
+        'car_plate_number',
         'email',
         'phone',
-        'customer_type_id',
         'address',
         'user_id', // Foreign key for the staff member who created/manages this customer (optional)
         'notes',   // Any additional notes about the customer
@@ -51,10 +51,6 @@ class Customer extends Model
     public function managedBy()
     {
         return $this->belongsTo(User::class, 'user_id');
-    }
-    
-    public function CustomerType(){
-        return $this->belongsTo(CustomerType::class);
     }
     
     /**
