@@ -24,14 +24,44 @@ class DashboardController extends Controller
         $cancelledOrders = Order::where('status', 'cancelled')->count();
         $totalActiveCustomers = Customer::count(); // Define "active" if needed, e.g., with recent orders
 
-        // Example: Revenue this month (sum of total_amount for completed orders)
+        // Orders count by day, week, month
+        $today = Carbon::today();
+        $startOfWeek = Carbon::now()->startOfWeek();
+        $endOfWeek = Carbon::now()->endOfWeek();
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
+
+        $totalOrdersToday = Order::whereDate('created_at', $today)->count();
+        $totalOrdersThisWeek = Order::whereBetween('created_at', [$startOfWeek, $endOfWeek])->count();
+        $totalOrdersThisMonth = Order::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+
+        // Paid totals (sum of payments.amount) by day, week, month
+        $payments = DB::table('payments')->where('type', 'payment');
+        $totalRevenueToday = (clone $payments)
+            ->whereDate('payment_date', $today)
+            ->sum('amount');
+        $totalRevenueThisWeek = (clone $payments)
+            ->whereBetween('payment_date', [$startOfWeek, $endOfWeek])
+            ->sum('amount');
+        $totalRevenueThisMonth = (clone $payments)
+            ->whereBetween('payment_date', [$startOfMonth, $endOfMonth])
+            ->sum('amount');
+
+        // Back-compat monthly revenue (keep existing field)
         $monthlyRevenue = Order::where('status', 'completed')
-                              ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
-                              ->sum('total_amount');
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
+            ->sum('total_amount');
 
         return response()->json([
+            // New fields expected by the frontend
+            'totalOrdersToday' => (int) $totalOrdersToday,
+            'totalOrdersThisWeek' => (int) $totalOrdersThisWeek,
+            'totalOrdersThisMonth' => (int) $totalOrdersThisMonth,
+
+            'totalRevenueToday' => (float) $totalRevenueToday,
+            'totalRevenueThisWeek' => (float) $totalRevenueThisWeek,
+            'totalRevenueThisMonth' => (float) $totalRevenueThisMonth,
+
             'pendingOrders' => $pendingOrders,
             'processingOrders' => $processingOrders,
             'deliveredOrders' => $deliveredOrders,
@@ -65,6 +95,32 @@ class DashboardController extends Controller
         }
 
         return response()->json(['data' => $dates->values()]);
+    }
+
+    public function topProducts(Request $request)
+    {
+        // Top 5 requested products by item count (grouped by product type)
+        $results = DB::table('order_items')
+            ->join('service_offerings', 'order_items.service_offering_id', '=', 'service_offerings.id')
+            ->join('product_types', 'service_offerings.product_type_id', '=', 'product_types.id')
+            ->select('product_types.name as name', DB::raw('COUNT(*) as count'))
+            ->groupBy('product_types.name')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+
+        $total = (int) $results->sum('count');
+        $data = $results->map(function ($row) use ($total) {
+            $count = (int) $row->count;
+            $percentage = $total > 0 ? round(($count / $total) * 100) : 0;
+            return [
+                'name' => $row->name,
+                'count' => $count,
+                'percentage' => $percentage,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 
     public function revenueBreakdown(Request $request)

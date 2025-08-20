@@ -168,6 +168,7 @@ Route::delete(
     Route::get('/dashboard/orders-trend', [DashboardController::class, 'ordersTrend']);
     Route::get('/dashboard/order-items-trend', [DashboardController::class, 'orderItemsTrend']);
     Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
+    Route::get('/dashboard/top-products', [DashboardController::class, 'topProducts']);
 
     Route::get('/reports/cost-summary', [ReportController::class, 'costSummary']);
     Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);
