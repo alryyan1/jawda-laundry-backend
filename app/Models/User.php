@@ -66,23 +66,7 @@ class User extends Authenticatable
         return $this->hasMany(Customer::class, 'user_id');
     }
 
-    /**
-     * Get navigation items that this user has explicit permissions for.
-     */
-    public function navigationItems(): BelongsToMany
-    {
-        return $this->belongsToMany(NavigationItem::class, 'user_navigation_permissions')
-                    ->withPivot('is_granted')
-                    ->withTimestamps();
-    }
 
-    /**
-     * Get the user's custom main navigation items.
-     */
-    public function userMainNavs()
-    {
-        return $this->hasMany(UserMainNav::class)->active()->ordered();
-    }
 
     /**
      * Get the user's roles.
@@ -93,37 +77,7 @@ class User extends Authenticatable
                     ->where('model_type', User::class);
     }
 
-    /**
-     * Get all accessible navigation items for this user.
-     */
-    public function getAccessibleNavigationItems(): array
-    {
-        $allNavigationItems = NavigationItem::active()->topLevel()->ordered()->with('activeChildren')->get();
-        $accessibleItems = [];
 
-        foreach ($allNavigationItems as $item) {
-            if ($item->userCanAccess($this)) {
-                $accessibleItem = $item->toArray();
-                
-                // Filter children that user can access
-                if ($item->activeChildren->isNotEmpty()) {
-                    $accessibleChildren = [];
-                    foreach ($item->activeChildren as $child) {
-                        if ($child->userCanAccess($this)) {
-                            $accessibleChildren[] = $child->toArray();
-                        }
-                    }
-                    $accessibleItem['children'] = $accessibleChildren;
-                } else {
-                    $accessibleItem['children'] = [];
-                }
-                
-                $accessibleItems[] = $accessibleItem;
-            }
-        }
-
-        return $accessibleItems;
-    }
 
     // Example role check (simple)
     public function isAdmin(): bool
@@ -143,27 +97,5 @@ class User extends Authenticatable
         return $this->hasRole('admin'); // Assuming 'admin' is a role name in Spatie
     }
 
-    /**
-     * Boot method to set up navigation permissions for new users
-     */
-    protected static function boot()
-    {
-        parent::boot();
 
-        // When a user is created, set up default navigation permissions
-        static::created(function ($user) {
-            // Import the seeder class
-            \Database\Seeders\UserNavigationPermissionSeeder::setupDefaultNavigationForUser($user);
-        });
-
-        // When a user's role is updated, update navigation permissions
-        static::updated(function ($user) {
-            if ($user->wasChanged('roles')) {
-                // Clear existing navigation permissions
-                $user->navigationItems()->detach();
-                // Set up new navigation permissions based on current role
-                \Database\Seeders\UserNavigationPermissionSeeder::setupDefaultNavigationForUser($user);
-            }
-        });
-    }
 }

@@ -8,27 +8,27 @@ use App\Models\ServiceAction;
 class LaundryServiceActionSeeder extends Seeder
 {
     /**
-     * Run the database seeds for laundry service actions.
+     * Run the database seeds for restaurant meal variations.
      */
     public function run(): void
     {
-        $this->command->info('Seeding laundry service actions...');
+        $this->command->info('Seeding restaurant meal variations...');
 
         $serviceActions = [
             [
-                'name' => 'Ironing - كي',
-                'description' => 'Professional ironing service for pressed and wrinkle-free garments. خدمة كي احترافية للملابس المكوية والخالية من التجاعيد.',
+                'name' => 'Small - صغير',
+                'description' => 'Small portion size suitable for light meals or appetizers. حجم صغير مناسب للوجبات الخفيفة أو المقبلات.',
+                'base_duration_minutes' => 10
+            ],
+            [
+                'name' => 'Medium - متوسط',
+                'description' => 'Standard portion size for regular meals. حجم قياسي للوجبات العادية.',
                 'base_duration_minutes' => 15
             ],
             [
-                'name' => 'Washing - غسيل',
-                'description' => 'Standard washing service for regular cleaning of garments. خدمة غسيل قياسية للتنظيف العادي للملابس.',
-                'base_duration_minutes' => 60
-            ],
-            [
-                'name' => 'Dry Clean - غسيل جاف',
-                'description' => 'Professional dry cleaning service for delicate and special fabrics. خدمة غسيل جاف احترافية للأقمشة الحساسة والخاصة.',
-                'base_duration_minutes' => 120
+                'name' => 'Large - كبير',
+                'description' => 'Large portion size for hearty meals or sharing. حجم كبير للوجبات الدسمة أو المشاركة.',
+                'base_duration_minutes' => 20
             ]
         ];
 
@@ -39,6 +39,6 @@ class LaundryServiceActionSeeder extends Seeder
             );
         }
         
-        $this->command->info('Laundry service actions seeded successfully.');
+        $this->command->info('Restaurant meal variations seeded successfully.');
     }
 } 

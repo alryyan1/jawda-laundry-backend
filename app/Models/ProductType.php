@@ -32,5 +32,14 @@ class ProductType extends Model
         return $this->hasMany(PredefinedSize::class);
     }
 
+    public function compositions()
+    {
+        return $this->hasMany(ProductTypeComposition::class);
+    }
+
+    public function activeCompositions()
+    {
+        return $this->hasMany(ProductTypeComposition::class)->where('is_active', true);
+    }
 
 }

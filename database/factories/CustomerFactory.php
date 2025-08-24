@@ -10,7 +10,7 @@ class CustomerFactory extends Factory
     {
         return [
             'name' => fake()->name(),
-            'car_plate_number' => fake()->optional()->regexify('[A-Z]{2,3}[0-9]{3,4}'),
+            'car_plate_number' => fake()->regexify('[A-Z]{2,3}[0-9]{3,4}'),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->optional()->safeEmail(),
             'address' => fake()->optional()->address(),

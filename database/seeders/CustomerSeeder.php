@@ -24,7 +24,7 @@ class CustomerSeeder extends Seeder
             ['email' => 'default@restaurant.com'],
             [
                 'name' => 'Default Customer',
-                'car_plate_number' => null,
+                'car_plate_number' => 'DEFAULT-001',
                 'phone' => '+1234567890',
                 'email' => 'default@restaurant.com',
                 'address' => 'Default Address',

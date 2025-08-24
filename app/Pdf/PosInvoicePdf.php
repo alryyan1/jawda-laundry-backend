@@ -148,8 +148,8 @@ class PosInvoicePdf extends TCPDF
                 'ar' => 'الفئة'
             ],
             'thank_you' => [
-                'en' => 'We work for the comfort of our customers',
-                'ar' => 'نعـمل من أجل راحـــة عمالئـنا'
+                'en' => '',
+                'ar' => ''
             ]
         ];
     }
@@ -534,6 +534,37 @@ class PosInvoicePdf extends TCPDF
                 $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 3), 0, 0, 'R');
                 $this->SetX(59); // Position for Total
                 $this->Cell(14, 4, number_format($item->sub_total, 3), 0, 1, 'R');
+                
+                // Show item notes if setting is enabled and notes exist
+                if (($this->settings['pos_show_item_notes_in_pdf'] ?? true) && !empty($item->notes)) {
+                    $this->SetFont($this->font, 'I', 7);
+                    $this->SetTextColor(100, 100, 100); // Gray color for notes
+                    
+                    // Sanitize and prepare notes text
+                    $notesText = $item->notes;
+                    
+                    // Replace ❌ emoji with "excluded" text
+                    $notesText = str_replace('❌', 'excluded:', $notesText);
+                    
+                    // Remove any problematic characters and ensure proper encoding
+                    $notesText = trim($notesText);
+                    $notesText = str_replace(["\r", "\n"], ' ', $notesText); // Replace newlines with spaces
+                    $notesText = preg_replace('/[^\x20-\x7E]/', '', $notesText); // Keep only printable ASCII characters
+                    $notesText = 'Notes: ' . $notesText;
+                    
+                    // Only add notes if we have valid text after sanitization
+                    if (!empty(trim($notesText)) && $notesText !== 'Notes: ') {
+                        try {
+                            $this->MultiCell(69, 3, $notesText, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+                        } catch (Exception $e) {
+                            // If MultiCell fails, try with a simpler approach
+                            $this->Cell(69, 3, substr($notesText, 0, 50) . (strlen($notesText) > 50 ? '...' : ''), 0, 1, 'L');
+                        }
+                    }
+                    
+                    $this->SetTextColor(0, 0, 0); // Reset to black
+                    $this->SetFont($this->font, '', 9);
+                }
             }
             
             // Add spacing between categories (except for the last category)

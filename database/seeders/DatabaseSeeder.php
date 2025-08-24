@@ -25,14 +25,15 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             RestaurantTableSeeder::class,
             PermissionSeeder::class,
-            NavigationItemSeeder::class,
-            UserNavigationPermissionSeeder::class, // Set up navigation permissions for existing users
-            // Product categories and types (must come before laundry seeder)
-            ProductCategoriesTableSeeder::class,
-            ProductTypesTableSeeder::class,
+
+            // Product compositions (ingredients)
+            ProductCompositionSeeder::class,
+            // Sekka Shawarma menu (categories and product types)
+            SekkaShawarmaMenuSeeder::class,
             SettingsSeeder::class,
-            // Laundry seeders (creates service offerings)
-            \Database\Seeders\Laundry\LaundrySeeder::class,
+            SekkaShawarmaSettingsSeeder::class,
+            // Sekka Shawarma service offerings
+            SekkaShawarmaServiceOfferingSeeder::class,
             // SupplierSeeder::class,
             // Add PricingRuleSeeder if you create one
         ]);

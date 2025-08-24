@@ -28,12 +28,14 @@ use App\Http\Controllers\Api\WhatsappTemplateController;
 use App\Http\Controllers\Api\RestaurantTableController;
 use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
-use App\Http\Controllers\Api\NavigationController;
+use App\Http\Controllers\Api\SimpleNavigationController;
 use App\Http\Controllers\Api\CustomerPriceListController;
 use App\Http\Controllers\Api\CustomerPricingRuleController;
 use App\Http\Controllers\Api\SettingsController;
-use App\Http\Controllers\Api\UserMainNavController;
+
 use App\Http\Controllers\Api\UltraMsgController;
+use App\Http\Controllers\Api\ProductTypeCompositionController;
+use App\Http\Controllers\Api\ProductCompositionController;
 
 // Public authentication routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -76,11 +78,13 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/orders/quote-item', [OrderController::class, 'quoteOrderItem']);
   Route::get('/orders/today', [OrderController::class, 'getTodayOrders']);
   Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+  Route::patch('/orders/{order}/order-type', [OrderController::class, 'updateOrderType']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
   Route::post('/orders/{order}/mark-received', [OrderController::class, 'markOrderReceived']);
   Route::patch('/order-items/{orderItem}/dimensions', [OrderController::class, 'updateOrderItemDimensions']);
-  Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateOrderItemQuantity']);
+Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateOrderItemQuantity']);
+Route::patch('/order-items/{orderItem}/notes', [OrderController::class, 'updateOrderItemNotes']);
 
 
   Route::apiResource('orders', OrderController::class);
@@ -97,6 +101,14 @@ Route::delete(
 )->name('product-types.predefined-sizes.destroy');
   // Service Management Admin Routes
   Route::apiResource('product-types', ProductTypeController::class);
+  
+  // Product Type Compositions Routes
+  Route::apiResource('product-types.compositions', ProductTypeCompositionController::class);
+Route::patch('/product-types/{productType}/compositions/{composition}/toggle-status', [ProductTypeCompositionController::class, 'toggleStatus']);
+
+// Product Compositions (base compositions)
+Route::apiResource('product-compositions', ProductCompositionController::class);
+  
   Route::apiResource('service-actions', ServiceActionController::class);
   Route::apiResource('service-offerings', ServiceOfferingController::class);
   Route::put('/product-types/{productTypeId}/first-offering-price', [ServiceOfferingController::class, 'updateFirstOfferingPrice']);
@@ -182,16 +194,9 @@ Route::delete(
     Route::get('/reports/daily-revenue', [ReportController::class, 'dailyRevenueReport']);
     Route::get('/reports/daily-costs', [ReportController::class, 'dailyCostsReport']);
     
-    // Navigation Management Routes
-    Route::get('/navigation/user', [NavigationController::class, 'getUserNavigation']);
-    Route::apiResource('navigation', NavigationController::class)->except(['show'])->parameters(['navigation' => 'navigationItem']);
-    Route::put('/navigation/order', [NavigationController::class, 'updateOrder']);
-    Route::get('/users/{user}/navigation-permissions', [NavigationController::class, 'getUserPermissions']);
-    Route::put('/users/{user}/navigation-permissions', [NavigationController::class, 'updateUserPermissions']);
-
-    // User Main Navigation Routes
-    Route::apiResource('user-main-navs', UserMainNavController::class);
-    Route::post('/user-main-navs/reorder', [UserMainNavController::class, 'reorder']);
+    // Simple Navigation Routes
+    Route::get('/navigation', [SimpleNavigationController::class, 'index']);
+    Route::get('/navigation/role/{role}', [SimpleNavigationController::class, 'getByRole']);
 
 
 

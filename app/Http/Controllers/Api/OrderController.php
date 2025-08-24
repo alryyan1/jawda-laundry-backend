@@ -928,6 +928,48 @@ class OrderController extends Controller
     }
     
     /**
+     * Update order item notes
+     */
+    public function updateOrderItemNotes(Request $request, OrderItem $orderItem)
+    {
+        // Authorization check removed
+
+        $validatedData = $request->validate([
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+            
+            // Update the order item notes
+            $orderItem->notes = $validatedData['notes'] ?? null;
+            $orderItem->save();
+            
+            Log::info('Updated order item notes:', [
+                'order_item_id' => $orderItem->id,
+                'notes' => $orderItem->notes,
+                'product_type' => $orderItem->serviceOffering->productType->name,
+            ]);
+            
+            // Load relationships for response
+            $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
+            
+            DB::commit();
+            
+            return response()->json([
+                'message' => 'Order item notes updated successfully.',
+                'order_item' => $orderItem,
+                'order' => $orderItem->order,
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error updating order item notes: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update order item notes.'], 500);
+        }
+    }
+    
+    /**
      * Generate and download a PDF invoice for the specified order using raw TCPDF methods.
      */
     public function downloadInvoice(Order $order)
@@ -1460,6 +1502,38 @@ class OrderController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
         }
+    }
+
+    /**
+     * Update the order type for a specific order
+     */
+    public function updateOrderType(Request $request, Order $order)
+    {
+        // Authorization check removed
+        
+        $validatedData = $request->validate([
+            'order_type' => 'required|in:in_house,take_away,delivery',
+        ]);
+
+        $oldOrderType = $order->order_type;
+        $order->order_type = $validatedData['order_type'];
+        $order->save();
+
+        // Log the order type change
+        Log::info('Order type updated', [
+            'order_id' => $order->id,
+            'old_order_type' => $oldOrderType,
+            'new_order_type' => $order->order_type,
+            'user_id' => Auth::id(),
+        ]);
+
+        // Load the order with relationships for the response
+        $order->load(['customer', 'user', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
+
+        return response()->json([
+            'message' => 'Order type updated successfully',
+            'order' => new OrderResource($order),
+        ]);
     }
 
  

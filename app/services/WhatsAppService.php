@@ -538,7 +538,7 @@ class WhatsAppService
         // Get the country code from database settings, default to Oman (968)
         $settingsService = app(\App\Services\SettingsService::class);
         $whatsappConfig = $settingsService->getWhatsAppConfig();
-        $countryCode = $whatsappConfig['country_code'] ?? '968';
+        $countryCode = $whatsappConfig['country_code'] ?? '971';
         
         // Clean the phone number (remove any non-digits, spaces, dashes, plus signs)
         $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
