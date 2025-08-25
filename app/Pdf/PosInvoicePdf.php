@@ -185,7 +185,7 @@ class PosInvoicePdf extends TCPDF
     {
         $en = $this->translations[$key]['en'] ?? $key;
         $ar = $this->translations[$key]['ar'] ?? $key;
-        return $en . ' / ' . $ar;
+        return $en;
     }
 
     /**
