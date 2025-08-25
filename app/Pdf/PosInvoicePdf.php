@@ -574,8 +574,8 @@ class PosInvoicePdf extends TCPDF
                 
                 // Show item notes if setting is enabled and notes exist
                 if (($this->settings['pos_show_item_notes_in_pdf'] ?? true) && !empty($item->notes)) {
-                    $this->SetFont($this->font, 'I', 7);
-                    $this->SetTextColor(100, 100, 100); // Gray color for notes
+                    $this->SetFont($this->font, '', 8);
+                    // $this->SetTextColor(100, 100, 100); // Gray color for notes
                     
                     // Sanitize and prepare notes text
                     $notesText = $item->notes;

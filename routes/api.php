@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Core CRUD
   Route::apiResource('customers', CustomerController::class);
   Route::post('/customers/{customer}/payment', [CustomerController::class, 'recordPayment']);
+  Route::patch('/order-items/{orderItem}/notes', [OrderController::class, 'updateOrderItemNotes']);
 
   Route::post('/orders/quote-item', [OrderController::class, 'quoteOrderItem']);
   Route::get('/orders/today', [OrderController::class, 'getTodayOrders']);
@@ -78,10 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/orders/{order}/order-type', [OrderController::class, 'updateOrderType']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
+  Route::get('/orders/{order}/pos-invoice-base64', [OrderController::class, 'downloadPosInvoiceBase64']);
+  Route::post('/orders/{order}/print', [OrderController::class, 'enqueuePrintJob']);
+  Route::patch('/print-jobs/{printJob}', [OrderController::class, 'updatePrintJobStatus']);
   Route::post('/orders/{order}/mark-received', [OrderController::class, 'markOrderReceived']);
   Route::patch('/order-items/{orderItem}/dimensions', [OrderController::class, 'updateOrderItemDimensions']);
 Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateOrderItemQuantity']);
-Route::patch('/order-items/{orderItem}/notes', [OrderController::class, 'updateOrderItemNotes']);
 
 
   Route::apiResource('orders', OrderController::class);

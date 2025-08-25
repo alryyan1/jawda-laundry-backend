@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
+use App\Models\PrintJob;
+use App\Events\PrintJobCreated;
 
 class OrderController extends Controller
 {
@@ -1074,6 +1076,61 @@ class OrderController extends Controller
             $pdf->Output('receipt-'.$order->id.'.pdf', 'I');
             exit;
         }
+    }
+
+    /**
+     * Return POS invoice PDF as base64 for client-side silent printing bridges
+     */
+    public function downloadPosInvoiceBase64(Order $order)
+    {
+        $content = $this->downloadPosInvoice($order, true);
+        return response()->json([
+            'order_id' => $order->id,
+            'pdf_base64' => base64_encode($content),
+            'filename' => 'receipt-'.$order->id.'.pdf'
+        ]);
+    }
+
+    /**
+     * Enqueue a print job for the POS invoice and broadcast to printer agent(s)
+     */
+    public function enqueuePrintJob(Order $order)
+    {
+        // Create a print job record
+        $printJob = PrintJob::create([
+            'order_id' => $order->id,
+            'status' => 'queued',
+            'attempts' => 0,
+        ]);
+
+        // Broadcast event to any listening agent(s)
+        event(new PrintJobCreated($printJob));
+
+        return response()->json([
+            'message' => 'Print job queued',
+            'job_id' => $printJob->id,
+            'order_id' => $order->id,
+            'pdf_url' => url("/api/orders/{$order->id}/pos-invoice-pdf"),
+        ], 202);
+    }
+
+    /**
+     * Update print job status (called by agent)
+     */
+    public function updatePrintJobStatus(Request $request, PrintJob $printJob)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:processing,printed,failed',
+            'error_message' => 'nullable|string'
+        ]);
+        $printJob->status = $validated['status'];
+        if ($validated['status'] === 'failed') {
+            $printJob->attempts = $printJob->attempts + 1;
+            $printJob->error_message = $validated['error_message'] ?? null;
+        }
+        $printJob->save();
+
+        return response()->json(['message' => 'Print job updated']);
     }
     
     /**
