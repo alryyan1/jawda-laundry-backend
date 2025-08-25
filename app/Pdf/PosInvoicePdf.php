@@ -4,6 +4,7 @@ namespace App\Pdf;
 
 use App\Models\Order;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
 use TCPDF;
 use Exception;
 
@@ -23,12 +24,31 @@ class PosInvoicePdf extends TCPDF
 
     public function setSettings(array $settings)
     {
-        $this->settings = $settings;
-        // Be tolerant to key names and fall back to DB directly (no helper)
-        $this->currencySymbol = $settings['currency_symbol']
-            ?? $settings['general_default_currency_symbol']
-            ?? Setting::getValue('currency_symbol', 'OMR');
-        $this->language = $settings['language'] ?? Setting::getValue('pdf_language', 'en');
+        // Ignore passed settings; load directly from DB to ensure consistency
+        $this->settings = [
+            'general_company_name' => Setting::getValue('company_name', config('app.name')),
+            'general_company_name_ar' => Setting::getValue('company_name_ar', ''),
+            'general_company_address' => Setting::getValue('company_address', ''),
+            'general_company_address_ar' => Setting::getValue('company_address_ar', ''),
+            'general_company_phone' => Setting::getValue('company_phone', ''),
+            'general_company_phone_2' => Setting::getValue('company_phone_2', ''),
+            'general_company_phone_ar' => Setting::getValue('company_phone_ar', ''),
+            'company_logo_url' => Setting::getValue('company_logo_url', null),
+            'general_default_currency_symbol' => Setting::getValue('currency_symbol', 'OMR'),
+            'language' => Setting::getValue('pdf_language', 'en'),
+            // Feature flags
+            'pos_show_item_notes_in_pdf' => Setting::getValue('pos_show_item_notes_in_pdf', true),
+        ];
+        $this->currencySymbol = $this->settings['general_default_currency_symbol'];
+        $this->language = $this->settings['language'];
+        Log::info('PosInvoicePdf::setSettings (DB-loaded)', [
+            'company_name' => $this->settings['general_company_name'],
+            'company_address' => $this->settings['general_company_address'],
+            'company_phone' => $this->settings['general_company_phone'],
+            'company_logo_url' => $this->settings['company_logo_url'],
+            'currency_symbol' => $this->currencySymbol,
+            'language' => $this->language,
+        ]);
         $this->loadTranslations();
     }
 
@@ -40,6 +60,7 @@ class PosInvoicePdf extends TCPDF
         $logoUrl = $this->settings['company_logo_url'] ?? Setting::getValue('company_logo_url', null);
         
         if (!$logoUrl) {
+            Log::warning('PosInvoicePdf::addLogo - No logo URL provided or found in DB');
             return false;
         }
 
@@ -52,8 +73,9 @@ class PosInvoicePdf extends TCPDF
             $maxHeight = 15;
             
             // Get image dimensions
-            $imageInfo = getimagesize($logoUrl);
+            $imageInfo = @getimagesize($logoUrl);
             if (!$imageInfo) {
+                Log::warning('PosInvoicePdf::addLogo - getimagesize failed for logo URL', ['logo_url' => $logoUrl]);
                 return false;
             }
             
@@ -80,6 +102,7 @@ class PosInvoicePdf extends TCPDF
             return true;
         } catch (Exception $e) {
             // Log error or handle gracefully
+            Log::error('PosInvoicePdf::addLogo - Exception while adding logo', ['error' => $e->getMessage()]);
             return false;
         }
     }
@@ -88,28 +111,16 @@ class PosInvoicePdf extends TCPDF
     {
         $this->translations = [
             'company_name' => [
-                'en' => $this->settings['general_company_name']
-                    ?? $this->settings['company_name']
-                    ?? Setting::getValue('company_name', 'RestaurantPro'),
-                'ar' => $this->settings['general_company_name_ar']
-                    ?? $this->settings['company_name_ar']
-                    ?? Setting::getValue('company_name_ar', 'لوندرى برو')
+                'en' => Setting::getValue('company_name', 'RestaurantPro'),
+                'ar' => Setting::getValue('company_name_ar', 'لوندرى برو')
             ],
             'company_address' => [
-                'en' => $this->settings['general_company_address']
-                    ?? $this->settings['company_address']
-                    ?? Setting::getValue('company_address', '123 Clean St, Fresh City'),
-                'ar' => $this->settings['general_company_address_ar']
-                    ?? $this->settings['company_address_ar']
-                    ?? Setting::getValue('company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة')
+                'en' => Setting::getValue('company_address', '123 Clean St, Fresh City'),
+                'ar' => Setting::getValue('company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة')
             ],
             'company_phone' => [
-                'en' => $this->settings['general_company_phone']
-                    ?? $this->settings['company_phone']
-                    ?? Setting::getValue('company_phone', '555-123-4567'),
-                'ar' => $this->settings['general_company_phone_ar']
-                    ?? $this->settings['company_phone_ar']
-                    ?? Setting::getValue('company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧')
+                'en' => Setting::getValue('company_phone', '555-123-4567'),
+                'ar' => Setting::getValue('company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧')
             ],
             'order' => [
                 'en' => 'Order #',
@@ -205,11 +216,7 @@ class PosInvoicePdf extends TCPDF
     public function Header() {}
     
     public function Footer() {
-        $this->SetY(-15);
-        $this->SetFont($this->font, '', 8);
-        $this->Cell(0, 5, 'we work for the comfort of our customers', 0, 1, 'C');
-        $this->Cell(0, 5, 'نعمل من أجل راحة عملائنا', 0, false, 'C');
-
+        // Intentionally left blank: no footer content on POS receipts
     }
 
     /**
@@ -446,6 +453,11 @@ class PosInvoicePdf extends TCPDF
         $this->SetFont($this->font, 'B', 14);
         $companyName = $this->settings['general_company_name']
             ?? Setting::getValue('company_name', config('app.name'));
+        Log::info('PosInvoicePdf::generate - Using company header values', [
+            'company_name' => $companyName,
+            'address_en' => $this->translations['company_address']['en'] ?? null,
+            'address_ar' => $this->translations['company_address']['ar'] ?? null,
+        ]);
         $this->Cell(0, 6, $companyName, 0, 1, 'C');
         $this->SetFont($this->font, '', 8);
         $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');

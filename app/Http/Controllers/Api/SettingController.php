@@ -85,8 +85,9 @@ class SettingController extends Controller
         ]);
 
         try {
+            $settingsService = app(\App\Services\SettingsService::class);
             // Delete old logo if it exists
-            $oldLogoUrl = app_setting('company_logo_url');
+            $oldLogoUrl = $settingsService->get('company_logo_url');
             if ($oldLogoUrl) {
                 // Extract path from URL to delete from storage
                 $oldPath = str_replace(asset('storage/'), '', $oldLogoUrl);
@@ -101,7 +102,6 @@ class SettingController extends Controller
 
 
             // Update the database with the new logo URL
-            $settingsService = app(\App\Services\SettingsService::class);
             $settingsService->set('company_logo_url', $logoUrl);
 
             return response()->json([
@@ -121,7 +121,8 @@ class SettingController extends Controller
     public function deleteLogo()
     {
         try {
-            $logoUrl = app_setting('company_logo_url');
+            $settingsService = app(\App\Services\SettingsService::class);
+            $logoUrl = $settingsService->get('company_logo_url');
             if ($logoUrl) {
                 // Extract path from URL to delete from storage
                 $path = str_replace(asset('storage/'), '', $logoUrl);
@@ -131,7 +132,6 @@ class SettingController extends Controller
             }
 
             // Update the database to remove the logo URL
-            $settingsService = app(\App\Services\SettingsService::class);
             $settingsService->set('company_logo_url', null);
 
             return response()->json([

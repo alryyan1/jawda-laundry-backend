@@ -1038,19 +1038,8 @@ class OrderController extends Controller
         
         // Pass data to the PDF class first so we can calculate height
         $pdf->setOrder($order);
-        $settings = [
-            'general_company_name' => $this->getSetting('company_name', config('app.name')),
-            'general_company_name_ar' => $this->getSetting('company_name_ar', ''),
-            'general_company_address' => $this->getSetting('company_address'),
-            'general_company_address_ar' => $this->getSetting('company_address_ar', 'مسقط'),
-            'general_company_phone' => $this->getSetting('company_phone'),
-            'general_company_phone_2' => $this->getSetting('company_phone_2'),
-            'general_company_phone_ar' => $this->getSetting('company_phone_ar', '--'),
-            'general_default_currency_symbol' => $this->getSetting('currency_symbol', 'OMR'),
-            'company_logo_url' => $this->getSetting('company_logo_url'),
-            'language' => 'en', // Default language, can be made configurable
-        ];
-        $pdf->setSettings($settings);
+        // No need to assemble settings; PDF will load directly from DB
+        $pdf->setSettings([]);
         
         // Calculate the actual height needed including category headers
         $requiredHeight = $pdf->calculateTotalHeight();
@@ -1059,7 +1048,7 @@ class OrderController extends Controller
         // Recreate PDF with calculated height
         $pdf = new PosInvoicePdf('P', 'mm', [80, $pageHeight], true, 'UTF-8', false);
         $pdf->setOrder($order);
-        $pdf->setSettings($settings);
+        $pdf->setSettings([]);
 
         // Set document information
         $pdf->SetTitle('Receipt ' . $order->id);
