@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\CustomerLedgerController;
 use App\Http\Controllers\Api\ExpenseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -29,8 +28,6 @@ use App\Http\Controllers\Api\RestaurantTableController;
 use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\SimpleNavigationController;
-use App\Http\Controllers\Api\CustomerPriceListController;
-use App\Http\Controllers\Api\CustomerPricingRuleController;
 use App\Http\Controllers\Api\SettingsController;
 
 use App\Http\Controllers\Api\UltraMsgController;
@@ -185,7 +182,7 @@ Route::apiResource('product-compositions', ProductCompositionController::class);
     Route::get('/reports/cost-summary', [ReportController::class, 'costSummary']);
     Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);
     Route::get('/reports/overdue-pickups', [ReportController::class, 'overduePickupOrders']);
-    Route::get('/customers/{customer}/ledger', [CustomerLedgerController::class, 'show']);
+    
     Route::get('/dashboard/today-summary', [App\Http\Controllers\Api\DashboardController::class, 'todaySummary']);
     Route::patch('/order-items/{id}/status', [\App\Http\Controllers\Api\OrderItemController::class, 'updateStatus']);
     Route::patch('/order-items/{id}/picked-up-quantity', [\App\Http\Controllers\Api\OrderItemController::class, 'updatePickedUpQuantity']);
@@ -200,23 +197,11 @@ Route::apiResource('product-compositions', ProductCompositionController::class);
 
 
 
-  // Customer Price List Management
-  Route::get('/customers/{customer}/price-list', [CustomerPriceListController::class, 'show']);
-  Route::put('/customers/{customer}/price-list', [CustomerPriceListController::class, 'update']);
-  Route::delete('/customers/{customer}/price-list', [CustomerPriceListController::class, 'destroy']);
-  Route::get('/customers/{customer}/price-list/summary', [CustomerPriceListController::class, 'summary']);
-  Route::get('/customers/{customer}/price-list/export', [CustomerPriceListController::class, 'export']);
+  
 
   // Customer Product Type Management
                 // Customer Pricing Rules
-              Route::get('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'index']);
-              Route::get('/customers/{customer}/pricing-rules/all', [CustomerPricingRuleController::class, 'getAllForCustomer']);
-              Route::post('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'store']);
-              Route::put('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'update']);
-              Route::delete('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'destroy']);
-              Route::get('/customers/{customer}/pricing-rules/available-service-offerings', [CustomerPricingRuleController::class, 'getAvailableServiceOfferings']);
-Route::post('/customers/{customer}/pricing-rules/import-all', [CustomerPricingRuleController::class, 'importAllServiceOfferings']);
-Route::get('/customers/{customer}/pricing-rules/products', [CustomerPricingRuleController::class, 'getCustomerProductsWithPricingRules']);
+              
 
 
   });

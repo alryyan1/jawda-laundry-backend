@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use App\Http\Resources\PaymentResource;
 use Illuminate\Support\Facades\Auth;
@@ -36,8 +37,9 @@ class PaymentController extends Controller
     {
         // Authorization check removed
 
-        // Dynamically get the list of allowed payment method keys from the config file.
-        $allowedPaymentMethods = array_keys(app_setting('payment_methods_ar', []));
+        // Dynamically get the list of allowed payment method keys from settings (no helper dependency)
+        $paymentMethods = Setting::getValue('payment_methods_ar', []);
+        $allowedPaymentMethods = is_array($paymentMethods) ? array_keys($paymentMethods) : [];
         
         // Fallback to default payment methods if settings are not available
         if (empty($allowedPaymentMethods)) {

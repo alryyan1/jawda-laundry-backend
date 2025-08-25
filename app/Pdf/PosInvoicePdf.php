@@ -3,6 +3,7 @@
 namespace App\Pdf;
 
 use App\Models\Order;
+use App\Models\Setting;
 use TCPDF;
 use Exception;
 
@@ -23,8 +24,11 @@ class PosInvoicePdf extends TCPDF
     public function setSettings(array $settings)
     {
         $this->settings = $settings;
-        $this->currencySymbol = $settings['general_default_currency_symbol'] ?? '$';
-        $this->language = $settings['language'] ?? 'en';
+        // Be tolerant to key names and fall back to DB directly (no helper)
+        $this->currencySymbol = $settings['currency_symbol']
+            ?? $settings['general_default_currency_symbol']
+            ?? Setting::getValue('currency_symbol', 'OMR');
+        $this->language = $settings['language'] ?? Setting::getValue('pdf_language', 'en');
         $this->loadTranslations();
     }
 
@@ -33,7 +37,7 @@ class PosInvoicePdf extends TCPDF
      */
     private function addLogo()
     {
-        $logoUrl = $this->settings['company_logo_url'] ?? null;
+        $logoUrl = $this->settings['company_logo_url'] ?? Setting::getValue('company_logo_url', null);
         
         if (!$logoUrl) {
             return false;
@@ -84,16 +88,28 @@ class PosInvoicePdf extends TCPDF
     {
         $this->translations = [
             'company_name' => [
-                'en' => $this->settings['general_company_name'] ?? 'RestaurantPro',
-                'ar' => $this->settings['general_company_name_ar'] ?? 'لوندرى برو'
+                'en' => $this->settings['general_company_name']
+                    ?? $this->settings['company_name']
+                    ?? Setting::getValue('company_name', 'RestaurantPro'),
+                'ar' => $this->settings['general_company_name_ar']
+                    ?? $this->settings['company_name_ar']
+                    ?? Setting::getValue('company_name_ar', 'لوندرى برو')
             ],
             'company_address' => [
-                'en' => $this->settings['general_company_address'] ?? '123 Clean St, Fresh City',
-                'ar' => $this->settings['general_company_address_ar'] ?? '١٢٣ شارع النظافة، المدينة النظيفة'
+                'en' => $this->settings['general_company_address']
+                    ?? $this->settings['company_address']
+                    ?? Setting::getValue('company_address', '123 Clean St, Fresh City'),
+                'ar' => $this->settings['general_company_address_ar']
+                    ?? $this->settings['company_address_ar']
+                    ?? Setting::getValue('company_address_ar', '١٢٣ شارع النظافة، المدينة النظيفة')
             ],
             'company_phone' => [
-                'en' => $this->settings['general_company_phone'] ?? '555-123-4567',
-                'ar' => $this->settings['general_company_phone_ar'] ?? '٥٥٥-١٢٣-٤٥٦٧'
+                'en' => $this->settings['general_company_phone']
+                    ?? $this->settings['company_phone']
+                    ?? Setting::getValue('company_phone', '555-123-4567'),
+                'ar' => $this->settings['general_company_phone_ar']
+                    ?? $this->settings['company_phone_ar']
+                    ?? Setting::getValue('company_phone_ar', '٥٥٥-١٢٣-٤٥٦٧')
             ],
             'order' => [
                 'en' => 'Order #',
@@ -428,10 +444,19 @@ class PosInvoicePdf extends TCPDF
         
         
         $this->SetFont($this->font, 'B', 14);
-        $this->Cell(0, 6, $this->settings['general_company_name'], 0, 1, 'C');
+        $companyName = $this->settings['general_company_name']
+            ?? Setting::getValue('company_name', config('app.name'));
+        $this->Cell(0, 6, $companyName, 0, 1, 'C');
         $this->SetFont($this->font, '', 8);
         $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');
-        $this->Cell(0, 4, $this->settings['general_company_phone_2'] .' - '.$this->settings['general_company_phone'], 0, 1, 'C');
+        $phone1 = $this->settings['general_company_phone']
+            ?? Setting::getValue('company_phone', '');
+        $phone2 = $this->settings['general_company_phone_2']
+            ?? Setting::getValue('company_phone_2', '');
+        $phoneLine = trim($phone2 . (($phone2 && $phone1) ? ' - ' : '') . $phone1);
+        if ($phoneLine !== '') {
+            $this->Cell(0, 4, $phoneLine, 0, 1, 'C');
+        }
         $this->Ln(4);
 
         // --- Divider ---

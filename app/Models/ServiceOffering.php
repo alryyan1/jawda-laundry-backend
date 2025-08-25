@@ -28,10 +28,7 @@ class ServiceOffering extends Model
     {
         return $this->belongsTo(ServiceAction::class);
     }
-    public function pricingRules()
-    {
-        return $this->hasMany(PricingRule::class);
-    }
+    // Removed pricingRules relationship (customer-specific pricing disabled)
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);

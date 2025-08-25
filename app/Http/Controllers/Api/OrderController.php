@@ -12,6 +12,7 @@ use App\Models\CustomerProductServiceOffering;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
+use App\Models\Setting;
 use App\Pdf\PosInvoicePdf;
 use App\Services\PricingService; // <-- Import the service
 use App\Services\WhatsAppService;
@@ -725,7 +726,7 @@ class OrderController extends Controller
     {
         $validatedData = $request->validate([
             'service_offering_id' => 'required|exists:service_offerings,id',
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => 'nullable|exists:customers,id',
             'quantity' => 'required|integer|min:1',
             'length_meters' => 'nullable|numeric|min:0',
             'width_meters' => 'nullable|numeric|min:0',
@@ -734,7 +735,7 @@ class OrderController extends Controller
 
         try {
             $serviceOffering = ServiceOffering::findOrFail($validatedData['service_offering_id']);
-            $customer = Customer::findOrFail($validatedData['customer_id']);
+            $customer = isset($validatedData['customer_id']) ? Customer::findOrFail($validatedData['customer_id']) : null;
             
             // If order_item_id is provided, update the order item dimensions in the database
             if (isset($validatedData['order_item_id'])) {
@@ -983,19 +984,19 @@ class OrderController extends Controller
         $pdf = new InvoicePdf(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
         $pdf->setOrder($order);
         $pdf->setCompanyDetails(
-            app_setting('company_name', config('app.name')),
-            app_setting('company_address')
+            $this->getSetting('company_name', config('app.name')),
+            $this->getSetting('company_address')
         );
         $pdf->setSettings([
-            'general_company_name' => app_setting('company_name', config('app.name')),
-            'general_company_name_ar' => app_setting('company_name_ar', ''),
-            'general_company_address' => app_setting('company_address'),
-            'general_company_address_ar' => app_setting('company_address_ar', ''),
-            'general_company_phone' => app_setting('company_phone'),
-            'general_company_phone_2' => app_setting('company_phone_2'),
-            'company_logo_url' => app_setting('company_logo_url'),
-            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
-            'language' => app_setting('pdf_language', 'en'),
+            'general_company_name' => $this->getSetting('company_name', config('app.name')),
+            'general_company_name_ar' => $this->getSetting('company_name_ar', ''),
+            'general_company_address' => $this->getSetting('company_address'),
+            'general_company_address_ar' => $this->getSetting('company_address_ar', ''),
+            'general_company_phone' => $this->getSetting('company_phone'),
+            'general_company_phone_2' => $this->getSetting('company_phone_2'),
+            'company_logo_url' => $this->getSetting('company_logo_url'),
+            'general_default_currency_symbol' => $this->getSetting('currency_symbol', 'OMR'),
+            'language' => $this->getSetting('pdf_language', 'en'),
         ]);
 
         // Meta
@@ -1038,15 +1039,15 @@ class OrderController extends Controller
         // Pass data to the PDF class first so we can calculate height
         $pdf->setOrder($order);
         $settings = [
-            'general_company_name' => app_setting('company_name', config('app.name')),
-            'general_company_name_ar' => app_setting('company_name_ar', ''),
-            'general_company_address' => app_setting('company_address'),
-            'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
-            'general_company_phone' => app_setting('company_phone'),
-            'general_company_phone_2' => app_setting('company_phone_2'),
-            'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
-            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
-            'company_logo_url' => app_setting('company_logo_url'),
+            'general_company_name' => $this->getSetting('company_name', config('app.name')),
+            'general_company_name_ar' => $this->getSetting('company_name_ar', ''),
+            'general_company_address' => $this->getSetting('company_address'),
+            'general_company_address_ar' => $this->getSetting('company_address_ar', 'مسقط'),
+            'general_company_phone' => $this->getSetting('company_phone'),
+            'general_company_phone_2' => $this->getSetting('company_phone_2'),
+            'general_company_phone_ar' => $this->getSetting('company_phone_ar', '--'),
+            'general_default_currency_symbol' => $this->getSetting('currency_symbol', 'OMR'),
+            'company_logo_url' => $this->getSetting('company_logo_url'),
             'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setSettings($settings);
@@ -1212,9 +1213,9 @@ class OrderController extends Controller
             $excelExport->setOrders($orders);
             $excelExport->setFilters($request->all());
             $excelExport->setSettings([
-                'company_name' => app_setting('company_name', config('app.name')),
-                'company_address' => app_setting('company_address'),
-                'currency_symbol' => app_setting('currency_symbol', 'OMR'),
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', 'OMR'),
             ]);
 
             $excelContent = $excelExport->generate();
@@ -1392,6 +1393,30 @@ class OrderController extends Controller
 
         return $detailedBreakdown;
     }
+
+    private function getSetting(string $key, $default = null)
+    {
+        try {
+            if (function_exists('app_setting')) {
+                return \app_setting($key, $default);
+            }
+        } catch (\Throwable $e) {
+            // ignore and fallback to config
+        }
+        $fallbackMap = [
+            'company_name' => config('app.name'),
+            'company_address' => '',
+            'company_phone' => '',
+            'company_phone_2' => '',
+            'company_phone_ar' => '',
+            'company_logo_url' => '',
+            'currency_symbol' => 'OMR',
+            'pdf_language' => 'en',
+            'company_name_ar' => '',
+            'company_address_ar' => '',
+        ];
+        return $fallbackMap[$key] ?? $default;
+    }
     
     /**
      * Get the height breakdown for a POS invoice (useful for debugging)
@@ -1405,14 +1430,14 @@ class OrderController extends Controller
         $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
         $pdf->setOrder($order);
         $settings = [
-            'general_company_name' => app_setting('company_name', config('app.name')),
-            'general_company_name_ar' => app_setting('company_name_ar', ''),
-            'general_company_address' => app_setting('company_address'),
-            'general_company_address_ar' => app_setting('company_address_ar', 'مسقط'),
-            'general_company_phone' => app_setting('company_phone'),
-            'general_company_phone_ar' => app_setting('company_phone_ar', '--'),
-            'general_default_currency_symbol' => app_setting('currency_symbol', 'OMR'),
-            'company_logo_url' => app_setting('company_logo_url'),
+            'general_company_name' => \app_setting('company_name', config('app.name')),
+            'general_company_name_ar' => \app_setting('company_name_ar', ''),
+            'general_company_address' => \app_setting('company_address'),
+            'general_company_address_ar' => \app_setting('company_address_ar', 'مسقط'),
+            'general_company_phone' => \app_setting('company_phone'),
+            'general_company_phone_ar' => \app_setting('company_phone_ar', '--'),
+            'general_default_currency_symbol' => \app_setting('currency_symbol', 'OMR'),
+            'company_logo_url' => \app_setting('company_logo_url'),
             'language' => 'en',
         ];
         $pdf->setSettings($settings);
@@ -1456,7 +1481,7 @@ class OrderController extends Controller
             }
 
             // Get company name for the message
-            $companyName = app_setting('company_name', config('app.name'));
+            $companyName = \app_setting('company_name', config('app.name'));
             
             // Create the receive order message
             $message = "🎉 *Order Received Successfully!*\n\n";
