@@ -24,7 +24,7 @@ class ExpenseController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Expense::with('user:id,name')->latest('expense_date'); // Default sort by most recent
+        $query = Expense::with('user:id,name')->orderBy('id', 'desc'); // Default sort by most recent
 
         // Filtering Logic
         if ($request->filled('search')) {

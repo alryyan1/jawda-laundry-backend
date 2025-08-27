@@ -26,7 +26,7 @@ channel.bind('PrintJobCreated', async (event) => {
     const jobId = payload.job_id || payload.id;
     const orderId = payload.order_id || payload.orderId || payload.order_id;
     const pdfUrl = `${API_BASE}/orders/${orderId}/pos-invoice-pdf`;
-    console.log(`[Agent] Received job ${jobId} for order ${orderId}`);
+    console.log(`[Agent] Received job ${jobId} for order ${orderId} ${pdfUrl}`);
 
     const tmpFile = path.join(os.tmpdir(), `order-${orderId}-${Date.now()}.pdf`);
     const response = await axios.get(pdfUrl, {
@@ -50,7 +50,9 @@ channel.bind('PrintJobCreated', async (event) => {
         await axios.patch(`${API_BASE}/print-jobs/${jobId}`, { status: 'printed' }, {
           headers: { Authorization: `Bearer ${SANCTUM_TOKEN}` },
         });
-      } catch (e) {}
+      } catch (e) {
+        console.log(e)
+      }
     }
 
     console.log(`[Agent] Printed job ${jobId}`);

@@ -26,7 +26,11 @@ class ProductTypeResource extends JsonResource
             'first_service_offering' => $this->serviceOfferings()->where('is_active', true)->first(),
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            'image_url' => $this->image_url ? asset('storage/' . $this->image_url) : null,
+            'image_url' => $this->image_url
+                ? (preg_match('/^https?:\\/\\//', $this->image_url)
+                    ? $this->image_url
+                    : asset('storage/' . ltrim(preg_replace('/^storage\\\//', '', $this->image_url), '/')))
+                : null,
         ];
     }
 }
