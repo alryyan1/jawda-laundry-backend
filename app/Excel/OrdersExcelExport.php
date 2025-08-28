@@ -5,6 +5,7 @@ namespace App\Excel;
 use App\Models\Order;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Writer\Csv;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -64,10 +65,25 @@ class OrdersExcelExport
         // Create charts sheet
         $this->createChartsSheet();
         
-        // Generate the Excel file
-        $writer = new Xlsx($this->spreadsheet);
+        // Generate the Excel file (with charts); fallback to CSV if Xlsx fails
         ob_start();
-        $writer->save('php://output');
+        try {
+            $writer = new Xlsx($this->spreadsheet);
+            if (method_exists($writer, 'setIncludeCharts')) {
+                $writer->setIncludeCharts(true);
+            }
+            $writer->save('php://output');
+        } catch (\Throwable $e) {
+            // Fallback to CSV so the endpoint still returns a file if Xlsx prerequisites are missing
+            ob_clean();
+            $csvWriter = new Csv($this->spreadsheet);
+            // Reasonable CSV defaults
+            $csvWriter->setDelimiter(',');
+            $csvWriter->setEnclosure('"');
+            $csvWriter->setLineEnding("\r\n");
+            $csvWriter->setSheetIndex(0);
+            $csvWriter->save('php://output');
+        }
         return ob_get_clean();
     }
 
