@@ -490,9 +490,9 @@ class ReportController extends Controller
             $pdf->setOrders($orders);
             $pdf->setDateRange($dateFrom, $dateTo);
             $pdf->setSettings([
-                'company_name' => app_setting('company_name', config('app.name')),
-                'company_address' => app_setting('company_address'),
-                'currency_symbol' => app_setting('currency_symbol', '$'),
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', '$'),
             ]);
 
             $pdfContent = $pdf->generate();
@@ -581,9 +581,9 @@ class ReportController extends Controller
             $pdf->setOrders($orders);
             $pdf->setDateRange($dateFrom, $dateTo);
             $pdf->setSettings([
-                'company_name' => app_setting('company_name', config('app.name')),
-                'company_address' => app_setting('company_address'),
-                'currency_symbol' => app_setting('currency_symbol', '$'),
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', '$'),
             ]);
 
             $pdfContent = $pdf->generate();
@@ -685,9 +685,9 @@ class ReportController extends Controller
                 'category_sequence_search' => $request->input('category_sequence_search'),
             ]);
             $pdf->setSettings([
-                'company_name' => app_setting('company_name', config('app.name')),
-                'company_address' => app_setting('company_address'),
-                'currency_symbol' => app_setting('currency_symbol', '$'),
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', '$'),
             ]);
 
             $pdfContent = $pdf->generate();
