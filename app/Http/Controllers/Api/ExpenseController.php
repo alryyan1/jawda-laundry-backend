@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Http\Resources\ExpenseResource;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ExpenseController extends Controller
 {
@@ -137,5 +138,84 @@ class ExpenseController extends Controller
             ->get();
             
         return response()->json($categories);
+    }
+
+    /**
+     * Export expenses as Excel
+     */
+    public function exportExcel(Request $request)
+    {
+        $query = Expense::with(['user:id,name', 'category:id,name'])->orderBy('id', 'desc');
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm){
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('description', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+        if ($request->filled('expense_category_id')) $query->where('expense_category_id', $request->expense_category_id);
+        if ($request->filled('date_from')) $query->whereDate('expense_date', '>=', $request->date_from);
+        if ($request->filled('date_to')) $query->whereDate('expense_date', '<=', $request->date_to);
+
+        $expenses = $query->get();
+
+        try {
+            $export = new \App\Excel\ExpensesExcelExport();
+            $export->setExpenses($expenses);
+            $export->setFilters($request->all());
+            $export->setSettings([
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', 'OMR'),
+            ]);
+            $content = $export->generate();
+            $fileName = 'expenses_report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            return response($content, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error exporting expenses Excel: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to export expenses'], 500);
+        }
+    }
+
+    /**
+     * Export expenses as PDF
+     */
+    public function exportPdf(Request $request)
+    {
+        $query = Expense::with(['user:id,name', 'category:id,name'])->orderBy('id', 'desc');
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm){
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('description', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+        if ($request->filled('expense_category_id')) $query->where('expense_category_id', $request->expense_category_id);
+        if ($request->filled('date_from')) $query->whereDate('expense_date', '>=', $request->date_from);
+        if ($request->filled('date_to')) $query->whereDate('expense_date', '<=', $request->date_to);
+
+        $expenses = $query->get();
+
+        try {
+            $pdf = new \App\Pdf\ExpensesListPdf();
+            $pdf->setExpenses($expenses);
+            $pdf->setFilters($request->all());
+            $pdf->setSettings([
+                'company_name' => \app_setting('company_name', config('app.name')),
+                'company_address' => \app_setting('company_address'),
+                'currency_symbol' => \app_setting('currency_symbol', 'OMR'),
+            ]);
+            $content = $pdf->generate();
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="expenses_report_' . now()->format('Y-m-d') . '.pdf"'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error exporting expenses PDF: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to export expenses'], 500);
+        }
     }
 }

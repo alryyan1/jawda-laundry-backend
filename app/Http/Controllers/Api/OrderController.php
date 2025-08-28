@@ -1265,29 +1265,15 @@ class OrderController extends Controller
             ]);
 
             $excelContent = $excelExport->generate();
-            $asCsv = false;
-            // Heuristic: if content starts with text and not a PK header, likely CSV fallback
-            if (!str_starts_with($excelContent, "PK")) {
-                $asCsv = true;
-            }
-
-            if ($asCsv) {
-                $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
-                return response($excelContent, 200, [
-                    'Content-Type' => 'text/csv',
-                    'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-                    'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-                    'Expires' => '0'
-                ]);
-            } else {
-                $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-                return response($excelContent, 200, [
-                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-                    'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-                    'Expires' => '0'
-                ]);
-            }
+            
+            $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            
+            return response($excelContent, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+                'Expires' => '0'
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Error exporting orders Excel: ' . $e->getMessage());

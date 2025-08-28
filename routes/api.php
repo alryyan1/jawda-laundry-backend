@@ -54,6 +54,7 @@ Route::get('/orders/{order}/pos-invoice-height', [OrderController::class, 'getPo
 Route::get('/reports/orders/pdf', [ReportController::class, 'exportOrdersReportPdf']);
 Route::get('/reports/orders/pdf/view', [ReportController::class, 'viewOrdersReportPdf']);
 Route::get('/reports/orders/list-pdf', [ReportController::class, 'exportOrdersListPdf']);
+Route::get('/reports/expenses/export-pdf', [ExpenseController::class, 'exportPdf']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -126,6 +127,7 @@ Route::apiResource('product-compositions', ProductCompositionController::class);
   // Expense Management
   Route::get('/expenses/categories', [ExpenseCategoryController::class, 'index']);
   Route::apiResource('expenses', ExpenseController::class);
+  Route::get('/reports/expenses/export-excel', [ExpenseController::class, 'exportExcel']);
   
   // Supplier Management
   Route::apiResource('suppliers', SupplierController::class);

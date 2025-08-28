@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ExpenseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,3 +31,7 @@ Route::get('/orders/pdf/download', [ReportController::class, 'exportOrdersReport
      ->name('orders.pdf.download');
 Route::get('/orders/excel/download', [OrderController::class, 'exportCsv'])
      ->name('orders.excel.download');
+
+// Expenses exports (public, web middleware)
+Route::get('/reports/expenses/pdf', [ExpenseController::class, 'exportPdf'])
+     ->name('expenses.pdf.download');
