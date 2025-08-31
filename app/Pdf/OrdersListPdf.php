@@ -112,18 +112,12 @@ class OrdersListPdf extends TCPDF
 
     public function generate()
     {
-        // Set landscape orientation
-        $this->AddPage('L');
+        // Set A4 portrait orientation
+        $this->AddPage('P');
         $this->SetFont($this->font, '', 11);
 
         // Show new orders table with heading first
         $this->generateOrdersTable();
-        
-        // Add some space after table
-        $this->Ln(15);
-
-        // Show delivered orders table
-        $this->generateDeliveredOrdersTable();
         
         // Add summary on new page
         $this->generateSummary();
@@ -131,12 +125,10 @@ class OrdersListPdf extends TCPDF
         return $this->Output('', 'S');
     }
 
-
-
     private function generateSummary()
     {
         // Add new page for summary
-        $this->AddPage('L');
+        $this->AddPage('P');
         
         // Calculate available width
         $pageWidth = $this->GetPageWidth();
@@ -161,59 +153,42 @@ class OrdersListPdf extends TCPDF
         // Summary title
         $this->SetFont($this->font, 'B', 16);
         $this->SetTextColor(52, 73, 94);
-        $this->Cell(0, 10, 'Orders Comparison Summary', 0, 1, 'C');
+        $this->Cell(0, 10, 'Orders Summary', 0, 1, 'C');
         
         $this->Ln(5);
         
-        // Get delivered orders for comparison
-        $deliveredOrders = $this->getDeliveredOrders();
+        // Calculate summary data for orders
+        $ordersCount = $this->orders->count();
+        $ordersAmount = $this->orders->sum('total_amount');
+        $ordersPaid = $this->orders->sum('paid_amount');
+        $ordersDue = $ordersAmount - $ordersPaid;
+        $ordersAverage = $ordersCount > 0 ? $ordersAmount / $ordersCount : 0;
         
-        // Calculate summary data for new orders
-        $newOrders = $this->orders->where('status', '!=', 'delivered');
-        $newOrdersCount = $newOrders->count();
-        $newOrdersAmount = $newOrders->sum('total_amount');
-        $newOrdersPaid = $newOrders->sum('paid_amount');
-        $newOrdersDue = $newOrdersAmount - $newOrdersPaid;
-        $newOrdersAverage = $newOrdersCount > 0 ? $newOrdersAmount / $newOrdersCount : 0;
-        
-        // Calculate summary data for delivered orders
-        $deliveredOrdersCount = $deliveredOrders->count();
-        $deliveredOrdersAmount = $deliveredOrders->sum('total_amount');
-        $deliveredOrdersPaid = $deliveredOrders->sum('paid_amount');
-        $deliveredOrdersDue = $deliveredOrdersAmount - $deliveredOrdersPaid;
-        $deliveredOrdersAverage = $deliveredOrdersCount > 0 ? $deliveredOrdersAmount / $deliveredOrdersCount : 0;
-        
-        // Create comparison table
+        // Create summary table
         $this->SetFont($this->font, 'B', 12);
         $this->SetTextColor(0, 0, 0);
         
         // Table header
-        $this->Cell($availableWidth * 0.25, 8, 'Metric', 1, 0, 'C', true);
-        $this->Cell($availableWidth * 0.375, 8, 'New Orders', 1, 0, 'C', true);
-        $this->Cell($availableWidth * 0.375, 8, 'Delivered Orders', 1, 1, 'C', true);
+        $this->Cell($availableWidth * 0.5, 8, 'Metric', 1, 0, 'C', true);
+        $this->Cell($availableWidth * 0.5, 8, 'Value', 1, 1, 'C', true);
         
         // Table data
         $this->SetFont($this->font, '', 10);
         
-        $this->Cell($availableWidth * 0.25, 8, 'Total Orders', 1, 0, 'L');
-        $this->Cell($availableWidth * 0.375, 8, $newOrdersCount, 1, 0, 'C');
-        $this->Cell($availableWidth * 0.375, 8, $deliveredOrdersCount, 1, 1, 'C');
+        $this->Cell($availableWidth * 0.5, 8, 'Total Orders', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.5, 8, $ordersCount, 1, 1, 'C');
         
-        $this->Cell($availableWidth * 0.25, 8, 'Total Amount', 1, 0, 'L');
-        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersAmount, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
-        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersAmount, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        $this->Cell($availableWidth * 0.5, 8, 'Total Amount', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.5, 8, number_format($ordersAmount, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
         
-        $this->Cell($availableWidth * 0.25, 8, 'Total Paid', 1, 0, 'L');
-        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersPaid, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
-        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        $this->Cell($availableWidth * 0.5, 8, 'Total Paid', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.5, 8, number_format($ordersPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
         
-        $this->Cell($availableWidth * 0.25, 8, 'Outstanding', 1, 0, 'L');
-        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersDue, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
-        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersDue, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        $this->Cell($availableWidth * 0.5, 8, 'Outstanding', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.5, 8, number_format($ordersDue, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
         
-        $this->Cell($availableWidth * 0.25, 8, 'Average Order', 1, 0, 'L');
-        $this->Cell($availableWidth * 0.375, 8, number_format($newOrdersAverage, 3) . ' ' . $this->currencySymbol, 1, 0, 'C');
-        $this->Cell($availableWidth * 0.375, 8, number_format($deliveredOrdersAverage, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
+        $this->Cell($availableWidth * 0.5, 8, 'Average Order', 1, 0, 'L');
+        $this->Cell($availableWidth * 0.5, 8, number_format($ordersAverage, 3) . ' ' . $this->currencySymbol, 1, 1, 'C');
         
         $this->Ln(5);
     }
@@ -258,25 +233,19 @@ class OrdersListPdf extends TCPDF
         
         // Calculate column widths based on available space
         $colWidths = [
-            'id' => $availableWidth * 0.08,      // 8% of available width
-            'customer' => $availableWidth * 0.20, // 20% of available width
-            'date' => $availableWidth * 0.12,     // 12% of available width
-            'items' => $availableWidth * 0.08,    // 8% of available width
-            'total' => $availableWidth * 0.15,    // 15% of available width
-            'paid' => $availableWidth * 0.15,     // 15% of available width
-            'due' => $availableWidth * 0.12,      // 12% of available width
-            'sequences' => $availableWidth * 0.10  // 10% of available width
+            'id' => $availableWidth * 0.15,      // 15% of available width
+            'date' => $availableWidth * 0.25,     // 25% of available width
+            'items' => $availableWidth * 0.20,    // 20% of available width
+            'total' => $availableWidth * 0.20,    // 20% of available width
+            'paid' => $availableWidth * 0.20      // 20% of available width
         ];
 
         
         $this->Cell($colWidths['id'], 5, 'ID', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['customer'], 5, 'Customer', 'TB', 0, 'C', false);
         $this->Cell($colWidths['date'], 5, 'Date', 'TB', 0, 'C', false);
         $this->Cell($colWidths['items'], 5, 'Items', 'TB', 0, 'C', false);
         $this->Cell($colWidths['total'], 5, 'Total', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['paid'], 5, 'Paid', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['due'], 5, 'Due', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['sequences'], 5, 'Sequences', 'TB', 1, 'C', false);
+        $this->Cell($colWidths['paid'], 5, 'Paid', 'TB', 1, 'C', false);
 
         // Table body with enhanced styling
         $this->SetFont($this->font, '', 10);
@@ -287,20 +256,17 @@ class OrdersListPdf extends TCPDF
         foreach ($this->orders as $order) {
             // Check if we need a new page
             if ($this->GetY() > 180) {
-                $this->AddPage('L');
+                $this->AddPage('P');
                 // Repeat header on new page
                 $this->SetFont($this->font, 'B', 11);
                 $this->SetTextColor(0, 0, 0);
                 $this->SetDrawColor(0, 0, 0);
                 
                 $this->Cell($colWidths['id'], 5, 'ID', 0, 0, 'C', false);
-                $this->Cell($colWidths['customer'], 5, 'Customer', 0, 0, 'C', false);
                 $this->Cell($colWidths['date'], 5, 'Date', 0, 0, 'C', false);
                 $this->Cell($colWidths['items'], 5, 'Items', 0, 0, 'C', false);
                 $this->Cell($colWidths['total'], 5, 'Total', 0, 0, 'C', false);
-                $this->Cell($colWidths['paid'], 5, 'Paid', 0, 0, 'C', false);
-                $this->Cell($colWidths['due'], 5, 'Due', 0, 0, 'C', false);
-                $this->Cell($colWidths['sequences'], 5, 'Sequences', 0, 1, 'C', false);
+                $this->Cell($colWidths['paid'], 5, 'Paid', 0, 1, 'C', false);
                 
                 $this->SetFont($this->font, '', 10);
                 $this->SetTextColor(0, 0, 0);
@@ -315,7 +281,6 @@ class OrdersListPdf extends TCPDF
                 $this->SetFillColor(255, 255, 255); // White for other rows (no styling)
             }
             
-            $customerName = $order->customer ? $order->customer->name : 'N/A';
             $orderDate = $order->order_date ? date('m/d/Y', strtotime($order->order_date)) : '-';
             $totalItems = $order->items ? $order->items->sum('quantity') : 0;
             $amountDue = $order->total_amount - $order->paid_amount;
@@ -327,15 +292,12 @@ class OrdersListPdf extends TCPDF
             }
             
             $this->Cell($colWidths['id'], 5, $order->id, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['customer'], 5, $this->truncateText($customerName, 35), 0, 0, 'C', $fill);
             $this->Cell($colWidths['date'], 5, $orderDate, 0, 0, 'C', $fill);
             $this->Cell($colWidths['items'], 5, $totalItems, 0, 0, 'C', $fill);
             
             
             $this->Cell($colWidths['total'], 5, number_format($order->total_amount, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['paid'], 5, number_format($order->paid_amount, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['due'], 5, number_format($amountDue, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['sequences'], 5, $this->truncateText($sequences, 35), 0, 1, 'C', $fill);
+            $this->Cell($colWidths['paid'], 5, number_format($order->paid_amount, 3), 0, 1, 'C', $fill);
             
             $fill = !$fill;
         }
@@ -361,188 +323,15 @@ class OrdersListPdf extends TCPDF
         $this->SetDrawColor(0, 0, 0);
         
         $this->Cell($colWidths['id'], 5, 'TOTAL', 0, 0, 'C', true);
-        $this->Cell($colWidths['customer'], 5, '', 0, 0, 'C', true);
         $this->Cell($colWidths['date'], 5, '', 0, 0, 'C', true);
         $this->Cell($colWidths['items'], 5, $totalItems, 0, 0, 'C', true);
         $this->Cell($colWidths['total'], 5, number_format($totalAmount, 3), 0, 0, 'C', true);
-        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 0, 0, 'C', true);
-        $this->Cell($colWidths['due'], 5, number_format($totalDue, 3), 0, 0, 'C', true);
-        $this->Cell($colWidths['sequences'], 5, '', 0, 1, 'C', true);
+        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 0, 1, 'C', true);
     }
     
-    private function generateDeliveredOrdersTable()
-    {
-        // Get delivered orders for the selected date range
-        $deliveredOrders = $this->getDeliveredOrders();
-        
-        if ($deliveredOrders->count() == 0) {
-            return; // Don't show table if no delivered orders
-        }
-        
-        // Calculate available width
-        $pageWidth = $this->GetPageWidth();
-        $leftMargin = $this->lMargin;
-        $rightMargin = $this->rMargin;
-        $topMargin = $this->tMargin;
-        $availableWidth = $pageWidth - $leftMargin - $rightMargin;
-        
-        // Add new page for delivered orders table
-        $this->AddPage('L');
-        
-        // Calculate proper top margin for delivered orders table (same as first table)
-        $headerHeight = 35;
-        $currentY = $this->GetY();
-        $requiredY = $topMargin + $headerHeight + 10; // 10mm spacing after header
-        
-        if ($currentY < $requiredY) {
-            $this->SetY($requiredY);
-        }
-        
-        // Table heading for delivered orders as side heading with underline
-        $this->SetFont($this->font, 'B', 14);
-        $this->SetTextColor(0, 0, 0);
-        $this->Cell(0, 8, 'Delivered Orders', 0, 1, 'L');
-        
-        // Underline
-        $this->SetDrawColor(0, 0, 0);
-        $this->Line($this->lMargin, $this->GetY(), $this->GetPageWidth() - $this->rMargin, $this->GetY());
-        
-        $this->Ln(5);
-        
-        // Calculate column widths based on available space
-        $colWidths = [
-            'id' => $availableWidth * 0.08,
-            'customer' => $availableWidth * 0.20,
-            'date' => $availableWidth * 0.12,
-            'items' => $availableWidth * 0.08,
-            'total' => $availableWidth * 0.15,
-            'paid' => $availableWidth * 0.15,
-            'due' => $availableWidth * 0.12,
-            'sequences' => $availableWidth * 0.10
-        ];
-        
-        // Header cells with top and bottom borders
-        $this->SetFont($this->font, 'B', 11);
-        $this->SetTextColor(0, 0, 0);
-        $this->SetDrawColor(0, 0, 0);
-        
-        $this->Cell($colWidths['id'], 5, 'ID', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['customer'], 5, 'Customer', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['date'], 5, 'Date', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['items'], 5, 'Items', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['total'], 5, 'Total', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['paid'], 5, 'Paid', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['due'], 5, 'Due', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['sequences'], 5, 'Sequences', 'TB', 1, 'C', false);
 
-        // Table body with enhanced styling
-        $this->SetFont($this->font, '', 10);
-        $this->SetTextColor(0, 0, 0);
-        $this->SetDrawColor(0, 0, 0);
-        $fill = false;
-        
-        foreach ($deliveredOrders as $order) {
-            // Check if we need a new page
-            if ($this->GetY() > 180) {
-                $this->AddPage('L');
-                // Repeat header on new page
-                $this->SetFont($this->font, 'B', 11);
-                $this->SetTextColor(0, 0, 0);
-                $this->SetDrawColor(0, 0, 0);
-                
-                $this->Cell($colWidths['id'], 5, 'ID', 0, 0, 'C', false);
-                $this->Cell($colWidths['customer'], 5, 'Customer', 0, 0, 'C', false);
-                $this->Cell($colWidths['date'], 5, 'Date', 0, 0, 'C', false);
-                $this->Cell($colWidths['items'], 5, 'Items', 0, 0, 'C', false);
-                $this->Cell($colWidths['total'], 5, 'Total', 0, 0, 'C', false);
-                $this->Cell($colWidths['paid'], 5, 'Paid', 0, 0, 'C', false);
-                $this->Cell($colWidths['due'], 5, 'Due', 0, 0, 'C', false);
-                $this->Cell($colWidths['sequences'], 5, 'Sequences', 0, 1, 'C', false);
-                
-                $this->SetFont($this->font, '', 10);
-                $this->SetTextColor(0, 0, 0);
-                $this->SetDrawColor(0, 0, 0);
-                $fill = false;
-            }
+    
 
-            // Set alternating row colors with lighter sky blue
-            if ($fill) {
-                $this->SetFillColor(167, 230, 245);
-            } else {
-                $this->SetFillColor(255, 255, 255);
-            }
-            
-            $customerName = $order->customer ? $order->customer->name : 'N/A';
-            $orderDate = $order->order_date ? date('m/d/Y', strtotime($order->order_date)) : '-';
-            $totalItems = $order->items ? $order->items->sum('quantity') : 0;
-            $amountDue = $order->total_amount - $order->paid_amount;
-            
-            $sequences = '';
-            if ($order->category_sequences && is_array($order->category_sequences)) {
-                $sequences = implode(', ', $order->category_sequences);
-            }
-            
-            $this->Cell($colWidths['id'], 5, $order->id, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['customer'], 5, $this->truncateText($customerName, 35), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['date'], 5, $orderDate, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['items'], 5, $totalItems, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['total'], 5, number_format($order->total_amount, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['paid'], 5, number_format($order->paid_amount, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['due'], 5, number_format($amountDue, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['sequences'], 5, $this->truncateText($sequences, 35), 0, 1, 'C', $fill);
-            
-            $fill = !$fill;
-        }
-        
-        // Add totals row for delivered orders
-        $this->addDeliveredTotalsRow($colWidths, $deliveredOrders);
-        
-        // Add summary section for delivered orders
-        $this->addDeliveredSummary($deliveredOrders);
-    }
-    
-    private function getDeliveredOrders()
-    {
-        // Get delivered orders for the selected date range
-        $query = Order::with(['customer', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction'])
-            ->where('status', 'delivered');
-        
-        // Apply date filters if provided
-        if (!empty($this->filters['date_from'])) {
-            $query->whereDate('order_date', '>=', $this->filters['date_from']);
-        }
-        if (!empty($this->filters['date_to'])) {
-            $query->whereDate('order_date', '<=', $this->filters['date_to']);
-        }
-        
-        return $query->get();
-    }
-    
-    private function addDeliveredTotalsRow($colWidths, $deliveredOrders)
-    {
-        // Calculate totals for delivered orders
-        $totalItems = $deliveredOrders->sum(function($order) {
-            return $order->items ? $order->items->sum('quantity') : 0;
-        });
-        $totalAmount = $deliveredOrders->sum('total_amount');
-        $totalPaid = $deliveredOrders->sum('paid_amount');
-        $totalDue = $totalAmount - $totalPaid;
-        
-        // Totals row styling
-        $this->SetFont($this->font, 'B', 10);
-        $this->SetTextColor(0, 0, 0);
-        $this->SetFillColor(255, 220, 180); // Light orange for delivered totals
-        $this->SetDrawColor(0, 0, 0);
-        
-        $this->Cell($colWidths['id'], 5, 'TOTAL', 'TB', 0, 'C', true);
-        $this->Cell($colWidths['customer'], 5, '', 'TB', 0, 'C', true);
-        $this->Cell($colWidths['date'], 5, '', 'TB', 0, 'C', true);
-        $this->Cell($colWidths['items'], 5, $totalItems, 'TB', 0, 'C', true);
-        $this->Cell($colWidths['total'], 5, number_format($totalAmount, 3), 'TB', 0, 'C', true);
-        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 'TB', 0, 'C', true);
-        $this->Cell($colWidths['due'], 5, number_format($totalDue, 3), 'TB', 0, 'C', true);
-        $this->Cell($colWidths['sequences'], 5, '', 'TB', 1, 'C', true);
-    }
 
     private function generateDetailedItems()
     {
@@ -685,43 +474,5 @@ class OrdersListPdf extends TCPDF
         }
     }
     
-    private function addDeliveredSummary($deliveredOrders)
-    {
-        // Calculate available width
-        $pageWidth = $this->GetPageWidth();
-        $leftMargin = $this->lMargin;
-        $rightMargin = $this->rMargin;
-        $availableWidth = $pageWidth - $leftMargin - $rightMargin;
-        
-        // Add some space before summary
-        $this->Ln(10);
-        
-        // Summary section with light background
-        $this->SetFillColor(255, 248, 220); // Light orange background to match delivered orders theme
-        $this->Rect($leftMargin, $this->GetY(), $availableWidth, 60, 'F');
-        
-        // Summary title
-        $this->SetFont($this->font, 'B', 14);
-        $this->SetTextColor(52, 73, 94);
-        $this->Cell(0, 8, 'Delivered Orders Summary', 0, 1, 'L');
-        
-        // Calculate summary data for delivered orders
-        $totalOrders = $deliveredOrders->count();
-        $totalAmount = $deliveredOrders->sum('total_amount');
-        $totalPaid = $deliveredOrders->sum('paid_amount');
-        $totalDue = $totalAmount - $totalPaid;
-        $averageOrderValue = $totalOrders > 0 ? $totalAmount / $totalOrders : 0;
-        
-        // Summary details in vertical layout
-        $this->SetFont($this->font, '', 10);
-        $this->SetTextColor(0, 0, 0);
-        
-        $this->Cell(0, 6, 'Total Delivered Orders: ' . $totalOrders, 0, 1, 'L');
-        $this->Cell(0, 6, 'Total Delivered Amount: ' . number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Total Delivered Paid: ' . number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Total Delivered Outstanding: ' . number_format($totalDue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        $this->Cell(0, 6, 'Average Delivered Order: ' . number_format($averageOrderValue, 3) . ' ' . $this->currencySymbol, 0, 1, 'L');
-        
-        $this->Ln(5);
-    }
+
 }

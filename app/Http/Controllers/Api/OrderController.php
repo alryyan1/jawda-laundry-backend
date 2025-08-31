@@ -56,8 +56,17 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
-        // Check if this is an empty order creation
-        $isEmptyOrder = $request->has('create_empty_order') && $request->input('create_empty_order') === true;
+        // Check if this is an empty order creation (flag or no items provided)
+        $isEmptyOrder = (
+            ($request->has('create_empty_order') && $request->boolean('create_empty_order') === true)
+            || !$request->has('items')
+            || empty($request->input('items'))
+        );
+        
+        // Normalize empty string customer_id to null so it passes nullable validation
+        if ($request->has('customer_id') && $request->input('customer_id') === '') {
+            $request->merge(['customer_id' => null]);
+        }
         
         $validationRules = [
             'notes' => 'nullable|string|max:2000',
@@ -72,7 +81,8 @@ class OrderController extends Controller
             $validationRules['items'] = 'nullable|array';
         } else {
             // For regular orders, customer_id and items are required
-            $validationRules['customer_id'] = 'required|exists:customers,id';
+            // Make customer optional; backend will assign default customer if missing
+            $validationRules['customer_id'] = 'nullable|exists:customers,id';
             $validationRules['items'] = 'required|array|min:1';
         }
         
@@ -91,6 +101,14 @@ class OrderController extends Controller
         $customer = null;
         if (!empty($validatedData['customer_id'])) {
             $customer = Customer::findOrFail($validatedData['customer_id']);
+        }
+        
+        // If no customer provided, assign the system default customer if available
+        if (!$customer) {
+            $defaultCustomer = Customer::where('is_default', true)->first();
+            if ($defaultCustomer) {
+                $customer = $defaultCustomer;
+            }
         }
         
         $orderTotalAmount = 0;
