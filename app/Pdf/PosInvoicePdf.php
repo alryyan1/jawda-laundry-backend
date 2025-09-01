@@ -52,60 +52,8 @@ class PosInvoicePdf extends TCPDF
         $this->loadTranslations();
     }
 
-    /**
-     * Add logo to the PDF if logo URL is provided
-     */
-    private function addLogo()
-    {
-        $logoUrl = $this->settings['company_logo_url'] ?? Setting::getValue('company_logo_url', null);
-        
-        if (!$logoUrl) {
-            Log::warning('PosInvoicePdf::addLogo - No logo URL provided or found in DB');
-            return false;
-        }
-
-        try {
-            // Get the current Y position
-            $currentY = $this->GetY();
-            
-            // Calculate logo dimensions (max width 20mm for POS receipt)
-            $maxWidth = 20;
-            $maxHeight = 15;
-            
-            // Get image dimensions
-            $imageInfo = @getimagesize($logoUrl);
-            if (!$imageInfo) {
-                Log::warning('PosInvoicePdf::addLogo - getimagesize failed for logo URL', ['logo_url' => $logoUrl]);
-                return false;
-            }
-            
-            $imageWidth = $imageInfo[0];
-            $imageHeight = $imageInfo[1];
-            
-            // Calculate scaling to fit within max dimensions while maintaining aspect ratio
-            $scaleX = $maxWidth / $imageWidth;
-            $scaleY = $maxHeight / $imageHeight;
-            $scale = min($scaleX, $scaleY);
-            
-            $scaledWidth = $imageWidth * $scale;
-            $scaledHeight = $imageHeight * $scale;
-            
-            // Center the logo horizontally
-            $x = ($this->GetPageWidth() - $scaledWidth) / 2;
-            
-            // Add the logo
-            $this->Image($logoUrl, $x, $currentY, $scaledWidth, $scaledHeight);
-            
-            // Move Y position down to account for logo
-            $this->SetY($currentY + $scaledHeight + 2);
-            
-            return true;
-        } catch (Exception $e) {
-            // Log error or handle gracefully
-            Log::error('PosInvoicePdf::addLogo - Exception while adding logo', ['error' => $e->getMessage()]);
-            return false;
-        }
-    }
+    // Logo disabled
+    private function addLogo() { return false; }
 
     private function loadTranslations()
     {
@@ -438,14 +386,8 @@ class PosInvoicePdf extends TCPDF
         $leftPadding = 0;
         $rightPadding = 0;
 
-        // --- Company Header with Logo ---
-        $logoAdded = $this->addLogo();
-        
-        // If logo was added, we don't need extra spacing
-        if (!$logoAdded) {
-            $this->Ln(2);
-
-        }
+        // --- Company Header without Logo ---
+        $this->Ln(2);
 
         //  dd($this->settings);
         
