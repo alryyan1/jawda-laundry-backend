@@ -261,9 +261,10 @@ class OrderController extends Controller
             ->with(['serviceOffering.productType.category', 'serviceOffering.serviceAction'])
             ->get();
 
+        // Return using API resources to ensure consistent camelCase keys
         return response()->json([
             'order_id' => $order->id,
-            'items' => $items,
+            'items' => \App\Http\Resources\OrderItemResource::collection($items),
         ]);
     }
 
