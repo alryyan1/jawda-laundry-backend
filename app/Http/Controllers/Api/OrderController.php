@@ -301,49 +301,45 @@ class OrderController extends Controller
 
             // Resolve service offering (supporting customer-specific mapping if needed)
             $serviceOffering = ServiceOffering::find($validatedData['service_offering_id']);
-            if (!$serviceOffering) {
-                $customerServiceOffering = CustomerProductServiceOffering::where('id', $validatedData['service_offering_id'])
-                    ->where('customer_id', $order->customer_id)
-                    ->first();
-                if ($customerServiceOffering) {
-                    // Create a temporary service offering object from customer data
-                    $serviceOffering = new ServiceOffering();
-                    $serviceOffering->id = $customerServiceOffering->id;
-                    $serviceOffering->product_type_id = $customerServiceOffering->product_type_id;
-                    $serviceOffering->service_action_id = $customerServiceOffering->service_action_id;
-                    $serviceOffering->name = $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name;
-                    $serviceOffering->description = $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description;
-                    $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
-                    $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
-                    $serviceOffering->is_active = $customerServiceOffering->is_active;
-                    // Load relations
-                    $serviceOffering->productType = $customerServiceOffering->productType;
-                    $serviceOffering->serviceAction = $customerServiceOffering->serviceAction;
-                }
-            }
+            // if (!$serviceOffering) {
+            //     $customerServiceOffering = CustomerProductServiceOffering::where('id', $validatedData['service_offering_id'])
+            //         ->where('customer_id', $order->customer_id)
+            //         ->first();
+            //     if ($customerServiceOffering) {
+            //         // Create a temporary service offering object from customer data
+            //         $serviceOffering = new ServiceOffering();
+            //         $serviceOffering->id = $customerServiceOffering->id;
+            //         $serviceOffering->product_type_id = $customerServiceOffering->product_type_id;
+            //         $serviceOffering->service_action_id = $customerServiceOffering->service_action_id;
+            //         $serviceOffering->name = $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name;
+            //         $serviceOffering->description = $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description;
+            //         $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
+            //         $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
+            //         $serviceOffering->is_active = $customerServiceOffering->is_active;
+            //         // Load relations
+            //         $serviceOffering->productType = $customerServiceOffering->productType;
+            //         $serviceOffering->serviceAction = $customerServiceOffering->serviceAction;
+            //     }
+            // }
 
             if (!$serviceOffering) {
                 return response()->json(['message' => 'Service offering not found.'], 404);
             }
-
-            // Calculate price
-            $priceDetails = $this->pricingService->calculatePrice(
-                $serviceOffering,
-                $order->customer,
-                $validatedData['quantity'],
-                $validatedData['length_meters'] ?? null,
-                $validatedData['width_meters'] ?? null
-            );
+            
+            // Calculate price using service offering default price only
+            $unitPrice = (float) ($serviceOffering->default_price ?? 0);
+            $quantity = (int) $validatedData['quantity'];
+            $subTotal = $unitPrice * $quantity;
 
             // Create order item
             $orderItem = $order->items()->create([
                 'service_offering_id' => $serviceOffering->id,
                 'product_description_custom' => $validatedData['product_description_custom'] ?? null,
-                'quantity' => $validatedData['quantity'],
+                'quantity' => $quantity,
                 'length_meters' => $validatedData['length_meters'] ?? null,
                 'width_meters' => $validatedData['width_meters'] ?? null,
-                'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                'sub_total' => $priceDetails['sub_total'],
+                'calculated_price_per_unit_item' => $unitPrice,
+                'sub_total' => $subTotal,
                 'notes' => $validatedData['notes'] ?? null,
             ]);
 
