@@ -90,6 +90,7 @@ Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'upda
 
   Route::apiResource('orders', OrderController::class);
   Route::get('/orders/{order}/items', [OrderController::class, 'getOrderItems']);
+  Route::post('/orders/{order}/items', [OrderController::class, 'addOrderItem']);
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
    // and POST /product-types/{product_type}/predefined-sizes
    Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)

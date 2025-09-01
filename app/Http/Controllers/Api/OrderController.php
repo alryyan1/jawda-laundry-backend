@@ -266,6 +266,112 @@ class OrderController extends Controller
             'items' => $items,
         ]);
     }
+
+    /**
+     * Add a single item to an existing order.
+     */
+    public function addOrderItem(Request $request, Order $order)
+    {
+        // Authorization check removed
+
+        $validatedData = $request->validate([
+            'service_offering_id' => 'required|integer',
+            'quantity' => 'required|integer|min:1',
+            'product_description_custom' => 'nullable|string|max:255',
+            'length_meters' => 'nullable|numeric|min:0',
+            'width_meters' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Ensure order has a customer; if not, try to assign default
+            if (!$order->customer) {
+                $defaultCustomer = Customer::where('is_default', true)->first();
+                if ($defaultCustomer) {
+                    $order->customer_id = $defaultCustomer->id;
+                    $order->save();
+                } else {
+                    return response()->json([
+                        'message' => 'Cannot add items to order without a customer. Please select a customer first.'
+                    ], 400);
+                }
+            }
+
+            // Resolve service offering (supporting customer-specific mapping if needed)
+            $serviceOffering = ServiceOffering::find($validatedData['service_offering_id']);
+            if (!$serviceOffering) {
+                $customerServiceOffering = CustomerProductServiceOffering::where('id', $validatedData['service_offering_id'])
+                    ->where('customer_id', $order->customer_id)
+                    ->first();
+                if ($customerServiceOffering) {
+                    // Create a temporary service offering object from customer data
+                    $serviceOffering = new ServiceOffering();
+                    $serviceOffering->id = $customerServiceOffering->id;
+                    $serviceOffering->product_type_id = $customerServiceOffering->product_type_id;
+                    $serviceOffering->service_action_id = $customerServiceOffering->service_action_id;
+                    $serviceOffering->name = $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name;
+                    $serviceOffering->description = $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description;
+                    $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
+                    $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
+                    $serviceOffering->is_active = $customerServiceOffering->is_active;
+                    // Load relations
+                    $serviceOffering->productType = $customerServiceOffering->productType;
+                    $serviceOffering->serviceAction = $customerServiceOffering->serviceAction;
+                }
+            }
+
+            if (!$serviceOffering) {
+                return response()->json(['message' => 'Service offering not found.'], 404);
+            }
+
+            // Calculate price
+            $priceDetails = $this->pricingService->calculatePrice(
+                $serviceOffering,
+                $order->customer,
+                $validatedData['quantity'],
+                $validatedData['length_meters'] ?? null,
+                $validatedData['width_meters'] ?? null
+            );
+
+            // Create order item
+            $orderItem = $order->items()->create([
+                'service_offering_id' => $serviceOffering->id,
+                'product_description_custom' => $validatedData['product_description_custom'] ?? null,
+                'quantity' => $validatedData['quantity'],
+                'length_meters' => $validatedData['length_meters'] ?? null,
+                'width_meters' => $validatedData['width_meters'] ?? null,
+                'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
+                'sub_total' => $priceDetails['sub_total'],
+                'notes' => $validatedData['notes'] ?? null,
+            ]);
+
+            // Recalculate and persist order totals
+            $order->recalculateTotalAmount();
+            $order->refresh();
+
+            // Load relations for response
+            $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+
+            // Broadcast
+            event(new OrderUpdated($order, ['items_changed' => true]));
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Order item added successfully.',
+                'order_item' => $orderItem,
+                'order' => new OrderResource($order),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error adding order item: '.$e->getMessage());
+            return response()->json(['message' => 'Failed to add order item.'], 500);
+        }
+    }
       /**
      * Update the specified resource in storage.
      * This now handles updates for notes, due_date, status, pickup_date, and adding items.
