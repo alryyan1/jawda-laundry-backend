@@ -249,6 +249,23 @@ class OrderController extends Controller
         $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         return new OrderResource($order);
     }
+
+    /**
+     * Return items for a specific order (for independent cart fetching)
+     */
+    public function getOrderItems(Order $order)
+    {
+        // Authorization check removed
+
+        $items = $order->items()
+            ->with(['serviceOffering.productType.category', 'serviceOffering.serviceAction'])
+            ->get();
+
+        return response()->json([
+            'order_id' => $order->id,
+            'items' => $items,
+        ]);
+    }
       /**
      * Update the specified resource in storage.
      * This now handles updates for notes, due_date, status, pickup_date, and adding items.
