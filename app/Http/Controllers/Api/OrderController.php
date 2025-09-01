@@ -216,7 +216,7 @@ class OrderController extends Controller
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
             // Broadcasting disabled
-            // event(new OrderCreated($order));
+            event(new OrderCreated($order));
             Log::info('OrderCreated skipped broadcasting', ['order_id' => $order->id]);
             
             // Return order with warnings if any
@@ -353,7 +353,7 @@ class OrderController extends Controller
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
 
             // Broadcasting disabled
-            // event(new OrderUpdated($order, ['items_changed' => true]));
+            event(new OrderUpdated($order, ['items_changed' => true]));
 
             DB::commit();
 
@@ -664,7 +664,7 @@ class OrderController extends Controller
         
         // Broadcast the order updated event
         // Broadcasting disabled
-        // event(new OrderUpdated($order, ['status' => $newStatus]));
+        event(new OrderUpdated($order, ['status' => $newStatus]));
         
         // Return order with warnings if any
         $response = new OrderResource($order);
@@ -743,7 +743,7 @@ class OrderController extends Controller
 
             // Broadcast the order updated event
             // Broadcasting disabled
-            // event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
+            event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
             Log::info('Order marked as received', ['order_id' => $order->id]);
 
             // Auto-send receive order message if enabled
@@ -811,7 +811,7 @@ class OrderController extends Controller
 
             // Broadcast the order updated event
             // Broadcasting disabled
-            // event(new OrderUpdated($order, ['status' => 'cancelled']));
+            event(new OrderUpdated($order, ['status' => 'cancelled']));
             Log::info('Order cancelled', ['order_id' => $order->id]);
 
             return response()->json([
