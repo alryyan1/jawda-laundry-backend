@@ -215,9 +215,9 @@ class OrderController extends Controller
 
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
             
-            // Broadcast the order created event
-            event(new OrderCreated($order));
-            Log::info('OrderCreated event fired', ['order_id' => $order->id]);
+            // Broadcasting disabled
+            // event(new OrderCreated($order));
+            Log::info('OrderCreated skipped broadcasting', ['order_id' => $order->id]);
             
             // Return order with warnings if any
             $response = new OrderResource($order);
@@ -352,8 +352,8 @@ class OrderController extends Controller
             $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
 
-            // Broadcast
-            event(new OrderUpdated($order, ['items_changed' => true]));
+            // Broadcasting disabled
+            // event(new OrderUpdated($order, ['items_changed' => true]));
 
             DB::commit();
 
@@ -561,9 +561,9 @@ class OrderController extends Controller
                 $order->generateCategorySequences(true); // true for update
             }
             
-            // Broadcast the order updated event
-            event(new OrderUpdated($order, ['status' => $newStatus]));
-            Log::info('OrderUpdated event fired', ['order_id' => $order->id, 'new_status' => $newStatus]);
+            // Broadcasting disabled
+            // event(new OrderUpdated($order, ['status' => $newStatus]));
+            Log::info('OrderUpdated event skipped', ['order_id' => $order->id, 'new_status' => $newStatus]);
             
             // Return order with warnings if any
             $response = new OrderResource($order);
@@ -663,7 +663,8 @@ class OrderController extends Controller
         $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
         
         // Broadcast the order updated event
-        event(new OrderUpdated($order, ['status' => $newStatus]));
+        // Broadcasting disabled
+        // event(new OrderUpdated($order, ['status' => $newStatus]));
         
         // Return order with warnings if any
         $response = new OrderResource($order);
@@ -741,7 +742,8 @@ class OrderController extends Controller
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
 
             // Broadcast the order updated event
-            event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
+            // Broadcasting disabled
+            // event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
             Log::info('Order marked as received', ['order_id' => $order->id]);
 
             // Auto-send receive order message if enabled
@@ -808,7 +810,8 @@ class OrderController extends Controller
             $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
 
             // Broadcast the order updated event
-            event(new OrderUpdated($order, ['status' => 'cancelled']));
+            // Broadcasting disabled
+            // event(new OrderUpdated($order, ['status' => 'cancelled']));
             Log::info('Order cancelled', ['order_id' => $order->id]);
 
             return response()->json([
