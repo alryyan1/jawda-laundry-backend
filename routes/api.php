@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\RestaurantTableController;
 use App\Http\Controllers\Api\DiningTableController;
 use App\Http\Controllers\Api\TableReservationController;
 use App\Http\Controllers\Api\SimpleNavigationController;
+use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SettingsController;
 
 use App\Http\Controllers\Api\UltraMsgController;
@@ -92,6 +93,10 @@ Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'upda
   Route::get('/orders/{order}/items', [OrderController::class, 'getOrderItems']);
   Route::post('/orders/{order}/items', [OrderController::class, 'addOrderItem']);
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
+  // Shifts
+  Route::get('/shifts/current', [ShiftController::class, 'current']);
+  Route::post('/shifts/open', [ShiftController::class, 'open']);
+  Route::post('/shifts/close', [ShiftController::class, 'close']);
    // and POST /product-types/{product_type}/predefined-sizes
    Route::apiResource('product-types.predefined-sizes', PredefinedSizeController::class)
    ->only(['index', 'store']);

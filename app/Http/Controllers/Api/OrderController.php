@@ -20,6 +20,7 @@ use App\Actions\NotifyCustomerForOrderStatus;
 use App\Events\OrderCreated;
 use App\Events\OrderUpdated;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Shift;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -179,9 +180,13 @@ class OrderController extends Controller
                 }
             }
 
+            // Attach current open shift if exists
+            $currentShiftId = optional(Shift::whereNull('closed_at')->orderByDesc('id')->first())->id;
+
             $order = Order::create([
                 'customer_id' => $customer ? $customer->id : null,
                 'user_id' => Auth::id(),
+                'shift_id' => $currentShiftId,
                 'status' => 'pending',
                 'order_type' => $validatedData['order_type'] ?? 'in_house',
                 'dining_table_id' => $validatedData['dining_table_id'] ?? null, // Add dining table ID

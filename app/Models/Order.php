@@ -24,6 +24,7 @@ class Order extends Model
         'table_id',
         'dining_table_id',
         'user_id',
+        'shift_id',
         'status',
         'order_complete',       // Track if order is completed
         'order_type', // New field for dine-in/take-away/delivery
@@ -98,6 +99,11 @@ class Order extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
     }
 
     /**
