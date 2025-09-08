@@ -95,6 +95,9 @@ Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'upda
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
   // Shifts
   Route::get('/shifts/current', [ShiftController::class, 'current']);
+  Route::get('/shifts/latest', [ShiftController::class, 'latest']);
+  Route::get('/shifts/{shift}/previous', [ShiftController::class, 'previous']);
+  Route::get('/shifts/{shift}/next', [ShiftController::class, 'next']);
   Route::post('/shifts/open', [ShiftController::class, 'open']);
   Route::post('/shifts/close', [ShiftController::class, 'close']);
    // and POST /product-types/{product_type}/predefined-sizes

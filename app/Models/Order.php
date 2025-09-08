@@ -245,6 +245,17 @@ class Order extends Model
     }
 
     /**
+     * Generate the next order number within a specific shift
+     */
+    public static function generateShiftOrderNumber(int $shiftId): int
+    {
+        $orderCount = self::where('shift_id', $shiftId)
+            ->whereNotNull('daily_order_number')
+            ->count();
+        return $orderCount + 1;
+    }
+
+    /**
      * Generate category-specific sequences for this order
      */
     public function generateCategorySequences(bool $isUpdate = false): void
@@ -276,7 +287,11 @@ class Order extends Model
 
         static::creating(function ($order) {
             if (empty($order->daily_order_number)) {
-                $order->daily_order_number = self::generateDailyOrderNumber();
+                if (!empty($order->shift_id)) {
+                    $order->daily_order_number = self::generateShiftOrderNumber((int) $order->shift_id);
+                } else {
+                    $order->daily_order_number = self::generateDailyOrderNumber();
+                }
             }
             
             // Set pickup_date to 3 days from now if not provided and order is not a customer payment

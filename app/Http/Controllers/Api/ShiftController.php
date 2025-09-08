@@ -15,6 +15,40 @@ class ShiftController extends Controller
         return response()->json(['shift' => $shift]);
     }
 
+    public function latest()
+    {
+        $shift = Shift::orderByDesc('opened_at')->orderByDesc('id')->first();
+        return response()->json(['shift' => $shift]);
+    }
+
+    public function previous(Shift $shift)
+    {
+        $prev = Shift::where(function ($q) use ($shift) {
+                $q->where('opened_at', '<', $shift->opened_at)
+                  ->orWhere(function ($q2) use ($shift) {
+                      $q2->whereNull('opened_at')->where('id', '<', $shift->id);
+                  });
+            })
+            ->orderByDesc('opened_at')
+            ->orderByDesc('id')
+            ->first();
+        return response()->json(['shift' => $prev]);
+    }
+
+    public function next(Shift $shift)
+    {
+        $next = Shift::where(function ($q) use ($shift) {
+                $q->where('opened_at', '>', $shift->opened_at)
+                  ->orWhere(function ($q2) use ($shift) {
+                      $q2->whereNull('opened_at')->where('id', '>', $shift->id);
+                  });
+            })
+            ->orderBy('opened_at')
+            ->orderBy('id')
+            ->first();
+        return response()->json(['shift' => $next]);
+    }
+
     public function open(Request $request)
     {
         $validated = $request->validate([

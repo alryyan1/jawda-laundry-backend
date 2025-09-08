@@ -118,6 +118,14 @@ class OrderController extends Controller
 
         DB::beginTransaction();
         try {
+            // Ensure there is an open shift before creating any order
+            $openShift = Shift::whereNull('closed_at')->orderByDesc('id')->first();
+            if (!$openShift) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Cannot create order: no open shift. Please open a shift first.'
+                ], 400);
+            }
             // Only process items if they exist and are not empty
             if (!empty($validatedData['items'])) {
                 foreach ($validatedData['items'] as $itemData) {
@@ -180,8 +188,8 @@ class OrderController extends Controller
                 }
             }
 
-            // Attach current open shift if exists
-            $currentShiftId = optional(Shift::whereNull('closed_at')->orderByDesc('id')->first())->id;
+            // Attach current open shift (already validated above)
+            $currentShiftId = $openShift->id;
 
             $order = Order::create([
                 'customer_id' => $customer ? $customer->id : null,
@@ -1471,6 +1479,7 @@ class OrderController extends Controller
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
+        if ($request->filled('shift_id')) $query->where('shift_id', $request->shift_id);
         if ($request->filled('date_from')) $query->whereDate('order_date', '>=', $request->date_from);
         if ($request->filled('date_to')) $query->whereDate('order_date', '<=', $request->date_to);
 
@@ -1521,10 +1530,12 @@ class OrderController extends Controller
         $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d',
+            'shift_id' => 'nullable|integer|exists:shifts,id',
         ]);
 
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
+        $shiftId = $request->get('shift_id');
 
         $query = Order::query();
 
@@ -1534,6 +1545,10 @@ class OrderController extends Controller
 
         if ($dateTo) {
             $query->whereDate('order_date', '<=', $dateTo);
+        }
+
+        if ($shiftId) {
+            $query->where('shift_id', $shiftId);
         }
 
         // Get total orders
