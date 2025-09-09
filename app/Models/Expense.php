@@ -31,7 +31,7 @@ class Expense extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'amount' => 'decimal:2', // Always handle money as a decimal or integer
+        'amount' => 'decimal:3', // Always handle money as a decimal or integer
         'expense_date' => 'date:Y-m-d', // Cast to a simple date string 'YYYY-MM-DD'
     ];
 

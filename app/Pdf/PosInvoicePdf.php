@@ -174,8 +174,12 @@ class PosInvoicePdf extends TCPDF
     {
         $totalHeight = 0;
         
-        // Header section height
-        $totalHeight += 20; // Company header with logo
+        // Header section height (includes company header and optional big daily number)
+        $headerHeight = 20; // Company header with logo
+        if (!empty($this->order) && !empty($this->order->daily_order_number)) {
+            $headerHeight += 12; // Extra space for big daily number line
+        }
+        $totalHeight += $headerHeight;
         $totalHeight += 10; // Order details section
         $totalHeight += 8;  // Items table header
         $totalHeight += 2;  // Header line
@@ -298,8 +302,13 @@ class PosInvoicePdf extends TCPDF
      */
     public function getHeightBreakdown(): array
     {
+        $headerHeight = 20;
+        if (!empty($this->order) && !empty($this->order->daily_order_number)) {
+            $headerHeight += 12;
+        }
+
         $breakdown = [
-            'header' => 20,
+            'header' => $headerHeight,
             'order_details' => 10,
             'table_header' => 8,
             'header_line' => 2,
@@ -389,6 +398,7 @@ class PosInvoicePdf extends TCPDF
         // --- Company Header without Logo ---
         $this->Ln(2);
 
+
         //  dd($this->settings);
         
         
@@ -413,6 +423,13 @@ class PosInvoicePdf extends TCPDF
         }
         $this->Ln(4);
 
+        // --- Big Daily Order Number (center top) ---
+        if (!empty($this->order->daily_order_number)) {
+            $this->SetFont($this->font, 'B', 20);
+            $this->Cell(0, 10, (string) $this->order->daily_order_number, 0, 1, 'C');
+            $this->SetFont($this->font, '', 10);
+            $this->Ln(1);
+        }
         // --- Divider ---
         $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
         $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
@@ -544,6 +561,11 @@ class PosInvoicePdf extends TCPDF
                     $this->SetTextColor(0, 0, 0); // Reset to black
                     $this->SetFont($this->font, '', 9);
                 }
+
+                // Draw separator line after each item (and its notes)
+                $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
+                $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+                $this->Ln(1);
             }
             
             // Add spacing between categories (except for the last category)
@@ -554,7 +576,7 @@ class PosInvoicePdf extends TCPDF
 
         $this->Ln(1);
         $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+        // $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
         $this->Ln(1);
 
         // --- Summary Section ---
@@ -580,7 +602,7 @@ class PosInvoicePdf extends TCPDF
 
         // --- Notes Section ---
         if ($this->order->notes) {
-            $this->SetFont('arial', 'I', 8);
+            $this->SetFont('arial', '', 8);
             $this->MultiCell(0, 4, $this->getBilingualText('notes') . ": " . $this->order->notes, 0, 'L');
         }
 

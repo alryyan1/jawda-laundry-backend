@@ -613,6 +613,7 @@ class ReportController extends Controller
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d',
             'category_sequence_search' => 'nullable|string',
+            'shift_id' => 'nullable|integer|exists:shifts,id',
         ]);
 
         try {
@@ -669,6 +670,11 @@ class ReportController extends Controller
                 $query->whereRaw("JSON_EXTRACT(category_sequences, '$.*') LIKE ?", ['%' . $searchTerm . '%']);
             }
 
+            // Filter by shift if provided
+            if ($request->filled('shift_id')) {
+                $query->where('shift_id', $request->input('shift_id'));
+            }
+
             $orders = $query->orderBy('order_date', 'desc')->get();
 
             // Generate PDF
@@ -683,6 +689,7 @@ class ReportController extends Controller
                 'customer_id' => $request->input('customer_id'),
                 'product_type_id' => $request->input('product_type_id'),
                 'category_sequence_search' => $request->input('category_sequence_search'),
+                'shift_id' => $request->input('shift_id'),
             ]);
             $pdf->setSettings([
                 'company_name' => \app_setting('company_name', config('app.name')),

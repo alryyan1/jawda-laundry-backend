@@ -1396,6 +1396,17 @@ class OrderController extends Controller
      */
     public function exportCsv(Request $request)
     {
+        // Default to latest shift if none provided, and clear date filters to enforce shift-based export
+        if (!$request->filled('shift_id')) {
+            $latestShift = \App\Models\Shift::orderByDesc('opened_at')->orderByDesc('id')->first();
+            if ($latestShift) {
+                $request->merge(['shift_id' => $latestShift->id]);
+                // Remove date range to avoid conflicting filters in headers and query
+                $request->request->remove('date_from');
+                $request->request->remove('date_to');
+            }
+        }
+
         // Reuse the same query builder logic from the index method
         $query = $this->buildOrderQuery($request);
         
@@ -1470,6 +1481,25 @@ class OrderController extends Controller
     }
 
     /**
+     * Return all orders for a given shift without pagination (for TodayOrdersColumn).
+     */
+    public function getOrdersByShift(Shift $shift)
+    {
+        $orders = Order::with([
+                'customer:id,name,phone',
+                'items.serviceOffering.productType.category',
+                'items.serviceOffering.serviceAction',
+                'diningTable'
+            ])
+            ->where('shift_id', $shift->id)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        \Illuminate\Http\Resources\Json\JsonResource::withoutWrapping();
+        return response()->json($orders);
+    }
+
+    /**
      * Helper function to build the order query based on request filters.
      * Reused by both index() and exportCsv().
      */
@@ -1479,9 +1509,13 @@ class OrderController extends Controller
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
-        if ($request->filled('shift_id')) $query->where('shift_id', $request->shift_id);
-        if ($request->filled('date_from')) $query->whereDate('order_date', '>=', $request->date_from);
-        if ($request->filled('date_to')) $query->whereDate('order_date', '<=', $request->date_to);
+        if ($request->filled('shift_id')) {
+            // When shift is specified, filter by shift and ignore date range
+            $query->where('shift_id', $request->shift_id);
+        } else {
+            if ($request->filled('date_from')) $query->whereDate('order_date', '>=', $request->date_from);
+            if ($request->filled('date_to')) $query->whereDate('order_date', '<=', $request->date_to);
+        }
 
         // Search by order ID (exact match)
         if ($request->filled('order_id')) {

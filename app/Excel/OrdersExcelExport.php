@@ -11,6 +11,9 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooter;
+use PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooterDrawing;
 use PhpOffice\PhpSpreadsheet\Chart\Chart;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
 use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
@@ -86,6 +89,7 @@ class OrdersExcelExport
     private function createSummarySheet()
     {
         $this->worksheet->setTitle('Summary');
+        $this->addSheetBranding($this->worksheet, 'H');
         
         // Company header
         $this->worksheet->mergeCells('A1:H1');
@@ -198,39 +202,37 @@ class OrdersExcelExport
     {
         $ordersSheet = $this->spreadsheet->createSheet();
         $ordersSheet->setTitle('Orders');
+        $this->addSheetBranding($ordersSheet, 'E');
         
         // Company header
-        $ordersSheet->mergeCells('A1:N1');
+        $ordersSheet->mergeCells('A1:E1');
         $ordersSheet->setCellValue('A1', $this->settings['company_name'] ?? 'Restaurant Service');
-        $this->applyHeaderStyle('A1:N1', $ordersSheet);
+        $this->applyHeaderStyle('A1:E1', $ordersSheet);
         
         // Report title
-        $ordersSheet->mergeCells('A2:N2');
+        $ordersSheet->mergeCells('A2:E2');
         $ordersSheet->setCellValue('A2', 'Orders Report');
-        $this->applySubHeaderStyle('A2:N2', $ordersSheet);
+        $this->applySubHeaderStyle('A2:E2', $ordersSheet);
         
         // Filters info
-        $ordersSheet->mergeCells('A3:N3');
+        $ordersSheet->mergeCells('A3:E3');
         $ordersSheet->setCellValue('A3', 'Filters: ' . $this->getFilterText());
-        $ordersSheet->getStyle('A3:N3')->applyFromArray([
+        $ordersSheet->getStyle('A3:E3')->applyFromArray([
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '2C3E50']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         
         // Generated date
-        $ordersSheet->mergeCells('A4:N4');
+        $ordersSheet->mergeCells('A4:E4');
         $ordersSheet->setCellValue('A4', 'Generated: ' . date('F j, Y \a\t g:i A'));
-        $ordersSheet->getStyle('A4:N4')->applyFromArray([
+        $ordersSheet->getStyle('A4:E4')->applyFromArray([
             'font' => ['size' => 9, 'color' => ['rgb' => '7F8C8D']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         
-        // Headers (starting at row 6)
-        $headers = [
-            'ID', 'Order Number', 'Customer Name', 'Customer Phone', 'Status',
-            'Order Date', 'Due Date', 'Pickup Date', 'Total Amount', 'Amount Paid', 'Amount Due',
-            'Category Sequences', 'Notes'
-        ];
+        // Headers (starting at row 6) - align with OrdersListPdf
+        $currency = $this->settings['currency_symbol'] ?? 'OMR';
+        $headers = [ 'ID', 'Date', 'Items', 'Total (' . $currency . ')', 'Paid (' . $currency . ')' ];
         
         $col = 'A';
         foreach ($headers as $header) {
@@ -239,38 +241,42 @@ class OrdersExcelExport
         }
         
         // Apply header styling
-        $this->applyTableHeaderStyle('A6:' . chr(ord($col) - 1) . '6', $ordersSheet);
+        $this->applyTableHeaderStyle('A6:E6', $ordersSheet);
         
         // Data rows
         $row = 7;
         foreach ($this->orders as $order) {
-            $ordersSheet->setCellValue('A' . $row, $order->id);
-            $ordersSheet->setCellValue('B' . $row, $order->id);
-            $ordersSheet->setCellValue('C' . $row, $order->customer ? $order->customer->name : 'N/A');
-            $ordersSheet->setCellValue('D' . $row, $order->customer ? $order->customer->phone : 'N/A');
-            $ordersSheet->setCellValue('E' . $row, ucfirst($order->status));
-            $ordersSheet->setCellValue('F' . $row, $order->order_date ? date('Y-m-d H:i', strtotime($order->order_date)) : '');
-            $ordersSheet->setCellValue('G' . $row, $order->due_date ? date('Y-m-d', strtotime($order->due_date)) : '');
-            $ordersSheet->setCellValue('H' . $row, $order->pickup_date ? date('Y-m-d H:i', strtotime($order->pickup_date)) : '');
-            $ordersSheet->setCellValue('I' . $row, $order->total_amount);
-            $ordersSheet->setCellValue('J' . $row, $order->paid_amount);
-            $ordersSheet->setCellValue('K' . $row, $order->amount_due);
-            $ordersSheet->setCellValue('L' . $row, $order->category_sequences_string ?? '');
-            $ordersSheet->setCellValue('M' . $row, $order->notes ?? '');
+            $idCell = $order->id . '-' . ($order->daily_order_number ?? '');
+            $ordersSheet->setCellValue('A' . $row, $idCell);
+            $ordersSheet->setCellValue('B' . $row, $order->order_date ? date('m/d/Y', strtotime($order->order_date)) : '-');
+            $totalItems = $order->items ? $order->items->sum('quantity') : 0;
+            $ordersSheet->setCellValue('C' . $row, $totalItems);
+            $ordersSheet->setCellValue('D' . $row, $order->total_amount);
+            $ordersSheet->setCellValue('E' . $row, $order->paid_amount);
+            // Highlight fully paid rows (soft green)
+            $fullyPaid = ((float) ($order->total_amount ?? 0)) > 0 && (float) ($order->paid_amount ?? 0) >= (float) ($order->total_amount ?? 0);
+            if ($fullyPaid) {
+                $ordersSheet->getStyle('A' . $row . ':E' . $row)->applyFromArray([
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'E8F8EA'],
+                    ],
+                ]);
+            }
             
             $row++;
         }
         
-        // Add totals row
+        // Add totals row (align with PDF totals summary)
         $totalRow = $row;
         $ordersSheet->setCellValue('A' . $totalRow, 'TOTAL');
-        $ordersSheet->mergeCells('A' . $totalRow . ':H' . $totalRow);
-        $ordersSheet->setCellValue('I' . $totalRow, '=SUM(I7:I' . ($row - 1) . ')');
-        $ordersSheet->setCellValue('J' . $totalRow, '=SUM(J7:J' . ($row - 1) . ')');
-        $ordersSheet->setCellValue('K' . $totalRow, '=SUM(K7:K' . ($row - 1) . ')');
+        $ordersSheet->mergeCells('A' . $totalRow . ':B' . $totalRow);
+        $ordersSheet->setCellValue('C' . $totalRow, '=SUM(C7:C' . ($row - 1) . ')');
+        $ordersSheet->setCellValue('D' . $totalRow, '=SUM(D7:D' . ($row - 1) . ')');
+        $ordersSheet->setCellValue('E' . $totalRow, '=SUM(E7:E' . ($row - 1) . ')');
         
         // Style totals row
-        $ordersSheet->getStyle('A' . $totalRow . ':N' . $totalRow)->applyFromArray([
+        $ordersSheet->getStyle('A' . $totalRow . ':E' . $totalRow)->applyFromArray([
             'font' => ['bold' => true, 'size' => 11],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -282,12 +288,13 @@ class OrdersExcelExport
             ],
         ]);
         
-        // Format currency columns
-        $ordersSheet->getStyle('I7:K' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.000');
-        $ordersSheet->getStyle('I' . $totalRow . ':K' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
+        // Format number columns
+        $ordersSheet->getStyle('C7:C' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0');
+        $ordersSheet->getStyle('D7:E' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.000');
+        $ordersSheet->getStyle('D' . $totalRow . ':E' . $totalRow)->getNumberFormat()->setFormatCode('#,##0.000');
         
         // Apply borders to all data cells
-        $ordersSheet->getStyle('A6:N' . ($row - 1))->applyFromArray([
+        $ordersSheet->getStyle('A6:E' . ($row - 1))->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -300,24 +307,20 @@ class OrdersExcelExport
             ],
         ]);
         
-        // Center align specific columns
-        $ordersSheet->getStyle('C7:C' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT); // Customer name
-        $ordersSheet->getStyle('L7:L' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT); // Category sequences
-        $ordersSheet->getStyle('M7:M' . ($row - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT); // Notes
-        
         // Auto-size columns
-        foreach (range('A', 'N') as $col) {
-            $ordersSheet->getColumnDimension($col)->setAutoSize(true);
+        foreach (range('A', 'E') as $colChar) {
+            $ordersSheet->getColumnDimension($colChar)->setAutoSize(true);
         }
         
         // Add filters
-        $ordersSheet->setAutoFilter('A6:N6');
+        $ordersSheet->setAutoFilter('A6:E6');
     }
 
     private function createDetailedItemsSheet()
     {
         $itemsSheet = $this->spreadsheet->createSheet();
         $itemsSheet->setTitle('Order Items');
+        $this->addSheetBranding($itemsSheet, 'K');
         
         // Company header
         $itemsSheet->mergeCells('A1:K1');
@@ -439,6 +442,56 @@ class OrdersExcelExport
         
         // Add filters
         $itemsSheet->setAutoFilter('A6:K6');
+    }
+
+    private function addSheetBranding(Worksheet $sheet, string $lastColumn): void
+    {
+        // Add left and right logos at the top with slight vertical offset
+        try {
+            $logoPath = function_exists('public_path') ? public_path('logo.png') : null;
+            if (!$logoPath || !@is_file($logoPath)) {
+                $logoPath = base_path('public/logo.png');
+            }
+            if ($logoPath && @is_file($logoPath)) {
+                // Left logo
+                $leftLogo = new Drawing();
+                $leftLogo->setName('Logo Left');
+                $leftLogo->setPath($logoPath);
+                $leftLogo->setCoordinates('A1');
+                $leftLogo->setOffsetY(10);
+                $leftLogo->setHeight(50);
+                $leftLogo->setWorksheet($sheet);
+
+                // Right logo
+                $rightLogo = new Drawing();
+                $rightLogo->setName('Logo Right');
+                $rightLogo->setPath($logoPath);
+                $rightLogo->setCoordinates($lastColumn . '1');
+                $rightLogo->setOffsetY(10);
+                $rightLogo->setHeight(50);
+                $rightLogo->setWorksheet($sheet);
+            }
+        } catch (\Throwable $e) {
+            // Ignore branding errors
+        }
+
+        // Add centered header watermark using header/footer image
+        try {
+            $wmPath = function_exists('public_path') ? public_path('logo.png') : null;
+            if (!$wmPath || !@is_file($wmPath)) {
+                $wmPath = base_path('public/logo.png');
+            }
+            if ($wmPath && @is_file($wmPath)) {
+                $sheet->getHeaderFooter()->setOddHeader('&C&G');
+                $headerImage = new HeaderFooterDrawing();
+                $headerImage->setName('Watermark');
+                $headerImage->setPath($wmPath);
+                $headerImage->setHeight(200);
+                $sheet->getHeaderFooter()->addImage($headerImage, HeaderFooter::IMAGE_HEADER_CENTER);
+            }
+        } catch (\Throwable $e) {
+            // Ignore header/footer image errors
+        }
     }
 
     private function createChartsSheet()
@@ -680,8 +733,13 @@ class OrdersExcelExport
     {
         $filters = [];
         
-        if (!empty($this->filters['date_from']) && !empty($this->filters['date_to'])) {
+        if (!empty($this->filters['shift_id'])) {
+            $filters[] = 'Shift: #' . $this->filters['shift_id'];
+        } elseif (!empty($this->filters['date_from']) && !empty($this->filters['date_to'])) {
             $filters[] = 'Date: ' . $this->filters['date_from'] . ' to ' . $this->filters['date_to'];
+        }
+        if (!empty($this->filters['shift_id'])) {
+            $filters[] = 'Shift: #' . $this->filters['shift_id'];
         }
         
         if (!empty($this->filters['status'])) {

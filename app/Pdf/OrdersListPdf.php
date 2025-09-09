@@ -3,6 +3,8 @@
 namespace App\Pdf;
 
 use App\Models\Order;
+use App\Models\Setting;
+use App\Models\Payment;
 use TCPDF;
 use Exception;
 
@@ -36,10 +38,86 @@ class OrdersListPdf extends TCPDF
 
     public function Header()
     {
-        // Simple header without background
+        // Simple header with optional logo
         $this->SetFont($this->font, 'B', 16);
         $this->SetTextColor(0, 0, 0);
-        $this->Cell(0, 8, $this->companyName, 0, 1, 'C');
+
+        // Page-wide faint watermark (centered)
+        try {
+            $wmPath = function_exists('public_path') ? public_path('logo.png') : null;
+            if ($wmPath && @is_file($wmPath)) {
+                $pageWidth = $this->GetPageWidth();
+                $pageHeight = $this->GetPageHeight();
+                $maxWidth = $pageWidth * 0.6;
+                $maxHeight = $pageHeight * 0.6;
+
+                $w = 80; // fallback
+                $h = 80; // fallback
+                $info = @getimagesize($wmPath);
+                if ($info && !empty($info[0]) && !empty($info[1])) {
+                    $aspect = $info[0] / max(1, $info[1]);
+                    if ($aspect >= 1) {
+                        $w = min($maxWidth, $maxHeight * $aspect);
+                        $h = $w / $aspect;
+                    } else {
+                        $h = min($maxHeight, $maxWidth / $aspect);
+                        $w = $h * $aspect;
+                    }
+                }
+
+                $x = ($pageWidth - $w) / 2;
+                $y = ($pageHeight - $h) / 2;
+
+                if (method_exists($this, 'SetAlpha')) {
+                    $this->SetAlpha(0.06);
+                }
+                $this->Image($wmPath, $x, $y, $w, $h, 'PNG');
+                if (method_exists($this, 'SetAlpha')) {
+                    $this->SetAlpha(1);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore watermark errors completely
+        }
+
+        // Try to render the main logo from backend public folder
+        try {
+            $logoPath = function_exists('public_path') ? public_path('logo.png') : null;
+            if ($logoPath && @is_file($logoPath)) {
+                $pageWidth = $this->GetPageWidth();
+                $leftMargin = $this->lMargin;
+                $rightMargin = $this->rMargin;
+                $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+
+                $yBase = $this->GetY();
+                $yOffset = 10; // place logos slightly lower
+                $imgHeight = 30; // mm (50% increase)
+
+                // Calculate width from image aspect ratio, constrain to 30% of available width
+                $imgWidth = 30; // fallback width (50% increase)
+                $info = @getimagesize($logoPath);
+                if ($info && !empty($info[0]) && !empty($info[1])) {
+                    $aspect = $info[0] / max(1, $info[1]);
+                    $imgWidth = min($imgHeight * $aspect, $availableWidth * 0.45); // cap increased by 50%
+                }
+
+                // Left logo
+                $xLeft = $leftMargin;
+                $y = $yBase + $yOffset;
+                $this->Image($logoPath, $xLeft, $y, $imgWidth, $imgHeight, 'PNG');
+
+                // Right logo
+                $xRight = $pageWidth - $rightMargin - $imgWidth;
+                $this->Image($logoPath, $xRight, $y, $imgWidth, $imgHeight, 'PNG');
+
+                // Move cursor below the logos
+                $this->SetY($y  + 10);
+            }
+        } catch (\Throwable $e) {
+            // Ignore logo errors; fallback to text header
+        }
+
+        $this->Cell(0, 5, $this->companyName, 0, 1, 'C');
         
         if ($this->companyAddress) {
             $this->SetFont($this->font, '', 10);
@@ -107,6 +185,10 @@ class OrdersListPdf extends TCPDF
             $filters[] = 'Order ID: ' . $this->filters['order_id'];
         }
         
+        if (!empty($this->filters['shift_id'])) {
+            $filters[] = 'Shift: #' . $this->filters['shift_id'];
+        }
+
         return implode(', ', $filters);
     }
 
@@ -116,6 +198,9 @@ class OrdersListPdf extends TCPDF
         $this->AddPage('P');
         $this->SetFont($this->font, '', 11);
 
+        // Payment methods breakdown at the top
+        $this->generatePaymentMethodBreakdown();
+
         // Show new orders table with heading first
         $this->generateOrdersTable();
         
@@ -123,6 +208,87 @@ class OrdersListPdf extends TCPDF
         $this->generateSummary();
 
         return $this->Output('', 'S');
+    }
+
+    private function generatePaymentMethodBreakdown()
+    {
+        // Calculate available width (page width minus left and right margins)
+        $pageWidth = $this->GetPageWidth();
+        $leftMargin = $this->lMargin;
+        $rightMargin = $this->rMargin;
+        $topMargin = $this->tMargin;
+        $availableWidth = $pageWidth - $leftMargin - $rightMargin;
+
+        // Ensure we start just after the header block
+        $headerHeight = 35;
+        $currentY = $this->GetY();
+        $requiredY = $topMargin + $headerHeight + 2; // slight spacing after header
+        if ($currentY < $requiredY) {
+            $this->SetY($requiredY);
+        }
+
+        // Aggregate paid amounts by payment method from payments table (only type = 'payment')
+        $orderIds = $this->orders ? $this->orders->pluck('id')->filter()->all() : [];
+        $methodTotals = [];
+        if (!empty($orderIds)) {
+            $rows = Payment::query()
+                ->whereIn('order_id', $orderIds)
+                ->where('type', 'payment')
+                ->selectRaw('COALESCE(method, "unknown") as method, SUM(amount) as total')
+                ->groupBy('method')
+                ->get();
+
+            foreach ($rows as $row) {
+                $key = (string) ($row->method ?? 'unknown');
+                $methodTotals[$key] = (float) $row->total;
+            }
+        }
+
+        if (empty($methodTotals)) {
+            return;
+        }
+
+        // Labels from settings (Arabic map used across backend); fallback to formatted key
+        $labels = Setting::getValue('payment_methods_ar', []);
+        if (!is_array($labels)) {
+            $labels = [];
+        }
+
+        // Title
+        $this->SetFont($this->font, 'B', 12);
+        $this->SetTextColor(0, 0, 0);
+        $this->Cell(0, 7, 'Payment Methods Breakdown', 0, 1, 'L');
+
+        // Table columns
+        $col = [
+            'method' => $availableWidth * 0.6,
+            'amount' => $availableWidth * 0.4,
+        ];
+
+        // Header row
+        $this->SetFont($this->font, 'B', 10);
+        $this->SetFillColor(248, 249, 250);
+        $this->SetDrawColor(200, 200, 200);
+        $this->Cell($col['method'], 6, 'Method', 1, 0, 'L', true);
+        $this->Cell($col['amount'], 6, 'Paid', 1, 1, 'R', true);
+
+        // Body rows
+        $this->SetFont($this->font, '', 9);
+        $grandTotal = 0.0;
+        foreach ($methodTotals as $key => $value) {
+            $display = $labels[$key] ?? ucfirst(str_replace('_', ' ', (string) $key));
+            $this->Cell($col['method'], 6, $display, 1, 0, 'L', false);
+            $this->Cell($col['amount'], 6, number_format((float) $value, 3) . ' ' . $this->currencySymbol, 1, 1, 'R', false);
+            $grandTotal += (float) $value;
+        }
+
+        // Total row
+        $this->SetFont($this->font, 'B', 10);
+        $this->SetFillColor(220, 220, 220);
+        $this->Cell($col['method'], 6, 'Total Paid', 1, 0, 'L', true);
+        $this->Cell($col['amount'], 6, number_format($grandTotal, 3) . ' ' . $this->currencySymbol, 1, 1, 'R', true);
+
+        $this->Ln(6);
     }
 
     private function generateSummary()
@@ -226,31 +392,32 @@ class OrdersListPdf extends TCPDF
         
         $this->Ln(5);
         
-        // Simple table header without colors
+        // Professional table header
         $this->SetFont($this->font, 'B', 11);
-        $this->SetTextColor(0, 0, 0);
-        $this->SetDrawColor(0, 0, 0);
+        $this->SetTextColor(52, 73, 94);
+        $this->SetDrawColor(200, 200, 200);
+        $this->SetFillColor(248, 249, 250);
+        $rowHeight = 7;
         
-        // Calculate column widths based on available space
+        // Calculate refined column widths based on available space
         $colWidths = [
-            'id' => $availableWidth * 0.15,      // 15% of available width
-            'date' => $availableWidth * 0.25,     // 25% of available width
-            'items' => $availableWidth * 0.20,    // 20% of available width
-            'total' => $availableWidth * 0.20,    // 20% of available width
-            'paid' => $availableWidth * 0.20      // 20% of available width
+            'id' => $availableWidth * 0.12,      // 12%
+            'date' => $availableWidth * 0.26,    // 26%
+            'items' => $availableWidth * 0.15,   // 15%
+            'total' => $availableWidth * 0.235,  // 23.5%
+            'paid' => $availableWidth * 0.235    // 23.5%
         ];
 
-        
-        $this->Cell($colWidths['id'], 5, 'ID', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['date'], 5, 'Date', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['items'], 5, 'Items', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['total'], 5, 'Total', 'TB', 0, 'C', false);
-        $this->Cell($colWidths['paid'], 5, 'Paid', 'TB', 1, 'C', false);
+        $this->Cell($colWidths['id'], $rowHeight, 'ID', 1, 0, 'C', true);
+        $this->Cell($colWidths['date'], $rowHeight, 'Date', 1, 0, 'C', true);
+        $this->Cell($colWidths['items'], $rowHeight, 'Items', 1, 0, 'C', true);
+        $this->Cell($colWidths['total'], $rowHeight, 'Total (' . $this->currencySymbol . ')', 1, 0, 'C', true);
+        $this->Cell($colWidths['paid'], $rowHeight, 'Paid (' . $this->currencySymbol . ')', 1, 1, 'C', true);
 
-        // Table body with enhanced styling
+        // Table body with professional styling
         $this->SetFont($this->font, '', 10);
         $this->SetTextColor(0, 0, 0);
-        $this->SetDrawColor(0, 0, 0);
+        $this->SetDrawColor(230, 230, 230);
         $fill = false;
         
         foreach ($this->orders as $order) {
@@ -259,26 +426,33 @@ class OrdersListPdf extends TCPDF
                 $this->AddPage('P');
                 // Repeat header on new page
                 $this->SetFont($this->font, 'B', 11);
-                $this->SetTextColor(0, 0, 0);
-                $this->SetDrawColor(0, 0, 0);
-                
-                $this->Cell($colWidths['id'], 5, 'ID', 0, 0, 'C', false);
-                $this->Cell($colWidths['date'], 5, 'Date', 0, 0, 'C', false);
-                $this->Cell($colWidths['items'], 5, 'Items', 0, 0, 'C', false);
-                $this->Cell($colWidths['total'], 5, 'Total', 0, 0, 'C', false);
-                $this->Cell($colWidths['paid'], 5, 'Paid', 0, 1, 'C', false);
-                
+                $this->SetTextColor(52, 73, 94);
+                $this->SetDrawColor(200, 200, 200);
+                $this->SetFillColor(248, 249, 250);
+
+                $this->Cell($colWidths['id'], $rowHeight, 'ID', 1, 0, 'C', true);
+                $this->Cell($colWidths['date'], $rowHeight, 'Date', 1, 0, 'C', true);
+                $this->Cell($colWidths['items'], $rowHeight, 'Items', 1, 0, 'C', true);
+                $this->Cell($colWidths['total'], $rowHeight, 'Total (' . $this->currencySymbol . ')', 1, 0, 'C', true);
+                $this->Cell($colWidths['paid'], $rowHeight, 'Paid (' . $this->currencySymbol . ')', 1, 1, 'C', true);
+
                 $this->SetFont($this->font, '', 10);
                 $this->SetTextColor(0, 0, 0);
-                $this->SetDrawColor(0, 0, 0);
+                $this->SetDrawColor(230, 230, 230);
                 $fill = false;
             }
 
-            // Set alternating row colors with lighter sky blue and skip styling
-            if ($fill) {
-                $this->SetFillColor(167, 230, 245); // 50% lighter sky blue for alternating rows
+            // Highlight fully paid rows; otherwise use very light zebra
+            $isPaid = (isset($order->payment_status) && strtolower((string) $order->payment_status) === 'paid')
+                || (((float) ($order->total_amount ?? 0)) > 0 && (float) ($order->paid_amount ?? 0) >= (float) ($order->total_amount ?? 0));
+
+            if ($isPaid) {
+                // soft green highlight
+                $this->SetFillColor(232, 248, 234);
+                $rowFill = true;
             } else {
-                $this->SetFillColor(255, 255, 255); // White for other rows (no styling)
+                $this->SetFillColor($fill ? 252 : 255, $fill ? 253 : 255, 255);
+                $rowFill = $fill;
             }
             
             $orderDate = $order->order_date ? date('m/d/Y', strtotime($order->order_date)) : '-';
@@ -291,18 +465,18 @@ class OrdersListPdf extends TCPDF
                 $sequences = implode(', ', $order->category_sequences);
             }
             
-            $this->Cell($colWidths['id'], 5, $order->id, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['date'], 5, $orderDate, 0, 0, 'C', $fill);
-            $this->Cell($colWidths['items'], 5, $totalItems, 0, 0, 'C', $fill);
-            
-            
-            $this->Cell($colWidths['total'], 5, number_format($order->total_amount, 3), 0, 0, 'C', $fill);
-            $this->Cell($colWidths['paid'], 5, number_format($order->paid_amount, 3), 0, 1, 'C', $fill);
+            $this->Cell($colWidths['id'], $rowHeight, $order->id.'-'.$order->daily_order_number, 'LR', 0, 'C', $rowFill);
+            $this->Cell($colWidths['date'], $rowHeight, $orderDate, 'LR', 0, 'C', $rowFill);
+            $this->Cell($colWidths['items'], $rowHeight, $totalItems, 'LR', 0, 'C', $rowFill);
+            $this->Cell($colWidths['total'], $rowHeight, number_format($order->total_amount, 3) . ' ' . $this->currencySymbol, 'LR', 0, 'C', $rowFill);
+            $this->Cell($colWidths['paid'], $rowHeight, number_format($order->paid_amount, 3) . ' ' . $this->currencySymbol, 'LR', 1, 'C', $rowFill);
             
             $fill = !$fill;
         }
         
-        // Add totals row
+        // Close table bottom border and add totals row
+        $this->SetDrawColor(200, 200, 200);
+        $this->Line($this->lMargin, $this->GetY(), $this->GetPageWidth() - $this->rMargin, $this->GetY());
         $this->addTotalsRow($colWidths);
     }
     
@@ -318,15 +492,16 @@ class OrdersListPdf extends TCPDF
         
         // Totals row styling
         $this->SetFont($this->font, 'B', 10);
-        $this->SetTextColor(0, 0, 0);
-        $this->SetFillColor(220, 220, 220); // Light gray for totals row
-        $this->SetDrawColor(0, 0, 0);
-        
-        $this->Cell($colWidths['id'], 5, 'TOTAL', 0, 0, 'C', true);
-        $this->Cell($colWidths['date'], 5, '', 0, 0, 'C', true);
-        $this->Cell($colWidths['items'], 5, $totalItems, 0, 0, 'C', true);
-        $this->Cell($colWidths['total'], 5, number_format($totalAmount, 3), 0, 0, 'C', true);
-        $this->Cell($colWidths['paid'], 5, number_format($totalPaid, 3), 0, 1, 'C', true);
+        $this->SetTextColor(15, 15, 15);
+        $this->SetFillColor(240, 240, 240);
+        $this->SetDrawColor(200, 200, 200);
+
+        $rowHeight = 7;
+        $this->Cell($colWidths['id'], $rowHeight, 'TOTAL', 1, 0, 'C', true);
+        $this->Cell($colWidths['date'], $rowHeight, '', 1, 0, 'C', true);
+        $this->Cell($colWidths['items'], $rowHeight, $totalItems, 1, 0, 'C', true);
+        $this->Cell($colWidths['total'], $rowHeight, number_format($totalAmount, 3) . ' ' . $this->currencySymbol, 1, 0, 'C', true);
+        $this->Cell($colWidths['paid'], $rowHeight, number_format($totalPaid, 3) . ' ' . $this->currencySymbol, 1, 1, 'C', true);
     }
     
 
@@ -467,6 +642,10 @@ class OrdersListPdf extends TCPDF
             $filterText[] = 'Category Seq: ' . $this->filters['category_sequence_search'];
         }
         
+        if (!empty($this->filters['shift_id'])) {
+            $filterText[] = 'Shift: #' . $this->filters['shift_id'];
+        }
+
         if (!empty($filterText)) {
             $this->SetFont($this->font, '', 9);
             $this->SetTextColor(128, 128, 128);

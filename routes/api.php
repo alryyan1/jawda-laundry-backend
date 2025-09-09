@@ -92,6 +92,7 @@ Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'upda
   Route::apiResource('orders', OrderController::class);
   Route::get('/orders/{order}/items', [OrderController::class, 'getOrderItems']);
   Route::post('/orders/{order}/items', [OrderController::class, 'addOrderItem']);
+  Route::get('/shifts/{shift}/orders', [OrderController::class, 'getOrdersByShift']);
   Route::post('/orders/{order}/cancel', [OrderController::class, 'cancelOrder']);
   // Shifts
   Route::get('/shifts/current', [ShiftController::class, 'current']);

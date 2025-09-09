@@ -58,7 +58,7 @@ class ExpenseController extends Controller
             'name' => 'required|string|max:255',
             'expense_category_id' => 'required|integer|exists:expense_categories,id',
             'description' => 'nullable|string|max:2000',
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|numeric|min:0.001',
             'expense_date' => 'required|date_format:Y-m-d',
             'payment_method' => 'required|string|max:255',
         ]);
@@ -91,7 +91,7 @@ class ExpenseController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'expense_category_id' => 'sometimes|required|integer|exists:expense_categories,id',
             'description' => 'sometimes|nullable|string|max:2000',
-            'amount' => 'sometimes|required|numeric|min:0.01',
+            'amount' => 'sometimes|required|numeric|min:0.001',
             'expense_date' => 'sometimes|required|date_format:Y-m-d',
             'payment_method' => 'sometimes|required|string|max:255',
         ]);
