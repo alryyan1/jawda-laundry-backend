@@ -1417,8 +1417,8 @@ class OrderController extends Controller
         ])->get();
         
         try {
-            // Use the professional Excel export
-            $excelExport = new \App\Excel\OrdersExcelExport();
+            // Use the new payments-focused Excel export
+            $excelExport = new \App\Excel\OrdersPaymentsExcelExport();
             $excelExport->setOrders($orders);
             $excelExport->setFilters($request->all());
             $excelExport->setSettings([
