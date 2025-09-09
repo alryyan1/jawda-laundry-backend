@@ -1396,15 +1396,13 @@ class OrderController extends Controller
      */
     public function exportCsv(Request $request)
     {
-        // Default to latest shift if none provided, and clear date filters to enforce shift-based export
-        if (!$request->filled('shift_id')) {
-            $latestShift = \App\Models\Shift::orderByDesc('opened_at')->orderByDesc('id')->first();
-            if ($latestShift) {
-                $request->merge(['shift_id' => $latestShift->id]);
-                // Remove date range to avoid conflicting filters in headers and query
-                $request->request->remove('date_from');
-                $request->request->remove('date_to');
-            }
+        // Always use latest shift for export, ignoring any provided shift_id or date range
+        $latestShift = \App\Models\Shift::orderByDesc('opened_at')->orderByDesc('id')->first();
+        if ($latestShift) {
+            $request->merge(['shift_id' => $latestShift->id]);
+            // Remove date range to avoid conflicting filters in headers and query
+            $request->request->remove('date_from');
+            $request->request->remove('date_to');
         }
 
         // Reuse the same query builder logic from the index method
