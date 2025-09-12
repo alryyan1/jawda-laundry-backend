@@ -424,6 +424,14 @@ class OrdersListPdf extends TCPDF
             // Check if we need a new page
             if ($this->GetY() > 180) {
                 $this->AddPage('P');
+                // After adding a new page, ensure content starts below header and top margin
+                $headerHeight = 35;
+                $topMargin = $this->tMargin;
+                $currentY = $this->GetY();
+                $requiredY = $topMargin + $headerHeight + 10; // match initial spacing
+                if ($currentY < $requiredY) {
+                    $this->SetY($requiredY);
+                }
                 // Repeat header on new page
                 $this->SetFont($this->font, 'B', 11);
                 $this->SetTextColor(52, 73, 94);

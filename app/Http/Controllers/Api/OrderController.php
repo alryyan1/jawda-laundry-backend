@@ -14,7 +14,7 @@ use App\Http\Resources\OrderResource;
 use App\Pdf\InvoicePdf;
 use App\Models\Setting;
 use App\Pdf\PosInvoicePdf;
-use App\Services\PricingService; // <-- Import the service
+ 
 use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
 use App\Events\OrderCreated;
@@ -31,18 +31,7 @@ use App\Events\PrintJobCreated;
 
 class OrderController extends Controller
 {
-    protected PricingService $pricingService;
     // protected InventoryService $inventoryService; // Removed inventory service dependency
-
-    public function __construct(PricingService $pricingService)
-    {
-        // Use Laravel's service container to automatically inject the PricingService
-        $this->pricingService = $pricingService;
-        // Remove inventory service dependency
-        // $this->inventoryService = $inventoryService;
-
-        // Authorization middleware removed
-    }
 
      // Refactor the index method to use the helper
      public function index(Request $request)
@@ -91,9 +80,6 @@ class OrderController extends Controller
         if (!$isEmptyOrder || ($request->has('items') && !empty($request->input('items')))) {
             $validationRules['items.*.service_offering_id'] = 'required|integer';
             $validationRules['items.*.quantity'] = 'required|integer|min:1';
-            $validationRules['items.*.product_description_custom'] = 'nullable|string|max:255';
-            $validationRules['items.*.length_meters'] = 'nullable|numeric|min:0';
-            $validationRules['items.*.width_meters'] = 'nullable|numeric|min:0';
             $validationRules['items.*.notes'] = 'nullable|string|max:1000';
         }
         
@@ -149,10 +135,9 @@ class OrderController extends Controller
                                 $regularServiceOffering = ServiceOffering::create([
                                     'product_type_id' => $customerServiceOffering->product_type_id,
                                     'service_action_id' => $customerServiceOffering->service_action_id,
-                                    'name' => $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name,
+                                    'name' => $customerServiceOffering->serviceAction->name,
                                     'description' => $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description,
                                     'default_price' => $customerServiceOffering->default_price,
-                                    'default_price_per_sq_meter' => $customerServiceOffering->default_price_per_sq_meter,
                                     'is_active' => $customerServiceOffering->is_active,
                                 ]);
                             }
@@ -166,25 +151,17 @@ class OrderController extends Controller
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
 
-                    $priceDetails = $this->pricingService->calculatePrice(
-                        $serviceOffering,
-                        $customer,
-                        $itemData['quantity'],
-                        $itemData['length_meters'] ?? null,
-                        $itemData['width_meters'] ?? null
-                    );
+                    $unitPrice = (float) ($serviceOffering->default_price ?? 0);
+                    $quantity = (int) $itemData['quantity'];
+                    $subTotal = $unitPrice * $quantity;
 
                     $orderItemsToCreate[] = [
                         'service_offering_id' => $serviceOffering->id,
-                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
                         'quantity' => $itemData['quantity'],
-                        'length_meters' => $itemData['length_meters'] ?? null,
-                        'width_meters' => $itemData['width_meters'] ?? null,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
+                        'sub_total' => $subTotal,
                         'notes' => $itemData['notes'] ?? null,
                     ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    $orderTotalAmount += $subTotal;
                 }
             }
 
@@ -199,7 +176,7 @@ class OrderController extends Controller
                 'order_type' => $validatedData['order_type'] ?? 'in_house',
                 'dining_table_id' => $validatedData['dining_table_id'] ?? null, // Add dining table ID
                 'total_amount' => $orderTotalAmount,
-                'paid_amount' => 0,
+                'paid_amount' => 0.00,
                 'payment_status' => 'pending',
                 'notes' => $validatedData['notes'] ?? null,
                 'due_date' => $validatedData['due_date'] ?? null,
@@ -291,9 +268,6 @@ class OrderController extends Controller
         $validatedData = $request->validate([
             'service_offering_id' => 'required|integer',
             'quantity' => 'required|integer|min:1',
-            'product_description_custom' => 'nullable|string|max:255',
-            'length_meters' => 'nullable|numeric|min:0',
-            'width_meters' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -348,11 +322,7 @@ class OrderController extends Controller
             // Create order item
             $orderItem = $order->items()->create([
                 'service_offering_id' => $serviceOffering->id,
-                'product_description_custom' => $validatedData['product_description_custom'] ?? null,
                 'quantity' => $quantity,
-                'length_meters' => $validatedData['length_meters'] ?? null,
-                'width_meters' => $validatedData['width_meters'] ?? null,
-                'calculated_price_per_unit_item' => $unitPrice,
                 'sub_total' => $subTotal,
                 'notes' => $validatedData['notes'] ?? null,
             ]);
@@ -408,9 +378,6 @@ class OrderController extends Controller
             'items' => 'sometimes|array|min:1', // Allow items to be updated
             'items.*.service_offering_id' => 'required_with:items|integer',
             'items.*.quantity' => 'required_with:items|integer|min:1',
-            'items.*.product_description_custom' => 'nullable|string|max:255',
-            'items.*.length_meters' => 'nullable|numeric|min:0',
-            'items.*.width_meters' => 'nullable|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:1000',
         ]);
         
@@ -472,10 +439,9 @@ class OrderController extends Controller
                             $serviceOffering->id = $customerServiceOffering->id;
                             $serviceOffering->product_type_id = $customerServiceOffering->product_type_id;
                             $serviceOffering->service_action_id = $customerServiceOffering->service_action_id;
-                            $serviceOffering->name = $customerServiceOffering->name_override ?: $customerServiceOffering->serviceAction->name;
+                            $serviceOffering->name = $customerServiceOffering->serviceAction->name;
                             $serviceOffering->description = $customerServiceOffering->description_override ?: $customerServiceOffering->serviceAction->description;
                             $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
-                            $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
                             $serviceOffering->is_active = $customerServiceOffering->is_active;
                             
                             // Load the relationships
@@ -488,25 +454,17 @@ class OrderController extends Controller
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
 
-                    $priceDetails = $this->pricingService->calculatePrice(
-                        $serviceOffering,
-                        $customer,
-                        $itemData['quantity'],
-                        $itemData['length_meters'] ?? null,
-                        $itemData['width_meters'] ?? null
-                    );
+                    $unitPrice = (float) ($serviceOffering->default_price ?? 0);
+                    $quantity = (int) $itemData['quantity'];
+                    $subTotal = $unitPrice * $quantity;
 
                     $orderItemsToCreate[] = [
                         'service_offering_id' => $serviceOffering->id,
-                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
-                        'quantity' => $itemData['quantity'],
-                        'length_meters' => $itemData['length_meters'] ?? null,
-                        'width_meters' => $itemData['width_meters'] ?? null,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
+                        'quantity' => $quantity,
+                        'sub_total' => $subTotal,
                         'notes' => $itemData['notes'] ?? null,
                     ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    $orderTotalAmount += $subTotal;
                 }
 
                 // Delete existing items and create new ones
@@ -544,7 +502,7 @@ class OrderController extends Controller
                     $paymentsCount = $order->payments()->count();
                     if ($paymentsCount > 0) {
                         $order->payments()->delete();
-                        $order->paid_amount = 0;
+                        $order->paid_amount = 0.00;
                         $order->payment_status = 'pending';
                         $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
                     }
@@ -632,7 +590,7 @@ class OrderController extends Controller
                     $paymentsCount = $order->payments()->count();
                     if ($paymentsCount > 0) {
                         $order->payments()->delete();
-                        $order->paid_amount = 0;
+                        $order->paid_amount = 0.00;
                         $order->payment_status = 'pending';
                         $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
                     }
@@ -707,6 +665,16 @@ class OrderController extends Controller
             ], 400);
         }
 
+        // Validate request data
+        $validatedData = $request->validate([
+            'items' => 'nullable|array',
+            'items.*.service_offering_id' => 'required_with:items|integer',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
+            'items.*.notes' => 'nullable|string|max:1000',
+            'customer_id' => 'nullable|integer|exists:customers,id',
+            'order_type' => 'nullable|in:in_house,take_away,delivery',
+        ]);
+
         DB::beginTransaction();
         try {
             // Log the initial state
@@ -718,7 +686,45 @@ class OrderController extends Controller
                 'old_total_amount' => $oldTotal,
                 'calculated_total_amount' => $calculatedTotal,
                 'items_count' => $order->items()->count(),
+                'new_items_count' => count($validatedData['items'] ?? []),
             ]);
+
+            // Update order details if provided
+            if (isset($validatedData['customer_id'])) {
+                $order->customer_id = $validatedData['customer_id'];
+            }
+            if (isset($validatedData['order_type'])) {
+                $order->order_type = $validatedData['order_type'];
+            }
+
+            // If items are provided, replace all existing items
+            if (isset($validatedData['items']) && !empty($validatedData['items'])) {
+                // Clear all existing order items
+                $order->items()->delete();
+                
+                // Add new items
+                foreach ($validatedData['items'] as $itemData) {
+                    $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
+                    if (!$serviceOffering) {
+                        throw new \Exception("Service offering not found: " . $itemData['service_offering_id']);
+                    }
+
+                    // Calculate subtotal using default price
+                    $unitPrice = (float) ($serviceOffering->default_price ?? 0);
+                    $quantity = (int) $itemData['quantity'];
+                    $subTotal = $unitPrice * $quantity;
+
+                    $orderItem = new OrderItem([
+                        'order_id' => $order->id,
+                        'service_offering_id' => $itemData['service_offering_id'],
+                        'quantity' => $quantity,
+                        'sub_total' => $subTotal,
+                        'notes' => $itemData['notes'] ?? null,
+                    ]);
+                    
+                    $orderItem->save();
+                }
+            }
             
             // Set received to true and set received_at timestamp
             $order->received = true;
@@ -769,7 +775,11 @@ class OrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Error marking order as received: " . $e->getMessage());
+            Log::error("Error marking order as received: " . $e->getMessage(), [
+                'order_id' => $order->id,
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
             return response()->json(['message' => 'Failed to mark order as received. An internal error occurred.'], 500);
         }
     }
@@ -801,7 +811,7 @@ class OrderController extends Controller
             $paymentsCount = $order->payments()->count();
             if ($paymentsCount > 0) {
                 $order->payments()->delete();
-                $order->paid_amount = 0;
+                    $order->paid_amount = 0.00;
                 $order->payment_status = 'pending';
                 $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
             }
@@ -884,8 +894,6 @@ class OrderController extends Controller
             'service_offering_id' => 'required|exists:service_offerings,id',
             'customer_id' => 'nullable|exists:customers,id',
             'quantity' => 'required|integer|min:1',
-            'length_meters' => 'nullable|numeric|min:0',
-            'width_meters' => 'nullable|numeric|min:0',
             'order_item_id' => 'nullable|exists:order_items,id', // Optional: if provided, update the order item
         ]);
 
@@ -893,28 +901,16 @@ class OrderController extends Controller
             $serviceOffering = ServiceOffering::findOrFail($validatedData['service_offering_id']);
             $customer = isset($validatedData['customer_id']) ? Customer::findOrFail($validatedData['customer_id']) : null;
             
-            // If order_item_id is provided, update the order item dimensions in the database
-            if (isset($validatedData['order_item_id'])) {
-                $orderItem = OrderItem::findOrFail($validatedData['order_item_id']);
-                $orderItem->length_meters = $validatedData['length_meters'] ?? null;
-                $orderItem->width_meters = $validatedData['width_meters'] ?? null;
-                $orderItem->save();
-                
-                Log::info('Updated order item dimensions:', [
-                    'order_item_id' => $orderItem->id,
-                    'length_meters' => $orderItem->length_meters,
-                    'width_meters' => $orderItem->width_meters,
-                ]);
-            }
             
-            $priceDetails = $this->pricingService->calculatePrice(
-                $serviceOffering,
-                $customer,
-                $validatedData['quantity'],
-                $validatedData['length_meters'] ?? null,
-                $validatedData['width_meters'] ?? null
-            );
-            return response()->json($priceDetails);
+            $unitPrice = (float) ($serviceOffering->default_price ?? 0);
+            $quantity = (int) $validatedData['quantity'];
+            $subTotal = $unitPrice * $quantity;
+            return response()->json([
+                'calculated_price_per_unit_item' => $unitPrice,
+                'sub_total' => round($subTotal, 3),
+                'applied_unit' => 'item',
+                'strategy_applied' => 'fixed',
+            ]);
         } catch (\Exception $e) {
             Log::error("Error quoting order item: " . $e->getMessage());
             return response()->json(['message' => 'Failed to calculate price quote.'], 500);
@@ -929,8 +925,6 @@ class OrderController extends Controller
         // Authorization check removed
 
         $validatedData = $request->validate([
-            'length_meters' => 'nullable|numeric|min:0',
-            'width_meters' => 'nullable|numeric|min:0',
         ]);
 
         try {
@@ -941,18 +935,14 @@ class OrderController extends Controller
             $orderItem->width_meters = $validatedData['width_meters'] ?? null;
             $orderItem->save();
             
-            // Recalculate the order item's subtotal using the new dimensions and quantity
-            $pricingService = app(PricingService::class);
-            $priceDetails = $pricingService->calculatePrice(
-                $orderItem->serviceOffering,
-                $orderItem->order->customer,
-                $orderItem->quantity,
-                $orderItem->length_meters,
-                $orderItem->width_meters
-            );
+            // Recalculate the order item's subtotal using default price and quantity
+            $unitPrice = (float) ($orderItem->serviceOffering->default_price ?? 0);
+            $priceDetails = [
+                'unit_price' => $unitPrice,
+                'sub_total' => $unitPrice * (int) $orderItem->quantity,
+            ];
             
-            // Update the order item's calculated price and subtotal
-            $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
+            // Update the order item's subtotal
             $orderItem->sub_total = $priceDetails['sub_total'];
             $orderItem->save();
             
@@ -961,7 +951,7 @@ class OrderController extends Controller
                 'quantity' => $orderItem->quantity,
                 'length_meters' => $orderItem->length_meters,
                 'width_meters' => $orderItem->width_meters,
-                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
+                'calculated_price_per_unit' => $unitPrice,
                 'subtotal' => $priceDetails['sub_total'],
                 'product_type' => $orderItem->serviceOffering->productType->name,
             ]);
@@ -1022,27 +1012,20 @@ class OrderController extends Controller
             $orderItem->quantity = $validatedData['quantity'];
             $orderItem->save();
             
-            // Recalculate the order item's subtotal using the new quantity and existing dimensions
-            $pricingService = app(PricingService::class);
-            $priceDetails = $pricingService->calculatePrice(
-                $orderItem->serviceOffering,
-                $orderItem->order->customer,
-                $orderItem->quantity,
-                $orderItem->length_meters,
-                $orderItem->width_meters
-            );
+            // Recalculate the order item's subtotal using default price and new quantity
+            $unitPrice = (float) ($orderItem->serviceOffering->default_price ?? 0);
+            $priceDetails = [
+                'unit_price' => $unitPrice,
+                'sub_total' => $unitPrice * (int) $orderItem->quantity,
+            ];
             
-            // Update the order item's calculated price and subtotal
-            $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
+            // Update the order item's subtotal
             $orderItem->sub_total = $priceDetails['sub_total'];
             $orderItem->save();
             
             Log::info('Updated order item quantity with recalculation:', [
                 'order_item_id' => $orderItem->id,
                 'quantity' => $orderItem->quantity,
-                'length_meters' => $orderItem->length_meters,
-                'width_meters' => $orderItem->width_meters,
-                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
                 'subtotal' => $priceDetails['sub_total'],
                 'product_type' => $orderItem->serviceOffering->productType->name,
             ]);
@@ -1537,6 +1520,12 @@ class OrderController extends Controller
         if ($request->filled('product_type_id')) {
             $query->whereHas('items.serviceOffering.productType', fn($q) => $q->where('id', $request->product_type_id));
         }
+        
+        // Filter by product category
+        if ($request->filled('category_id')) {
+            $query->whereHas('items.serviceOffering.productType.category', fn($q) => $q->where('id', $request->category_id));
+        }
+        
         if ($request->filled('created_date')) {
             $query->whereDate('created_at', $request->created_date);
         }
@@ -1552,6 +1541,49 @@ class OrderController extends Controller
         }
         
         return $query;
+    }
+
+    /**
+     * Get unique product categories from orders with counts.
+     */
+    public function getOrderCategories(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        // Build the same query as the main orders list to get consistent results
+        $query = $this->buildOrderQuery($request);
+        
+        // Get orders with their items and categories
+        $orders = $query->with(['items.serviceOffering.productType.category'])->get();
+        
+        // Extract unique categories with counts
+        $categoryMap = [];
+        
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                $category = $item->serviceOffering?->productType?->category;
+                if ($category) {
+                    if (!isset($categoryMap[$category->id])) {
+                        $categoryMap[$category->id] = [
+                            'id' => $category->id,
+                            'name' => $category->name,
+                            'count' => 0
+                        ];
+                    }
+                    $categoryMap[$category->id]['count']++;
+                }
+            }
+        }
+        
+        // Sort by count (descending)
+        $categories = array_values($categoryMap);
+        usort($categories, fn($a, $b) => $b['count'] - $a['count']);
+        
+        return response()->json($categories);
     }
 
     /**
@@ -1730,7 +1762,7 @@ class OrderController extends Controller
             $message .= "• Order #: *{$order->id}*\n";
             $message .= "• Received Date: *" . now()->format('d/m/Y H:i') . "*\n";
             $message .= "• Total Items: *" . $order->items->sum('quantity') . "*\n";
-            $message .= "• Total Amount: *" . number_format($order->total_amount, 3) . " OMR*\n\n";
+            $message .= "• Total Amount: *" . number_format((float)$order->total_amount, 3) . " OMR*\n\n";
             $message .= "🔄 *What's Next:*\n";
             $message .= "We will start processing your order immediately. You will receive updates on the progress.\n\n";
             $message .= "📞 *Contact Us:*\n";

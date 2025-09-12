@@ -11,8 +11,7 @@ use App\Models\Order;
 use App\Models\ServiceOffering;
 use App\Models\Supplier;
 use App\Models\Purchase;
-use App\Services\PricingService;
-use Illuminate\Support\Facades\App;
+ 
 use Illuminate\Support\Str;
 
 class TestSystemSeeder extends Seeder
@@ -95,7 +94,6 @@ class TestSystemSeeder extends Seeder
 
         // === Create a large number of Orders ===
         if (Order::count() < 200) {
-            $pricingService = App::make(PricingService::class);
             $customers = Customer::all();
             $activeOfferings = ServiceOffering::where('is_active', true)->with('productType')->get();
 
@@ -124,17 +122,18 @@ class TestSystemSeeder extends Seeder
                         $quantity = rand(1, 8);
                     }
 
-                    $priceDetails = $pricingService->calculatePrice($offering, $customer, $quantity, $length, $width);
+                    $unitPrice = (float) ($offering->default_price ?? 0);
+                    $subTotal = $unitPrice * (int) $quantity;
                     $orderItemsData[] = [
                         'service_offering_id' => $offering->id,
                         'product_description_custom' => fake()->boolean(20) ? 'Brand: ' . fake()->company() : null,
                         'quantity' => $quantity,
                         'length_meters' => $length,
                         'width_meters' => $width,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
+                        'calculated_price_per_unit_item' => $unitPrice,
+                        'sub_total' => $subTotal,
                     ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    $orderTotalAmount += $subTotal;
                 }
 
                 if (empty($orderItemsData)) continue;

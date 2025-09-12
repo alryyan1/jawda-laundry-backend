@@ -7,9 +7,9 @@ use App\Models\Order;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
 use App\Models\User;
-use App\Services\PricingService; // Assuming you will inject this
+ 
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\App; // To resolve service from container
+ 
 
 class OrderSeeder extends Seeder
 {
@@ -18,7 +18,7 @@ class OrderSeeder extends Seeder
         $customers = Customer::take(5)->get(); // Get a few customers
         $activeOfferings = ServiceOffering::where('is_active', true)->with(['productType', 'serviceAction'])->get();
         $staffUser = User::where('role', 'staff')->first();
-        $pricingService = App::make(PricingService::class); // Resolve PricingService
+        
 
         if ($customers->isEmpty() || $activeOfferings->isEmpty() || !$staffUser) {
             $this->command->warn('Cannot seed orders: Missing customers, active service offerings, or staff user.');
@@ -47,13 +47,8 @@ class OrderSeeder extends Seeder
                         $quantity = rand(1, 5);
                     }
 
-                    $priceDetails = $pricingService->calculatePrice(
-                        $offering,
-                        $customer, // Pass customer for customer-specific pricing
-                        $quantity,
-                        $length,
-                        $width
-                    );
+                    $unitPrice = (float) ($offering->default_price ?? 0);
+                    $subTotal = $unitPrice * (int) $quantity;
 
                     $orderItemsData[] = [
                         'service_offering_id' => $offering->id,
@@ -61,11 +56,11 @@ class OrderSeeder extends Seeder
                         'quantity' => $quantity,
                         'length_meters' => $length,
                         'width_meters' => $width,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
+                        'calculated_price_per_unit_item' => $unitPrice,
+                        'sub_total' => $subTotal,
                         'notes' => fake()->boolean(15) ? fake()->sentence(3) : null,
                     ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    $orderTotalAmount += $subTotal;
                 }
 
                 if (empty($orderItemsData)) continue; // Skip if no items somehow

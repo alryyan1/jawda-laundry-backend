@@ -95,6 +95,28 @@ class ShiftController extends Controller
 
         return response()->json(['message' => 'Shift closed', 'shift' => $shift]);
     }
+
+    public function byMonth(Request $request)
+    {
+        $validated = $request->validate([
+            'year' => 'required|integer|min:2020|max:2030',
+            'month' => 'required|integer|min:1|max:12',
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        // Get start and end of the month
+        $startOfMonth = \Carbon\Carbon::create($year, $month, 1)->startOfMonth();
+        $endOfMonth = \Carbon\Carbon::create($year, $month, 1)->endOfMonth();
+
+        $shifts = Shift::whereBetween('opened_at', [$startOfMonth, $endOfMonth])
+            ->orderByDesc('opened_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json(['shifts' => $shifts]);
+    }
 }
 
 

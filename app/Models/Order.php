@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes; // Orders are good candidates for soft deletes
 use App\Traits\LogsActivity;
 use Illuminate\Support\Facades\Log;
-use App\Services\PricingService;
+ 
 
 class Order extends Model
 {
@@ -177,7 +177,6 @@ class Order extends Model
      */
     public function recalculateTotalAmountWithItemRecalculation(): void
     {
-        $pricingService = app(PricingService::class);
         $totalAmount = 0;
 
         // Load items with their relationships
@@ -185,28 +184,22 @@ class Order extends Model
 
         foreach ($this->items as $item) {
             // Recalculate the price for this item, considering quantity
-            $priceDetails = $pricingService->calculatePrice(
-                $item->serviceOffering,
-                $this->customer,
-                $item->quantity,
-                $item->length_meters,
-                $item->width_meters
-            );
+            $unitPrice = (float) ($item->serviceOffering->default_price ?? 0);
+            $subTotal = $unitPrice * (int) $item->quantity;
 
-            // Update the item's calculated price and subtotal
-            $item->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
-            $item->sub_total = $priceDetails['sub_total'];
+            // Update the item's subtotal only (column for unit price no longer exists)
+            $item->sub_total = $subTotal;
             $item->saveQuietly(); // Use saveQuietly to avoid triggering events
 
-            $totalAmount += $priceDetails['sub_total'];
+            $totalAmount += $subTotal;
             
             Log::info('Recalculated order item:', [
                 'order_item_id' => $item->id,
                 'quantity' => $item->quantity,
                 'length_meters' => $item->length_meters,
                 'width_meters' => $item->width_meters,
-                'calculated_price_per_unit' => $priceDetails['calculated_price_per_unit_item'],
-                'subtotal' => $priceDetails['sub_total'],
+                'unit_price' => $unitPrice,
+                'subtotal' => $subTotal,
                 'product_type' => $item->serviceOffering->productType->name,
             ]);
         }

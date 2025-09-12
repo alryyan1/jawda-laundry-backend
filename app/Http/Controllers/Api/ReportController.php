@@ -95,7 +95,7 @@ class ReportController extends Controller
             ->select(
                 'service_offerings.id',
                 // Use a database-level CONCAT to build the display name
-                DB::raw("COALESCE(service_offerings.name_override, CONCAT(product_types.name, ' - ', service_actions.name)) as display_name"),
+                DB::raw("CONCAT(product_types.name, ' - ', service_actions.name) as display_name"),
                 DB::raw('SUM(order_items.quantity) as total_quantity'),
                 DB::raw('SUM(order_items.sub_total) as total_revenue')
             )

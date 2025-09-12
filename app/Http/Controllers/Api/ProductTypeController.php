@@ -93,7 +93,6 @@ class ProductTypeController extends Controller
             ],
             'product_category_id' => 'required|integer|exists:product_categories,id',
             'description' => 'nullable|string|max:1000',
-            'is_dimension_based' => 'sometimes|nullable|in:true,false,1,0,"true","false","1","0"',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             // 'is_active' => 'sometimes|boolean', // If you add an is_active field
         ], [
@@ -111,10 +110,7 @@ class ProductTypeController extends Controller
 
 
         try {
-            // Ensure is_dimension_based is properly converted to boolean
-            if (isset($validatedData['is_dimension_based'])) {
-                $validatedData['is_dimension_based'] = filter_var($validatedData['is_dimension_based'], FILTER_VALIDATE_BOOLEAN);
-            }
+            // removed is_dimension_based handling
             
             $productType = ProductType::create($validatedData);
             $productType->load('category');
@@ -157,7 +153,6 @@ class ProductTypeController extends Controller
             ],
             'product_category_id' => 'sometimes|required|integer|exists:product_categories,id',
             'description' => 'sometimes|nullable|string|max:1000',
-            'is_dimension_based' => 'sometimes|nullable|in:true,false,1,0,"true","false","1","0"',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             // 'is_active' => 'sometimes|boolean',
         ], [
@@ -184,10 +179,7 @@ class ProductTypeController extends Controller
         }
 
         try {
-            // Ensure is_dimension_based is properly converted to boolean
-            if (isset($validatedData['is_dimension_based'])) {
-                $validatedData['is_dimension_based'] = filter_var($validatedData['is_dimension_based'], FILTER_VALIDATE_BOOLEAN);
-            }
+            // removed is_dimension_based handling
             
             $productType->update($validatedData);
             $productType->load('category');
@@ -244,7 +236,6 @@ class ProductTypeController extends Controller
                 'service_action_id' => $action->id,
                 // Set defaults. Price is 0 so admin is forced to set it.
                 'default_price' => 0.00,
-                'default_price_per_sq_meter' => 0.00,
                 'is_active' => true, // Default to active, admin can deactivate
                 'created_at' => now(),
                 'updated_at' => now(),

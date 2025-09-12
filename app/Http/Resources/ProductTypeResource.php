@@ -18,7 +18,6 @@ class ProductTypeResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
-            'is_dimension_based' => $this->is_dimension_based,
             'product_category_id' => $this->product_category_id,
             'category' => new ProductCategoryResource($this->whenLoaded('category')),
 

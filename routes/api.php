@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/orders/{order}/order-type', [OrderController::class, 'updateOrderType']);
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
+  Route::get('/orders/categories', [OrderController::class, 'getOrderCategories']);
   Route::get('/orders/{order}/pos-invoice-base64', [OrderController::class, 'downloadPosInvoiceBase64']);
   Route::post('/orders/{order}/print', [OrderController::class, 'enqueuePrintJob']);
   Route::patch('/print-jobs/{printJob}', [OrderController::class, 'updatePrintJobStatus']);
@@ -97,6 +98,7 @@ Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'upda
   // Shifts
   Route::get('/shifts/current', [ShiftController::class, 'current']);
   Route::get('/shifts/latest', [ShiftController::class, 'latest']);
+  Route::get('/shifts/by-month', [ShiftController::class, 'byMonth']);
   Route::get('/shifts/{shift}/previous', [ShiftController::class, 'previous']);
   Route::get('/shifts/{shift}/next', [ShiftController::class, 'next']);
   Route::post('/shifts/open', [ShiftController::class, 'open']);

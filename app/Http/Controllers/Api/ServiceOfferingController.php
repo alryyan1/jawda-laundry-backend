@@ -38,8 +38,7 @@ class ServiceOfferingController extends Controller
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
-                $q->where('name_override', 'LIKE', "%{$searchTerm}%")
-                    ->orWhereHas('productType', fn($ptQuery) => $ptQuery->where('name', 'LIKE', "%{$searchTerm}%"))
+                $q->whereHas('productType', fn($ptQuery) => $ptQuery->where('name', 'LIKE', "%{$searchTerm}%"))
                     ->orWhereHas('serviceAction', fn($saQuery) => $saQuery->where('name', 'LIKE', "%{$searchTerm}%"));
             });
         }
@@ -50,7 +49,7 @@ class ServiceOfferingController extends Controller
         // Sorting
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
-        $allowedSorts = ['id', 'name_override', 'default_price', 'created_at'];
+        $allowedSorts = ['id', 'default_price', 'created_at'];
         if (in_array($sortBy, $allowedSorts) && in_array($sortDirection, ['asc', 'desc'])) {
             $query->orderBy($sortBy, $sortDirection);
         } else {
@@ -67,7 +66,7 @@ class ServiceOfferingController extends Controller
     public function allForSelect(Request $request)
     {
         $query = ServiceOffering::with([
-            'productType:id,name,is_dimension_based,product_category_id', // Only what's needed
+            'productType:id,name,product_category_id', // Only what's needed
             'serviceAction:id,name'
         ])
             ->where('is_active', true)
@@ -101,11 +100,8 @@ class ServiceOfferingController extends Controller
                 }),
             ],
             'service_action_id' => 'required|integer|exists:service_actions,id',
-            'name_override' => 'nullable|string|max:255',
             'description_override' => 'nullable|string|max:1000',
             'default_price' => 'nullable|numeric|min:0',
-            'default_price_per_sq_meter' => 'nullable|numeric|min:0',
-            'applicable_unit' => 'nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
         ], [
             'product_type_id.unique' => 'This service action is already offered for this product type.'
@@ -138,11 +134,8 @@ class ServiceOfferingController extends Controller
         $validatedData = $request->validate([
             'product_type_id' => 'sometimes|required|integer|exists:product_types,id',
             'service_action_id' => 'sometimes|required|integer|exists:service_actions,id',
-            'name_override' => 'sometimes|nullable|string|max:255',
             'description_override' => 'sometimes|nullable|string|max:1000',
             'default_price' => 'sometimes|nullable|numeric|min:0',
-            'default_price_per_sq_meter' => 'sometimes|nullable|numeric|min:0',
-            'applicable_unit' => 'sometimes|nullable|string|max:50',
             'is_active' => 'sometimes|boolean',
         ]);
 

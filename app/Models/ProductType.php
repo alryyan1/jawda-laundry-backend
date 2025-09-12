@@ -11,12 +11,10 @@ class ProductType extends Model
         'product_category_id',
         'name',
         'description',
-        'is_dimension_based', // Changed from base_measurement_unit
         'image_url',
     ];
 
     protected $casts = [
-        'is_dimension_based' => 'boolean', // Add this cast
     ];
     public function category()
     {
