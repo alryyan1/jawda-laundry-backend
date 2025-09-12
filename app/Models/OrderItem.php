@@ -33,6 +33,14 @@ class OrderItem extends Model
     }
 
     /**
+     * Get the calculated price per unit item (accessor for backward compatibility)
+     */
+    public function getCalculatedPricePerUnitItemAttribute()
+    {
+        return $this->serviceOffering ? (float) ($this->serviceOffering->default_price ?? 0) : 0;
+    }
+
+    /**
      * Boot method to recalculate order total when items are saved
      */
     protected static function boot()
