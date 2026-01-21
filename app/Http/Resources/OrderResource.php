@@ -19,10 +19,7 @@ class OrderResource extends JsonResource
             'daily_order_number' => $this->daily_order_number,
             'customer_id' => $this->customer_id,
             'customer' => new CustomerResource($this->whenLoaded('customer')),
-            'table_id' => $this->table_id,
-            'table' => new RestaurantTableResource($this->whenLoaded('table')),
-            'dining_table_id' => $this->dining_table_id,
-            'dining_table' => new DiningTableResource($this->whenLoaded('diningTable')),
+
             'user_id' => $this->user_id,
             'staff_user' => new UserResource($this->whenLoaded('user')), // Assuming 'user' is the relationship name for staff
             'status' => $this->status,
@@ -47,7 +44,7 @@ class OrderResource extends JsonResource
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
             'user' => new UserResource($this->whenLoaded('user')), // Fixed: use whenLoaded instead of load
-               
+
             // أضف هذا الحقل. سيتم تضمينه فقط إذا كان موجودًا في كائن الطلب.
             'overdue_days' => $this->when(isset($this->overdue_days), (int) $this->overdue_days),
             'whatsapp_pdf_sent' => $this->whatsapp_pdf_sent,

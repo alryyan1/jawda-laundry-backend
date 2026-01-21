@@ -11,7 +11,7 @@ use App\Services\PricingService;
 
 class Order extends Model
 {
-    use HasFactory , LogsActivity;
+    use HasFactory, LogsActivity;
 
     /**
      * The attributes that are mass assignable.
@@ -21,8 +21,6 @@ class Order extends Model
     protected $fillable = [
         'daily_order_number',
         'customer_id',
-        'table_id',
-        'dining_table_id',
         'user_id',
         'status',
         'order_complete',       // Track if order is completed
@@ -45,7 +43,7 @@ class Order extends Model
         'received_at',          // When order was received
         'order_receive_message_sent', // Track if receive message was sent
     ];
-    
+
     /**
      * The attributes that should be cast.
      *
@@ -76,21 +74,7 @@ class Order extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    /**
-     * Get the table associated with the Order.
-     */
-    public function table()
-    {
-        return $this->belongsTo(RestaurantTable::class, 'table_id');
-    }
 
-    /**
-     * Get the dining table associated with the Order.
-     */
-    public function diningTable()
-    {
-        return $this->belongsTo(DiningTable::class);
-    }
 
     /**
      * Get the user (staff member) who processed the Order.
@@ -115,8 +99,8 @@ class Order extends Model
     public function services()
     {
         return $this->belongsToMany(Service::class, 'order_items')
-                    ->withPivot('quantity', 'price_at_order', 'sub_total')
-                    ->withTimestamps();
+            ->withPivot('quantity', 'price_at_order', 'sub_total')
+            ->withTimestamps();
     }
 
     /**
@@ -144,7 +128,7 @@ class Order extends Model
     public function getCalculatedTotalAmountAttribute(): float
     {
         $calculated = (float) $this->items()->sum('sub_total');
-        
+
         // Debug logging
         Log::info('Calculating total amount for order:', [
             'order_id' => $this->id,
@@ -152,7 +136,7 @@ class Order extends Model
             'items_count' => $this->items()->count(),
             'items_sum' => $this->items()->sum('sub_total'),
         ]);
-        
+
         return $calculated;
     }
 
@@ -193,7 +177,7 @@ class Order extends Model
             $item->saveQuietly(); // Use saveQuietly to avoid triggering events
 
             $totalAmount += $priceDetails['sub_total'];
-            
+
             Log::info('Recalculated order item:', [
                 'order_item_id' => $item->id,
                 'quantity' => $item->quantity,
@@ -229,12 +213,12 @@ class Order extends Model
     public static function generateDailyOrderNumber(): int
     {
         $today = now()->format('Y-m-d');
-        
+
         // Count the number of orders for today
         $orderCount = self::whereDate('created_at', $today)
             ->whereNotNull('daily_order_number')
             ->count();
-        
+
         return $orderCount + 1;
     }
 
@@ -272,7 +256,7 @@ class Order extends Model
             if (empty($order->daily_order_number)) {
                 $order->daily_order_number = self::generateDailyOrderNumber();
             }
-            
+
             // Set pickup_date to 3 days from now if not provided and order is not a customer payment
             if (empty($order->pickup_date) && $order->order_type !== 'customer_payment') {
                 $order->pickup_date = now()->addDays(3);

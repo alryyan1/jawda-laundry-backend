@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Customer;
 use App\Models\ServiceOffering;
-use App\Models\DiningTable;
 use App\Models\CustomerProductServiceOffering;
 use Illuminate\Http\Request;
 use App\Http\Resources\OrderResource;
@@ -40,13 +39,13 @@ class OrderController extends Controller
         // Authorization middleware removed
     }
 
-     // Refactor the index method to use the helper
-     public function index(Request $request)
-     {
-         $query = $this->buildOrderQuery($request);
-         $orders = $query->paginate($request->get('per_page', 15));
-         return OrderResource::collection($orders);
-     }
+    // Refactor the index method to use the helper
+    public function index(Request $request)
+    {
+        $query = $this->buildOrderQuery($request);
+        $orders = $query->paginate($request->get('per_page', 15));
+        return OrderResource::collection($orders);
+    }
 
     /**
      * Store a newly created resource in storage.
@@ -55,14 +54,13 @@ class OrderController extends Controller
     {
         // Check if this is an empty order creation
         $isEmptyOrder = $request->has('create_empty_order') && $request->input('create_empty_order') === true;
-        
+
         $validationRules = [
             'notes' => 'nullable|string|max:2000',
             'due_date' => 'nullable|date_format:Y-m-d',
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
-            'dining_table_id' => 'nullable|exists:dining_tables,id',
         ];
-        
+
         if ($isEmptyOrder) {
             // For empty orders, customer_id and items are optional
             $validationRules['customer_id'] = 'nullable|exists:customers,id';
@@ -72,7 +70,7 @@ class OrderController extends Controller
             $validationRules['customer_id'] = 'required|exists:customers,id';
             $validationRules['items'] = 'required|array|min:1';
         }
-        
+
         // Add item validation rules if items are provided
         if (!$isEmptyOrder || ($request->has('items') && !empty($request->input('items')))) {
             $validationRules['items.*.service_offering_id'] = 'required|integer';
@@ -82,14 +80,14 @@ class OrderController extends Controller
             $validationRules['items.*.width_meters'] = 'nullable|numeric|min:0';
             $validationRules['items.*.notes'] = 'nullable|string|max:1000';
         }
-        
+
         $validatedData = $request->validate($validationRules);
 
         $customer = null;
         if (!empty($validatedData['customer_id'])) {
             $customer = Customer::findOrFail($validatedData['customer_id']);
         }
-        
+
         $orderTotalAmount = 0;
         $orderItemsToCreate = [];
         $warnings = []; // Array to collect warnings
@@ -101,19 +99,19 @@ class OrderController extends Controller
                 foreach ($validatedData['items'] as $itemData) {
                     // Try to find the service offering in regular service_offerings table first
                     $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
-                    
+
                     // If not found in regular table, try customer_product_service_offerings table
                     if (!$serviceOffering && $customer) {
                         $customerServiceOffering = CustomerProductServiceOffering::where('id', $itemData['service_offering_id'])
                             ->where('customer_id', $customer->id)
                             ->first();
-                        
+
                         if ($customerServiceOffering) {
                             // Check if a regular service offering exists for this product_type and service_action
                             $regularServiceOffering = ServiceOffering::where('product_type_id', $customerServiceOffering->product_type_id)
                                 ->where('service_action_id', $customerServiceOffering->service_action_id)
                                 ->first();
-                            
+
                             if (!$regularServiceOffering) {
                                 // Create the missing regular service offering
                                 $regularServiceOffering = ServiceOffering::create([
@@ -126,12 +124,12 @@ class OrderController extends Controller
                                     'is_active' => $customerServiceOffering->is_active,
                                 ]);
                             }
-                            
+
                             // Use the regular service offering for the order item
                             $serviceOffering = $regularServiceOffering;
                         }
                     }
-                    
+
                     if (!$serviceOffering) {
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
@@ -163,7 +161,7 @@ class OrderController extends Controller
                 'user_id' => Auth::id(),
                 'status' => 'pending',
                 'order_type' => $validatedData['order_type'] ?? 'in_house',
-                'dining_table_id' => $validatedData['dining_table_id'] ?? null, // Add dining table ID
+                'order_type' => $validatedData['order_type'] ?? 'in_house',
                 'total_amount' => $orderTotalAmount,
                 'paid_amount' => 0,
                 'payment_status' => 'pending',
@@ -173,31 +171,25 @@ class OrderController extends Controller
             ]);
 
             $order->items()->createMany($orderItemsToCreate);
-            
+
             // Recalculate total amount from created items to ensure consistency
             $order->recalculateTotalAmount();
-            
-            // Update dining table status to occupied if the order has a dining table
-            if ($order->dining_table_id) {
-                $diningTable = DiningTable::find($order->dining_table_id);
-                if ($diningTable) {
-                    $diningTable->update(['status' => 'occupied']);
-                }
-            }
-            
+
+
+
             // Generate category sequences for the order (inside transaction)
             if ($order->items()->count() > 0) {
                 $order->generateCategorySequences();
             }
-            
+
             DB::commit();
 
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
-            
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
+
             // Broadcast the order created event
             event(new OrderCreated($order));
             Log::info('OrderCreated event fired', ['order_id' => $order->id]);
-            
+
             // Return order with warnings if any
             $response = new OrderResource($order);
             if (!empty($warnings)) {
@@ -207,12 +199,11 @@ class OrderController extends Controller
                     'message' => 'Order created successfully with some warnings.'
                 ]);
             }
-            
+
             return response()->json([
                 'order' => $response,
                 'message' => 'Order created successfully.'
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error creating order: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
@@ -225,10 +216,10 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
+        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
         return new OrderResource($order);
     }
-      /**
+    /**
      * Update the specified resource in storage.
      * This now handles updates for notes, due_date, status, pickup_date, and adding items.
      */
@@ -259,7 +250,7 @@ class OrderController extends Controller
             'items.*.width_meters' => 'nullable|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:1000',
         ]);
-        
+
         $oldStatus = $order->status;
         $order->fill($validatedData); // Fill all validated data
         $newStatus = $order->status;
@@ -290,14 +281,14 @@ class OrderController extends Controller
             // Handle items update if provided
             if ($request->has('items')) {
                 $customer = $order->customer;
-                
+
                 // If no customer is set, we can't calculate prices
                 if (!$customer) {
                     return response()->json([
                         'message' => 'Cannot add items to order without a customer. Please select a customer first.'
                     ], 400);
                 }
-                
+
                 $orderTotalAmount = 0;
                 $orderItemsToCreate = [];
 
@@ -305,13 +296,13 @@ class OrderController extends Controller
                 foreach ($validatedData['items'] as $itemData) {
                     // Try to find the service offering in regular service_offerings table first
                     $serviceOffering = ServiceOffering::find($itemData['service_offering_id']);
-                    
+
                     // If not found in regular table, try customer_product_service_offerings table
                     if (!$serviceOffering) {
                         $customerServiceOffering = CustomerProductServiceOffering::where('id', $itemData['service_offering_id'])
                             ->where('customer_id', $customer->id)
                             ->first();
-                        
+
                         if ($customerServiceOffering) {
                             // Create a temporary service offering object from customer data
                             $serviceOffering = new ServiceOffering();
@@ -323,13 +314,13 @@ class OrderController extends Controller
                             $serviceOffering->default_price = $customerServiceOffering->custom_price ?: $customerServiceOffering->default_price;
                             $serviceOffering->default_price_per_sq_meter = $customerServiceOffering->custom_price_per_sq_meter ?: $customerServiceOffering->default_price_per_sq_meter;
                             $serviceOffering->is_active = $customerServiceOffering->is_active;
-                            
+
                             // Load the relationships
                             $serviceOffering->productType = $customerServiceOffering->productType;
                             $serviceOffering->serviceAction = $customerServiceOffering->serviceAction;
                         }
                     }
-                    
+
                     if (!$serviceOffering) {
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
@@ -358,23 +349,23 @@ class OrderController extends Controller
                 // Delete existing items and create new ones
                 $order->items()->delete();
                 $order->items()->createMany($orderItemsToCreate);
-                
+
                 // Recalculate and update order total from items
                 $order->recalculateTotalAmount();
-                
+
                 $order->logActivity("Order items were updated. New total: " . $order->total_amount);
             }
 
             // Save all changes
             $order->save();
-            
+
             // Check if order_complete was set to true and recalculate total amount
             $oldOrderComplete = $order->getOriginal('order_complete');
             if (!$oldOrderComplete && $order->order_complete) {
                 $order->recalculateTotalAmountWithItemRecalculation();
                 $order->logActivity("Order marked as complete - total amount recalculated: " . $order->total_amount);
             }
-            
+
             // Debug: Log the final state after save
             Log::info('Order saved - final state:', [
                 'order_id' => $order->id,
@@ -395,15 +386,15 @@ class OrderController extends Controller
                         $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
                     }
                 }
-                
-      
-                
+
+
+
                 // Remove inventory transaction creation when order is completed
                 // if ($oldStatus !== 'completed' && $newStatus === 'completed') {
                 //     $order->load(['items.serviceOffering.productType']);
                 //     $this->createInventoryTransactionsForOrder($order);
                 // }
-                
+
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order);
             }
@@ -413,17 +404,17 @@ class OrderController extends Controller
             DB::commit();
 
             // Return the fresh resource with all relations
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
-            
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
+
             // Generate category sequences for the order if items were updated
             if ($request->has('items') && $order->items()->count() > 0) {
                 $order->generateCategorySequences(true); // true for update
             }
-            
+
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['status' => $newStatus]));
             Log::info('OrderUpdated event fired', ['order_id' => $order->id, 'new_status' => $newStatus]);
-            
+
             // Return order with warnings if any
             $response = new OrderResource($order);
             if (!empty($warnings)) {
@@ -433,9 +424,8 @@ class OrderController extends Controller
                     'message' => 'Order updated successfully with some warnings.'
                 ]);
             }
-            
-            return $response;
 
+            return $response;
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error updating order: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
@@ -472,7 +462,7 @@ class OrderController extends Controller
                 } elseif ($newStatus === 'cancelled') {
                     $order->order_complete = false;
                 }
-                
+
                 // Remove all payments when order is cancelled
                 if ($newStatus === 'cancelled') {
                     $paymentsCount = $order->payments()->count();
@@ -483,34 +473,20 @@ class OrderController extends Controller
                         $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
                     }
                 }
-                
+
                 $order->save();
-                
-                // Update dining table status to available if order is completed and has a dining table
-                if ($newStatus === 'completed' && $order->dining_table_id) {
-                    $diningTable = DiningTable::find($order->dining_table_id);
-                    if ($diningTable) {
-                        $diningTable->update(['status' => 'available']);
-                    }
-                }
-                
-                // Update dining table status to available if order is cancelled and has a dining table
-                if ($newStatus === 'cancelled' && $order->dining_table_id) {
-                    $diningTable = DiningTable::find($order->dining_table_id);
-                    if ($diningTable) {
-                        $diningTable->update(['status' => 'available']);
-                    }
-                }
-                
+
+
+
                 // Remove inventory transaction creation when order is completed
                 // if ($oldStatus !== 'completed' && $newStatus === 'completed') {
                 //     $order->load(['items.serviceOffering.productType']);
                 //     $this->createInventoryTransactionsForOrder($order);
                 // }
-                
+
                 $order->logActivity("Status changed from '{$oldStatus}' to '{$newStatus}'.");
                 $notifier->execute($order); // Call the action to handle notification logic
-                
+
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -518,12 +494,12 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Failed to update order status.'], 500);
             }
         }
-        
-        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments', 'diningTable']);
-        
+
+        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
+
         // Broadcast the order updated event
         event(new OrderUpdated($order, ['status' => $newStatus]));
-        
+
         // Return order with warnings if any
         $response = new OrderResource($order);
         if (!empty($warnings)) {
@@ -533,7 +509,7 @@ class OrderController extends Controller
                 'message' => 'Order status updated successfully with some warnings.'
             ]);
         }
-        
+
         return $response;
     }
 
@@ -557,30 +533,30 @@ class OrderController extends Controller
             // Log the initial state
             $oldTotal = $order->total_amount;
             $calculatedTotal = $order->calculated_total_amount;
-            
+
             Log::info('Marking order as received - initial state:', [
                 'order_id' => $order->id,
                 'old_total_amount' => $oldTotal,
                 'calculated_total_amount' => $calculatedTotal,
                 'items_count' => $order->items()->count(),
             ]);
-            
+
             // Set received to true and set received_at timestamp
             $order->received = true;
             $order->received_at = now();
-            
+
             // Always recalculate total amount from order items with their current quantities, widths, and lengths
             $order->recalculateTotalAmountWithItemRecalculation();
-            
+
             Log::info('Recalculated total amount from order items:', [
                 'order_id' => $order->id,
                 'new_total_amount' => $order->total_amount,
                 'items_processed' => $order->items()->count(),
             ]);
-            
+
             // Ensure the order is saved with the new values
             $order->save();
-            
+
             // Log the final state
             Log::info('Order marked as received - final state:', [
                 'order_id' => $order->id,
@@ -588,16 +564,16 @@ class OrderController extends Controller
                 'received' => $order->received,
                 'received_at' => $order->received_at,
             ]);
-            
+
             $order->logActivity("Order marked as received. Total amount recalculated: " . $order->total_amount);
-            
+
             DB::commit();
 
             // Refresh the order to get the latest data from database
             $order->refresh();
 
             // Load relationships for response
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
 
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
@@ -610,7 +586,6 @@ class OrderController extends Controller
                 'message' => 'Order marked as received successfully.',
                 'order' => new OrderResource($order)
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error marking order as received: " . $e->getMessage());
@@ -640,7 +615,7 @@ class OrderController extends Controller
             $order->received_at = null;
             // $order->status = 'cancelled';
             $order->pickup_date = null; // Clear pickup date for cancelled orders
-            
+
             // Remove all payments when order is cancelled
             $paymentsCount = $order->payments()->count();
             if ($paymentsCount > 0) {
@@ -650,13 +625,6 @@ class OrderController extends Controller
                 $order->logActivity("Order cancelled - {$paymentsCount} payment(s) removed.");
             }
 
-            // Update dining table status to available if order has a dining table
-            if ($order->dining_table_id) {
-                $diningTable = DiningTable::find($order->dining_table_id);
-                if ($diningTable) {
-                    $diningTable->update(['status' => 'available']);
-                }
-            }
 
             $order->save();
             $order->logActivity("Order cancelled - order_complete set to false.");
@@ -664,7 +632,7 @@ class OrderController extends Controller
             DB::commit();
 
             // Load relationships for response
-            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable']);
+            $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction']);
 
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['status' => 'cancelled']));
@@ -674,7 +642,6 @@ class OrderController extends Controller
                 'message' => 'Order cancelled successfully.',
                 'order' => new OrderResource($order)
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error cancelling order: " . $e->getMessage());
@@ -735,21 +702,21 @@ class OrderController extends Controller
         try {
             $serviceOffering = ServiceOffering::findOrFail($validatedData['service_offering_id']);
             $customer = Customer::findOrFail($validatedData['customer_id']);
-            
+
             // If order_item_id is provided, update the order item dimensions in the database
             if (isset($validatedData['order_item_id'])) {
                 $orderItem = OrderItem::findOrFail($validatedData['order_item_id']);
                 $orderItem->length_meters = $validatedData['length_meters'] ?? null;
                 $orderItem->width_meters = $validatedData['width_meters'] ?? null;
                 $orderItem->save();
-                
+
                 Log::info('Updated order item dimensions:', [
                     'order_item_id' => $orderItem->id,
                     'length_meters' => $orderItem->length_meters,
                     'width_meters' => $orderItem->width_meters,
                 ]);
             }
-            
+
             $priceDetails = $this->pricingService->calculatePrice(
                 $serviceOffering,
                 $customer,
@@ -778,12 +745,12 @@ class OrderController extends Controller
 
         try {
             DB::beginTransaction();
-            
+
             // Update the order item dimensions
             $orderItem->length_meters = $validatedData['length_meters'] ?? null;
             $orderItem->width_meters = $validatedData['width_meters'] ?? null;
             $orderItem->save();
-            
+
             // Recalculate the order item's subtotal using the new dimensions and quantity
             $pricingService = app(PricingService::class);
             $priceDetails = $pricingService->calculatePrice(
@@ -793,12 +760,12 @@ class OrderController extends Controller
                 $orderItem->length_meters,
                 $orderItem->width_meters
             );
-            
+
             // Update the order item's calculated price and subtotal
             $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
             $orderItem->sub_total = $priceDetails['sub_total'];
             $orderItem->save();
-            
+
             Log::info('Updated order item dimensions with quantity consideration:', [
                 'order_item_id' => $orderItem->id,
                 'quantity' => $orderItem->quantity,
@@ -808,16 +775,16 @@ class OrderController extends Controller
                 'subtotal' => $priceDetails['sub_total'],
                 'product_type' => $orderItem->serviceOffering->productType->name,
             ]);
-            
+
             // Recalculate the order's total amount
             $orderItem->order->recalculateTotalAmount();
-            
+
             // Refresh the order to ensure we have the latest data
             $orderItem->order->refresh();
-            
+
             // Regenerate category sequences to reflect any changes
             $orderItem->order->generateCategorySequences(true);
-            
+
             Log::info('Updated order item dimensions and recalculated totals:', [
                 'order_item_id' => $orderItem->id,
                 'order_id' => $orderItem->order->id,
@@ -827,19 +794,18 @@ class OrderController extends Controller
                 'new_order_total' => $orderItem->order->total_amount,
                 'category_sequences' => $orderItem->order->category_sequences,
             ]);
-            
+
             DB::commit();
-            
+
             // Load relationships for response
             $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
-            
+
             return response()->json([
                 'message' => 'Order item dimensions updated successfully.',
                 'order_item' => $orderItem,
                 'order_total' => $orderItem->order->total_amount,
                 'category_sequences' => $orderItem->order->category_sequences,
             ]);
-            
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error updating order item dimensions: " . $e->getMessage());
@@ -860,11 +826,11 @@ class OrderController extends Controller
 
         try {
             DB::beginTransaction();
-            
+
             // Update the order item quantity
             $orderItem->quantity = $validatedData['quantity'];
             $orderItem->save();
-            
+
             // Recalculate the order item's subtotal using the new quantity and existing dimensions
             $pricingService = app(PricingService::class);
             $priceDetails = $pricingService->calculatePrice(
@@ -874,12 +840,12 @@ class OrderController extends Controller
                 $orderItem->length_meters,
                 $orderItem->width_meters
             );
-            
+
             // Update the order item's calculated price and subtotal
             $orderItem->calculated_price_per_unit_item = $priceDetails['calculated_price_per_unit_item'];
             $orderItem->sub_total = $priceDetails['sub_total'];
             $orderItem->save();
-            
+
             Log::info('Updated order item quantity with recalculation:', [
                 'order_item_id' => $orderItem->id,
                 'quantity' => $orderItem->quantity,
@@ -889,16 +855,16 @@ class OrderController extends Controller
                 'subtotal' => $priceDetails['sub_total'],
                 'product_type' => $orderItem->serviceOffering->productType->name,
             ]);
-            
+
             // Recalculate the order's total amount
             $orderItem->order->recalculateTotalAmount();
-            
+
             // Refresh the order to ensure we have the latest data
             $orderItem->order->refresh();
-            
+
             // Regenerate category sequences to reflect the new quantity
             $orderItem->order->generateCategorySequences(true);
-            
+
             Log::info('Updated order item quantity and recalculated totals:', [
                 'order_item_id' => $orderItem->id,
                 'order_id' => $orderItem->order->id,
@@ -907,26 +873,25 @@ class OrderController extends Controller
                 'new_order_total' => $orderItem->order->total_amount,
                 'category_sequences' => $orderItem->order->category_sequences,
             ]);
-            
+
             DB::commit();
-            
+
             // Load relationships for response
             $orderItem->load(['serviceOffering.productType', 'serviceOffering.serviceAction']);
-            
+
             return response()->json([
                 'message' => 'Order item quantity updated successfully.',
                 'order_item' => $orderItem,
                 'order_total' => $orderItem->order->total_amount,
                 'category_sequences' => $orderItem->order->category_sequences,
             ]);
-            
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error updating order item quantity: " . $e->getMessage());
             return response()->json(['message' => 'Failed to update order item quantity.'], 500);
         }
     }
-    
+
     /**
      * Generate and download a PDF invoice for the specified order using raw TCPDF methods.
      */
@@ -977,7 +942,7 @@ class OrderController extends Controller
         $pdf->Output('invoice-' . $order->id . '.pdf', 'I');
         exit;
     }
-     /**
+    /**
      * Generate and download a PDF invoice formatted for a POS thermal printer.
      */
     public function downloadPosInvoice(Order $order, bool $base64 = false)
@@ -992,7 +957,7 @@ class OrderController extends Controller
         // 80mm is a common POS paper width
         // Calculate dynamic page height based on content including category headers
         $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false); // Use A4 height as default
-        
+
         // Pass data to the PDF class first so we can calculate height
         $pdf->setOrder($order);
         $settings = [
@@ -1008,11 +973,11 @@ class OrderController extends Controller
             'language' => 'en', // Default language, can be made configurable
         ];
         $pdf->setSettings($settings);
-        
+
         // Calculate the actual height needed including category headers
         $requiredHeight = $pdf->calculateTotalHeight();
         $pageHeight = max(120, $requiredHeight + 20 + 20); // Minimum 120mm, add 20mm buffer
-        
+
         // Recreate PDF with calculated height
         $pdf = new PosInvoicePdf('P', 'mm', [80, $pageHeight], true, 'UTF-8', false);
         $pdf->setOrder($order);
@@ -1034,16 +999,16 @@ class OrderController extends Controller
 
         if ($base64) {
             // Return base64 encoded PDF content
-            return $pdf->Output('receipt-'.$order->id.'.pdf', 'S');
+            return $pdf->Output('receipt-' . $order->id . '.pdf', 'S');
         } else {
             // Close and output PDF document
             // 'I' for inline browser display. This is best for POS printing.
             // The browser's PDF viewer will handle the print dialog.
-            $pdf->Output('receipt-'.$order->id.'.pdf', 'I');
+            $pdf->Output('receipt-' . $order->id . '.pdf', 'I');
             exit;
         }
     }
-    
+
     /**
      * Generates an invoice PDF and sends it via WhatsApp using UltraMsg API.
      */
@@ -1072,7 +1037,7 @@ class OrderController extends Controller
             // --- 3. Send via WhatsApp Service using UltraMsg document API with base64 ---
             // Create data URL for UltraMsg
             $dataUrl = "data:application/pdf;base64,{$base64Pdf}";
-            
+
             // Use the customer's phone number directly - WhatsAppService will format it
             $result = $whatsAppService->sendMedia($customer->phone, $dataUrl, $fileName, $caption);
 
@@ -1089,14 +1054,13 @@ class OrderController extends Controller
                     'customer_phone' => $customer->phone,
                     'result' => $result
                 ]);
-                
+
                 return response()->json([
                     'message' => 'Failed to send WhatsApp invoice.',
                     'details' => $result['message'] ?? 'Unknown API error.',
                     'api_response' => $result['data'] ?? null
                 ], 500);
             }
-
         } catch (\Exception $e) {
             Log::error("Exception in sendWhatsappInvoice", [
                 'order_id' => $order->id,
@@ -1148,14 +1112,14 @@ class OrderController extends Controller
             ], 500);
         }
     }
-     /**
+    /**
      * Export a filtered list of orders to a CSV file.
      */
     public function exportCsv(Request $request)
     {
         // Reuse the same query builder logic from the index method
         $query = $this->buildOrderQuery($request);
-        
+
         // Get all matching orders without pagination for the export
         $orders = $query->with([
             'customer',
@@ -1163,7 +1127,7 @@ class OrderController extends Controller
             'items.serviceOffering.serviceAction',
             'payments'
         ])->get();
-        
+
         try {
             // Use the professional Excel export
             $excelExport = new \App\Excel\OrdersExcelExport();
@@ -1176,22 +1140,21 @@ class OrderController extends Controller
             ]);
 
             $excelContent = $excelExport->generate();
-            
+
             $fileName = 'orders_report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-            
+
             return response($excelContent, 200, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
                 'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
                 'Expires' => '0'
             ]);
-
         } catch (\Exception $e) {
             Log::error('Error exporting orders Excel: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to export Excel file'], 500);
         }
     }
-    
+
     /**
      * Get all orders for a specific date without pagination (for TodayOrdersColumn).
      */
@@ -1202,12 +1165,11 @@ class OrderController extends Controller
         ]);
 
         $date = $request->get('date');
-        
+
         $query = Order::with([
-            'customer:id,name,phone', 
-            'items.serviceOffering.productType.category', 
-            'items.serviceOffering.serviceAction', 
-            'diningTable'
+            'customer:id,name,phone',
+            'items.serviceOffering.productType.category',
+            'items.serviceOffering.serviceAction'
         ])->orderBy('id', 'desc');
 
         if ($date) {
@@ -1232,7 +1194,7 @@ class OrderController extends Controller
      */
     private function buildOrderQuery(Request $request)
     {
-        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'diningTable'])->orderBy('id', 'desc');
+        $query = Order::with(['customer:id,name,phone', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction'])->orderBy('id', 'desc');
 
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
@@ -1264,7 +1226,7 @@ class OrderController extends Controller
         if ($request->filled('created_date')) {
             $query->whereDate('created_at', $request->created_date);
         }
-        
+
         // Handle today parameter
         if ($request->boolean('today')) {
             $query->whereDate('created_at', now()->toDateString());
@@ -1274,7 +1236,7 @@ class OrderController extends Controller
         if ($request->boolean('show_only_incomplete')) {
             $query->whereNull('completed_at');
         }
-        
+
         return $query;
     }
 
@@ -1333,14 +1295,14 @@ class OrderController extends Controller
 
         // Define all payment methods
         $allPaymentMethods = ['cash', 'visa', 'bank_transfer'];
-        
+
         // Build detailed breakdown with percentages
         $detailedBreakdown = [];
-        
+
         foreach ($allPaymentMethods as $method) {
             $amount = isset($paymentData[$method]) ? (float) $paymentData[$method]['total_amount'] : 0;
             $percentage = $totalAmountPaid > 0 ? round(($amount / $totalAmountPaid) * 100, 1) : 0;
-            
+
             $detailedBreakdown[$method] = [
                 'amount' => $amount,
                 'percentage' => $percentage,
@@ -1350,16 +1312,16 @@ class OrderController extends Controller
 
         return $detailedBreakdown;
     }
-    
+
     /**
      * Get the height breakdown for a POS invoice (useful for debugging)
      */
     public function getPosInvoiceHeight(Order $order)
     {
         // Authorization check removed
-        
+
         $order->load(['customer', 'user', 'items.serviceOffering.productType', 'items.serviceOffering.serviceAction']);
-        
+
         $pdf = new PosInvoicePdf('P', 'mm', [80, 297], true, 'UTF-8', false);
         $pdf->setOrder($order);
         $settings = [
@@ -1374,10 +1336,10 @@ class OrderController extends Controller
             'language' => 'en',
         ];
         $pdf->setSettings($settings);
-        
+
         $heightBreakdown = $pdf->getHeightBreakdown();
         $totalHeight = $pdf->calculateTotalHeight();
-        
+
         return response()->json([
             'order_id' => $order->id,
             'id' => $order->id,
@@ -1407,7 +1369,7 @@ class OrderController extends Controller
             // Check if auto-send receive order message is enabled
             $settingsService = app(\App\Services\SettingsService::class);
             $autoSendReceiveMessage = $settingsService->get('pos_auto_send_receive_order_message', false);
-            
+
             if (!$autoSendReceiveMessage) {
                 Log::info("Auto-send receive order message is disabled", ['order_id' => $order->id]);
                 return;
@@ -1415,7 +1377,7 @@ class OrderController extends Controller
 
             // Get company name for the message
             $companyName = app_setting('company_name', config('app.name'));
-            
+
             // Create the receive order message
             $message = "🎉 *Order Received Successfully!*\n\n";
             $message .= "Dear *{$order->customer->name}*,\n\n";
@@ -1439,7 +1401,7 @@ class OrderController extends Controller
                 // Update order to mark that receive message was sent
                 $order->order_receive_message_sent = true;
                 $order->save();
-                
+
                 Log::info("Receive order message sent successfully", [
                     'order_id' => $order->id,
                     'customer_phone' => $order->customer->phone,
@@ -1452,7 +1414,6 @@ class OrderController extends Controller
                     'error' => $result['message']
                 ]);
             }
-
         } catch (\Exception $e) {
             Log::error("Error sending receive order message", [
                 'order_id' => $order->id,
@@ -1461,6 +1422,4 @@ class OrderController extends Controller
             ]);
         }
     }
-
- 
 }

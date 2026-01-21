@@ -38,7 +38,7 @@ class PaymentController extends Controller
 
         // Dynamically get the list of allowed payment method keys from the config file.
         $allowedPaymentMethods = array_keys(app_setting('payment_methods_ar', []));
-        
+
         // Fallback to default payment methods if settings are not available
         if (empty($allowedPaymentMethods)) {
             $allowedPaymentMethods = ['cash', 'visa', 'mastercard', 'bank_transfer', 'mada', 'store_credit', 'other'];
@@ -59,12 +59,12 @@ class PaymentController extends Controller
         // --- Business Logic Checks ---
         // First recalculate the order total to ensure it's accurate
         $order->recalculateTotalAmount();
-        
+
         if ($paymentType === 'payment' && ($order->paid_amount + $paymentAmount) > $order->total_amount) {
             return response()->json(['message' => 'Payment amount exceeds the amount due.'], 422);
         }
         if ($paymentType === 'refund' && $paymentAmount > $order->paid_amount) {
-             return response()->json(['message' => 'Refund amount cannot exceed the total amount paid.'], 422);
+            return response()->json(['message' => 'Refund amount cannot exceed the total amount paid.'], 422);
         }
 
         // --- Database Transaction ---
@@ -79,11 +79,11 @@ class PaymentController extends Controller
                 'current_paid_amount' => $order->paid_amount,
                 'order_total_amount' => $order->total_amount,
             ]);
-            
+
             // A refund is stored as a positive number but subtracted from the total paid.
             // Or stored as negative, but this approach is clearer.
             $finalAmount = $paymentType === 'refund' ? -$paymentAmount : $paymentAmount;
-            
+
             $payment = $order->payments()->create([
                 'user_id' => Auth::id(),
                 'amount' => $finalAmount,
@@ -105,21 +105,15 @@ class PaymentController extends Controller
             // Update the order's payment status based on the new total
             if ($order->paid_amount >= $order->total_amount && $order->total_amount > 0) {
                 $order->payment_status = 'paid';
-                
+
                 // Automatically complete the order if payment is fully paid and order is not already completed
                 if ($order->status !== 'completed' && $order->status !== 'cancelled') {
                     $oldStatus = $order->status;
                     $order->status = 'completed';
                     $order->pickup_date = now();
-                    
-                    // Update dining table status to available if order has a dining table
-                    if ($order->dining_table_id) {
-                        $diningTable = \App\Models\DiningTable::find($order->dining_table_id);
-                        if ($diningTable) {
-                            $diningTable->update(['status' => 'available']);
-                        }
-                    }
-                    
+
+
+
                     $order->logActivity("Order automatically completed due to full payment. Status changed from '{$oldStatus}' to 'completed'.");
                 }
             } elseif ($order->paid_amount > 0) {
@@ -127,14 +121,14 @@ class PaymentController extends Controller
             } else {
                 $order->payment_status = 'pending';
             }
-            
+
             $order->save();
-            
+
             // Broadcast order updated event if status changed
             if ($order->wasChanged('status')) {
                 event(new \App\Events\OrderUpdated($order, ['status' => $order->status]));
             }
-            
+
             DB::commit();
 
             // Log successful payment
@@ -148,7 +142,6 @@ class PaymentController extends Controller
 
             $payment->load('user');
             return new PaymentResource($payment);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error recording payment for order {$order->id}: " . $e->getMessage());
@@ -188,9 +181,8 @@ class PaymentController extends Controller
             }
             $order->save();
             DB::commit();
-            
-            return response()->json(['message' => 'Payment record deleted successfully.']);
 
+            return response()->json(['message' => 'Payment record deleted successfully.']);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error deleting payment {$payment->id}: " . $e->getMessage());
