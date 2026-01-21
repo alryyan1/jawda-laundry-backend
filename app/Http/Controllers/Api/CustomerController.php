@@ -29,21 +29,19 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $query = Customer::withCount('orders')
-                         ->with('customerType') // Eager load customer type
-                         ->latest();
+
+            ->latest();
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('email', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
             });
         }
 
-        if ($request->filled('customer_type_id')) {
-            $query->where('customer_type_id', $request->customer_type_id);
-        }
+
 
         $customers = $query->paginate($request->get('per_page', 10));
         return CustomerResource::collection($customers);
@@ -61,7 +59,7 @@ class CustomerController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:30', // Max length for phone
             'address' => 'nullable|string|max:1000', // Max length for address
-            'customer_type_id' => 'sometimes|nullable|exists:customer_types,id',
+
             'is_default' => 'sometimes|boolean',
         ]);
 
@@ -79,7 +77,7 @@ class CustomerController extends Controller
             return new CustomerResource($customer);
         } catch (\Exception $e) {
             Log::error("Error creating customer: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to create customer. Please try again.'.$e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to create customer. Please try again.' . $e->getMessage()], 500);
         }
     }
 
@@ -109,7 +107,7 @@ class CustomerController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'phone' => 'sometimes|nullable|string|max:30',
             'address' => 'sometimes|nullable|string|max:1000',
-            'customer_type_id' => 'sometimes|nullable|exists:customer_types,id',
+
             'is_default' => 'sometimes|boolean',
         ]);
 
@@ -122,7 +120,7 @@ class CustomerController extends Controller
             return new CustomerResource($customer);
         } catch (\Exception $e) {
             Log::error("Error updating customer {$customer->id}: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to update customer. Please try again.' , 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to update customer. Please try again.', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -194,7 +192,6 @@ class CustomerController extends Controller
                     'notes' => $validated['notes'] ?? null,
                 ]
             ], 201);
-
         } catch (\Exception $e) {
             DB::rollback();
             Log::error("Error recording customer payment: " . $e->getMessage());

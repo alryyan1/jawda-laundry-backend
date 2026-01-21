@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
-use App\Http\Controllers\Api\CustomerTypeController;
+
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductTypeController;
@@ -139,7 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/ultramsg/instance-info', [UltraMsgController::class, 'getInstanceInfo']);
   Route::get('/ultramsg/chat-history', [UltraMsgController::class, 'getChatHistory']);
   Route::post('/ultramsg/send-test', [UltraMsgController::class, 'sendTestMessage']);
-  Route::apiResource('customer-types', CustomerTypeController::class);
+
 
   // Restaurant Table Management
   Route::apiResource('restaurant-tables', RestaurantTableController::class);

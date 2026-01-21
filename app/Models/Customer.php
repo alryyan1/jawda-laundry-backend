@@ -19,7 +19,6 @@ class Customer extends Model
         'name',
         'email',
         'phone',
-        'customer_type_id',
         'address',
         'user_id', // Foreign key for the staff member who created/manages this customer (optional)
         'notes',   // Any additional notes about the customer
@@ -52,11 +51,7 @@ class Customer extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-    
-    public function CustomerType(){
-        return $this->belongsTo(CustomerType::class);
-    }
-    
+
     /**
      * Get all pricing rules for this customer
      */

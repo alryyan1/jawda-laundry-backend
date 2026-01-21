@@ -21,8 +21,7 @@ class CustomerResource extends JsonResource
             'phone' => $this->phone,
             'address' => $this->address,
             'notes' => $this->notes,
-            'customer_type_id' => $this->customer_type_id,
-            'customerType' => new CustomerTypeResource($this->whenLoaded('customerType')),
+            'notes' => $this->notes,
             'user_id' => $this->user_id, // Staff who created/manages
             'managedBy' => new UserResource($this->whenLoaded('managedBy')), // Relationship name from Customer model
             'registered_date' => $this->created_at ? $this->created_at->toIso8601String() : null,

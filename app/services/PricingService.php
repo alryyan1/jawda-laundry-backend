@@ -30,13 +30,10 @@ class PricingService
         int $quantity,
         ?float $length,
         ?float $width
-    ): array
-    {
+    ): array {
         // Eager load necessary relationships if they haven't been loaded already.
+        // $offering->loadMissing(['productType', 'pricingRules']); // Optimization: eager load in controller if possible
         $offering->loadMissing(['productType', 'pricingRules']);
-        if ($customer) {
-            $customer->loadMissing('customerType');
-        }
 
         $productType = $offering->productType;
         if (!$productType) {
