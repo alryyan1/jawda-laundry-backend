@@ -51,12 +51,4 @@ class Customer extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-
-    /**
-     * Get all pricing rules for this customer
-     */
-    public function pricingRules()
-    {
-        return $this->hasMany(PricingRule::class);
-    }
 }

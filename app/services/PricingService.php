@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\ServiceOffering;
 use App\Models\Customer;
-use App\Models\PricingRule;
+
 
 class PricingService
 {
@@ -33,7 +33,7 @@ class PricingService
     ): array {
         // Eager load necessary relationships if they haven't been loaded already.
         // $offering->loadMissing(['productType', 'pricingRules']); // Optimization: eager load in controller if possible
-        $offering->loadMissing(['productType', 'pricingRules']);
+        $offering->loadMissing(['productType']);
 
         $productType = $offering->productType;
         if (!$productType) {
@@ -62,6 +62,7 @@ class PricingService
             $subTotal = $pricePerUnit * $quantity;
         }
 
+
         return [
             'calculated_price_per_unit_item' => $pricePerUnit,
             'sub_total' => round($subTotal, 3),
@@ -71,9 +72,9 @@ class PricingService
     }
 
     /**
-     * Determines the correct price per unit by checking rules in order of precedence.
-     * Precedence: Customer Rule > Service Offering Default.
-     * Note: Customer Type rules were removed when pricing_rules table was simplified.
+     * Determines the correct price per unit.
+     * Note: Customer specific and Customer Type rules were removed.
+     * Now it always returns the Service Offering Default.
      *
      * @param ServiceOffering $offering
      * @param Customer|null $customer
@@ -87,15 +88,15 @@ class PricingService
             ? $offering->default_price_per_sq_meter
             : $offering->default_price;
 
-        if (!$customer) {
-            return (float) $price;
-        }
+        // Customer specific logic removed as per requirement
+        // if (!$customer) {
+        //     return (float) $price;
+        // }
 
-        // 1. Check for a rule specific to this customer (highest priority)
+        /* 
+        // 1. Check for a rule specific to this customer (highest priority) - DISABLED
         $customerRule = $offering->pricingRules
             ->where('customer_id', $customer->id)
-            // You can add more complex rule checks here, e.g., for quantity tiers or date validity
-            // ->where('valid_from', '<=', now())->where('valid_to', '>=', now())
             ->first();
 
         if ($customerRule) {
@@ -103,16 +104,13 @@ class PricingService
                 ? $customerRule->price_per_sq_meter
                 : $customerRule->price;
 
-            // If the rule has a valid price, use it. Otherwise, we'll continue to check customer type.
             if ($rulePrice !== null) {
                 return (float) $rulePrice;
             }
         }
+        */
 
-        // 2. Customer type rules were removed when pricing_rules table was simplified
-        // Pricing rules now only link directly to customers, not customer types
-
-        // 3. If no rules applied, return the initial default price from the offering
+        // 3. Return the initial default price from the offering
         return (float) $price;
     }
 

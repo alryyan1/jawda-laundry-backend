@@ -27,7 +27,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WhatsappTemplateController;
 use App\Http\Controllers\Api\NavigationController;
 use App\Http\Controllers\Api\CustomerPriceListController;
-use App\Http\Controllers\Api\CustomerPricingRuleController;
+
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserMainNavController;
 use App\Http\Controllers\Api\UltraMsgController;
@@ -196,15 +196,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/customers/{customer}/price-list/export', [CustomerPriceListController::class, 'export']);
 
   // Customer Product Type Management
-  // Customer Pricing Rules
-  Route::get('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'index']);
-  Route::get('/customers/{customer}/pricing-rules/all', [CustomerPricingRuleController::class, 'getAllForCustomer']);
-  Route::post('/customers/{customer}/pricing-rules', [CustomerPricingRuleController::class, 'store']);
-  Route::put('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'update']);
-  Route::delete('/customers/{customer}/pricing-rules/{pricingRule}', [CustomerPricingRuleController::class, 'destroy']);
-  Route::get('/customers/{customer}/pricing-rules/available-service-offerings', [CustomerPricingRuleController::class, 'getAvailableServiceOfferings']);
-  Route::post('/customers/{customer}/pricing-rules/import-all', [CustomerPricingRuleController::class, 'importAllServiceOfferings']);
-  Route::get('/customers/{customer}/pricing-rules/products', [CustomerPricingRuleController::class, 'getCustomerProductsWithPricingRules']);
+
 });
 
 // Reports routes (protected)

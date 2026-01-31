@@ -28,10 +28,7 @@ class ServiceOffering extends Model
     {
         return $this->belongsTo(ServiceAction::class);
     }
-    public function pricingRules()
-    {
-        return $this->hasMany(PricingRule::class);
-    }
+
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
@@ -41,6 +38,6 @@ class ServiceOffering extends Model
     public function getDisplayNameAttribute(): string
     {
         if ($this->name_override) return $this->name_override;
-        return($this->serviceAction?->name ?: 'N/A Action');
+        return ($this->serviceAction?->name ?: 'N/A Action');
     }
 }
