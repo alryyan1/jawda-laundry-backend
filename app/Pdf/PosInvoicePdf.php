@@ -411,190 +411,173 @@ class PosInvoicePdf extends TCPDF
     public function generate()
     {
         $this->AddPage();
-        $this->SetFont($this->font, '', 10);
 
-        // Define padding variables
-        $leftPadding = 0;
-        $rightPadding = 0;
+        // --- Constants ---
+        $pageWidth = 72; // Printable width in mm (approx for 80mm paper)
+        $lineColor = [100, 100, 100]; // Dark Gray
+        $this->SetLineWidth(0.1);
+        $this->SetDrawColorArray($lineColor);
 
-        // --- Company Header with Logo ---
+        // --- Logo & Company Header ---
         $logoAdded = $this->addLogo();
-
-        // If logo was added, we don't need extra spacing
         if (!$logoAdded) {
             $this->Ln(2);
         }
 
-        //  dd($this->settings);
-
-
-        $this->SetFont($this->font, 'B', 14);
-        // $this->Cell(0, 6, $this->settings['general_company_name'], 0, 1, 'C');
-        // $this->SetFont($this->font, '', 8);
+        // Company Info - Centered
+        $this->SetFont($this->font, '', 9);
         $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');
         $this->Cell(0, 4, $this->settings['general_company_phone'], 0, 1, 'C');
-        $this->Ln(4);
+        $this->Ln(3);
 
         // --- Divider ---
-        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
-        $this->Ln(1);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+        $this->Ln(2);
 
-        // --- Order Details ---
+        // --- Order Meta Data (Grid Layout) ---
         $this->SetFont($this->font, '', 9);
-        $this->Cell(20, 5, $this->getBilingualText('order'));
-        $this->Cell(0, 5, $this->order->id, 0, 1, 'R');
-        $this->Cell(20, 5, $this->getBilingualText('date'));
-        $this->Cell(0, 5, $this->order->order_date->format('M d, Y h:i A'), 0, 1, 'R');
-        $this->Cell(20, 5, $this->getBilingualText('customer'));
-        $this->Cell(0, 5, $this->order->customer->name, 0, 1, 'R');
-        $this->Cell(20, 5, $this->getBilingualText('cashier'));
-        $this->Cell(0, 5, $this->order->user->name ?? 'N/A', 0, 1, 'R');
 
-        // Display category sequences if available
+        // Helper for Key-Value Rows
+        $printMetaRow = function ($label, $value) use ($pageWidth) {
+            $this->SetFont($this->font, 'B', 9);
+            $this->Cell(25, 5, $label . ':', 0, 0, 'L');
+            $this->SetFont($this->font, '', 9);
+            $this->Cell($pageWidth - 25, 5, $value, 0, 1, 'R');
+        };
+
+        $printMetaRow($this->getBilingualText('order'), '#' . $this->order->id);
+        $printMetaRow($this->getBilingualText('date'), $this->order->order_date->format('d/m/Y h:i A'));
+        $printMetaRow($this->getBilingualText('customer'), $this->order->customer->name);
+
+        if ($this->order->user) {
+            $printMetaRow($this->getBilingualText('cashier'), $this->order->user->name);
+        }
+
+        // --- Category Sequences (if any) ---
         if ($this->order->category_sequences && !empty($this->order->category_sequences)) {
             $this->Ln(1);
             $this->SetFont($this->font, 'B', 10);
-            $this->Cell(0, 5, 'Category Sequences: ' . $this->order->getCategorySequencesString(), 0, 1, 'C');
-            $this->SetFont($this->font, '', 9);
+            $this->MultiCell(0, 5, 'Seq: ' . $this->order->getCategorySequencesString(), 0, 'C');
         }
 
         $this->Ln(2);
-
-        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
-        $this->Ln(1);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+        $this->Ln(2);
 
         // --- Items Table Header ---
+        // Widths: Item(34), Qty(8), Price(13), Total(17) = 72mm
+        $wItem = 34;
+        $wQty = 8;
+        $wPrice = 13;
+        $wTotal = 17;
+
         $this->SetFont($this->font, 'B', 9);
-        $this->Cell(35, 6, $this->getBilingualText('item'), 0, 0, 'L');
-        $this->Cell(8, 6, 'Qty', 0, 0, 'C'); // Only English
-        $this->Cell(12, 6, 'Price', 0, 0, 'R');
-        $this->Cell(14, 6, 'Total', 0, 1, 'R'); // Only English
-        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
+        $this->Cell($wItem, 6, $this->getBilingualText('item'), 0, 0, 'L');
+        $this->Cell($wQty, 6, 'Qty', 0, 0, 'C');
+        $this->Cell($wPrice, 6, 'Price', 0, 0, 'R');
+        $this->Cell($wTotal, 6, 'Total', 0, 1, 'R');
+
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
         $this->Ln(1);
 
-        // --- Items Table Body (Grouped by Category) ---
+        // --- Items Body ---
         $this->SetFont($this->font, '', 9);
         $groupedItems = $this->groupItemsByCategory();
 
         foreach ($groupedItems as $categoryId => $categoryData) {
-            // Check if this category has sequence enabled
             $category = \App\Models\ProductCategory::find($categoryId);
             $hasSequence = $category && $category->sequence_enabled && $category->sequence_prefix;
 
-            // Add division line for categories with sequences
+            // Sequence Header (Only show sequence number prominently)
             if ($hasSequence) {
-                $this->SetLineStyle(['width' => 0.3, 'color' => [0, 0, 0]]);
-                $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
-                $this->Ln(1);
-            }
-
-            // Category Header
-            if ($hasSequence) {
-                // Display sequence number on separate line with bigger font
                 $sequence = $this->getCategorySequence($categoryId);
                 if ($sequence) {
-                    $this->SetFont($this->font, 'B', 14);
-                    $this->SetTextColor(0, 0, 0); // Black color for sequence
-                    $this->Cell(0, 8, $sequence, 0, 1, 'C');
                     $this->Ln(1);
+                    $this->SetFont($this->font, 'B', 12);
+                    $this->Cell(0, 6, $sequence, 0, 1, 'C');
+                    $this->SetFont($this->font, '', 9);
                 }
-
-                // Display category name
-                $this->SetFont($this->font, 'B', 11);
-                // $this->SetTextColor(100, 100, 100); // Gray color for category name
-                $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
-            } else {
-                // Regular category without sequence
-                $this->SetFont($this->font, 'B', 11);
-                // $this->SetTextColor(100, 100, 100); // Gray color for regular categories
-                $this->Cell(0, 5, '--- ' . $categoryData['name'] . ' ---', 0, 1, 'C');
             }
 
-            $this->SetTextColor(0, 0, 0); // Reset to black
-            $this->SetFont($this->font, '', 9);
-            $this->Ln(1);
-
-            // Items in this category
             foreach ($categoryData['items'] as $item) {
-                // Create combined text: Product Name - Display Name
+                // Prepare Item Name
                 $productName = $item->serviceOffering->productType->name ?? '';
                 $displayName = $item->serviceOffering->display_name ?? '';
-                $combinedText = $productName;
-                if ($displayName) {
-                    $combinedText .= ' / ' . $displayName;
+                $itemText = $productName . ($displayName ? ' / ' . $displayName : '');
+
+                // Calculate Height required for this Item Name
+                $nbLines = $this->getNumLines($itemText, $wItem);
+                $lineHeight = 5;
+                $rowHeight = $nbLines * $lineHeight;
+
+                // Check for page break (simple check)
+                if ($this->GetY() + $rowHeight > $this->getPageHeight() - 15) {
+                    $this->AddPage();
+                    // Re-print header if needed, but for POS usually unnecessary
                 }
 
-                // Use MultiCell for the combined name to allow wrapping
-                $this->MultiCell(35, 4, $combinedText, 0, 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
-                $currentY = $this->GetY();
-                $this->SetY($currentY - 4); // Move back up to align other cells
+                $startX = $this->GetX();
+                $startY = $this->GetY();
 
-                $this->SetX(39); // Position for Qty
-                $this->Cell(8, 4, $item->quantity, 0, 0, 'C');
-                $this->SetX(47); // Position for Price
-                $this->Cell(12, 4, number_format($item->calculated_price_per_unit_item, 3), 0, 0, 'R');
-                $this->SetX(59); // Position for Total
-                $this->Cell(14, 4, number_format($item->sub_total, 3), 0, 1, 'R');
+                // Print Name (MultiCell)
+                $this->MultiCell($wItem, $lineHeight, $itemText, 0, 'L', false, 1);
+                $endY = $this->GetY(); // Capture Y after name
+
+                // Print Numbers (Single Line, aligned to top of row)
+                // Reset to top of row
+                $this->SetXY($startX + $wItem, $startY);
+
+                $this->Cell($wQty, $lineHeight, $item->quantity, 0, 0, 'C');
+                $this->Cell($wPrice, $lineHeight, number_format($item->calculated_price_per_unit_item, 3), 0, 0, 'R');
+                $this->Cell($wTotal, $lineHeight, number_format($item->sub_total, 3), 0, 0, 'R');
+
+                // Move to end of row (max Y)
+                $this->SetY($endY);
+                // Add tiny buffer if multiple lines
+                if ($nbLines > 1) $this->Ln(1);
             }
 
-            // Add spacing between categories (except for the last category)
-            if ($categoryId !== array_key_last($groupedItems)) {
-                $this->Ln(2);
-            }
+            // tiny separation between categories if needed
+            // if ($categoryId !== array_key_last($groupedItems)) {
+            //    $this->Ln(1);
+            // }
         }
 
-        $this->Ln(1);
-        $this->SetLineStyle(['width' => 0.1, 'color' => [0, 0, 0]]);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 72, $this->GetY());
-        $this->Ln(1);
+        $this->Ln(2);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+        $this->Ln(2);
 
         // --- Summary Section ---
-        $this->SetFont($this->font, '', 10);
-        $this->Cell(40, 6, $this->getBilingualText('subtotal') . ':', 0, 0, 'R');
-        $this->Cell(25, 6, number_format($this->order->calculated_total_amount, 3), 0, 1, 'R');
+        $printSummaryRow = function ($label, $value, $isBold = false, $fontSize = 9) use ($pageWidth) {
+            $this->SetFont($this->font, $isBold ? 'B' : '', $fontSize);
+            $this->Cell($pageWidth - 30, 5, $label . ':', 0, 0, 'R');
+            $this->Cell(30, 5, $value, 0, 1, 'R');
+        };
 
-        // Add Tax/Discount here if needed
+        $printSummaryRow($this->getBilingualText('subtotal'), number_format($this->order->calculated_total_amount, 3));
 
-        $this->SetFont($this->font, 'B', 12);
-        $this->Cell(40, 8, $this->getBilingualText('total') . ':', 0, 0, 'R');
-        $this->Cell(25, 8, $this->currencySymbol . number_format($this->order->calculated_total_amount, 3), 0, 1, 'R');
+        $this->Ln(1);
+        $printSummaryRow($this->getBilingualText('total'), $this->currencySymbol . ' ' . number_format($this->order->calculated_total_amount, 3), true, 12);
+        $this->Ln(1);
 
-        $this->SetFont($this->font, '', 10);
-        $this->Cell(40, 6, $this->getBilingualText('amount_paid') . ':', 0, 0, 'R');
-        $this->Cell(25, 6, number_format($this->order->paid_amount, 3), 0, 1, 'R');
+        $printSummaryRow($this->getBilingualText('amount_paid'), number_format($this->order->paid_amount, 3));
 
-        $this->SetFont('arial', 'B', 10);
-        $this->Cell(40, 6, $this->getBilingualText('amount_due') . ':', 0, 0, 'R');
-        $this->Cell(25, 6, number_format($this->order->calculated_total_amount - $this->order->paid_amount, 3), 0, 1, 'R');
-
-        $this->Ln(5);
-
-        // --- Notes Section ---
-        if ($this->order->notes) {
-            $this->SetFont('arial', 'I', 8);
-            $this->MultiCell(0, 4, $this->getBilingualText('notes') . ": " . $this->order->notes, 0, 'L');
+        $dueAmount = $this->order->calculated_total_amount - $this->order->paid_amount;
+        if ($dueAmount > 0) {
+            $printSummaryRow($this->getBilingualText('amount_due'), number_format($dueAmount, 3), true, 10);
         }
 
-        // --- Barcode ---
-        $style = [
-            'position' => '',
-            'align' => 'C',
-            'stretch' => false,
-            'fitwidth' => true,
-            'cellfitalign' => '',
-            'border' => false,
-            'hpadding' => 'auto',
-            'vpadding' => 'auto',
-            'fgcolor' => [0, 0, 0],
-            'bgcolor' => false,
-            'text' => true,
-            'font' => 'helvetica',
-            'fontsize' => 8,
-            'stretchtext' => 4
-        ];
-        // $this->write1DBarcode(strval($this->order->id), 'C128', '', '', '', 15, 0.4, $style, 'N');
+        $this->Ln(4);
+
+        // --- Footer Note ---
+        if ($this->order->notes) {
+            $this->SetFont($this->font, 'I', 8);
+            $this->MultiCell(0, 4, $this->getBilingualText('notes') . ": " . $this->order->notes, 0, 'L');
+            $this->Ln(2);
+        }
+
+        $this->SetFont($this->font, 'I', 8);
+        $this->MultiCell(0, 4, $this->getBilingualText('thank_you'), 0, 'C');
+        $this->Ln(2);
     }
 }

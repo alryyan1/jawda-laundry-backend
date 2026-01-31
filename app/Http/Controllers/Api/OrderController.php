@@ -161,7 +161,6 @@ class OrderController extends Controller
                 'user_id' => Auth::id(),
                 'status' => 'pending',
                 'order_type' => $validatedData['order_type'] ?? 'in_house',
-                'order_type' => $validatedData['order_type'] ?? 'in_house',
                 'total_amount' => $orderTotalAmount,
                 'paid_amount' => 0,
                 'payment_status' => 'pending',
@@ -216,7 +215,7 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load(['customer.customerType', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
+        $order->load(['customer', 'user', 'items.serviceOffering.productType.category', 'items.serviceOffering.serviceAction', 'payments']);
         return new OrderResource($order);
     }
     /**
