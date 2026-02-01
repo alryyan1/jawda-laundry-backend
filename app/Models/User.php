@@ -6,14 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 // use Illuminate\Database\Eloquent\SoftDeletes; // Optional: If users can be soft-deleted
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable,HasRoles;
+    use HasApiTokens, HasFactory, Notifiable;
     // use SoftDeletes; // Uncomment if using soft deletes for users
 
     /**
@@ -25,8 +24,9 @@ class User extends Authenticatable
         'name',
         'username',
         'password',
+        'user_type', // 'admin' or 'staff'
         'avatar_url', // Example: if users have avatars
-      
+
     ];
 
     /**
@@ -72,8 +72,8 @@ class User extends Authenticatable
     public function navigationItems(): BelongsToMany
     {
         return $this->belongsToMany(NavigationItem::class, 'user_navigation_permissions')
-                    ->withPivot('is_granted')
-                    ->withTimestamps();
+            ->withPivot('is_granted')
+            ->withTimestamps();
     }
 
     /**
@@ -87,11 +87,8 @@ class User extends Authenticatable
     /**
      * Get the user's roles.
      */
-    public function roles(): BelongsToMany
-    {
-        return $this->belongsToMany(\Spatie\Permission\Models\Role::class, 'model_has_roles', 'model_id', 'role_id')
-                    ->where('model_type', User::class);
-    }
+    // roles relationship removed
+
 
     /**
      * Get all accessible navigation items for this user.
@@ -104,7 +101,7 @@ class User extends Authenticatable
         foreach ($allNavigationItems as $item) {
             if ($item->userCanAccess($this)) {
                 $accessibleItem = $item->toArray();
-                
+
                 // Filter children that user can access
                 if ($item->activeChildren->isNotEmpty()) {
                     $accessibleChildren = [];
@@ -117,7 +114,7 @@ class User extends Authenticatable
                 } else {
                     $accessibleItem['children'] = [];
                 }
-                
+
                 $accessibleItems[] = $accessibleItem;
             }
         }
@@ -125,23 +122,17 @@ class User extends Authenticatable
         return $accessibleItems;
     }
 
-    // Example role check (simple)
+    // Check if user is admin
     public function isAdmin(): bool
     {
-            return $this->hasRole('admin');
-        }
+        return $this->user_type === 'admin';
+    }
 
     public function isStaff(): bool
     {
-        return $this->hasRole('staff') || $this->isAdmin(); // Admins are also staff
+        return $this->user_type === 'staff' || $this->isAdmin();
     }
-    
-    // Spatie provides methods like $user->hasRole('admin'), $user->can('edit articles'), etc.
-    // So, our custom isAdmin(), isReceptionist() might become:
-    public function isAdminSpatie(): bool
-    {
-        return $this->hasRole('admin'); // Assuming 'admin' is a role name in Spatie
-    }
+
 
     /**
      * Boot method to set up navigation permissions for new users
@@ -158,7 +149,7 @@ class User extends Authenticatable
 
         // When a user's role is updated, update navigation permissions
         static::updated(function ($user) {
-            if ($user->wasChanged('roles')) {
+            if ($user->wasChanged('user_type')) {
                 // Clear existing navigation permissions
                 $user->navigationItems()->detach();
                 // Set up new navigation permissions based on current role

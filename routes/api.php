@@ -21,7 +21,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
-use App\Http\Controllers\Api\SettingController;
+
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WhatsappTemplateController;
@@ -198,13 +198,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 Route::apiResource('product-categories', ProductCategoryController::class);
 // Application Settings
-Route::get('/settings', [SettingController::class, 'index']);
-Route::put('/settings', [SettingController::class, 'update']);
-Route::post('/settings/logo/upload', [SettingController::class, 'uploadLogo']);
-Route::delete('/settings/logo', [SettingController::class, 'deleteLogo']);
-Route::post('/settings/whatsapp/send-test', [SettingController::class, 'sendTestWhatsapp']);
-Route::get('admin/settings', [SettingController::class, 'index'])->name('settings.index');
-Route::put('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+Route::get('/settings', [SettingsController::class, 'indexLegacy']);
+Route::put('/settings', [SettingsController::class, 'updateLegacy']);
+Route::post('/settings/logo/upload', [SettingsController::class, 'uploadLogo']);
+Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo']);
+Route::post('/settings/whatsapp/send-test', [SettingsController::class, 'sendTestWhatsapp']);
+Route::get('admin/settings', [SettingsController::class, 'indexLegacy'])->name('settings.index');
+Route::put('admin/settings', [SettingsController::class, 'updateLegacy'])->name('settings.update');
 
 // New Database Settings API
 Route::get('/settings/public', [SettingsController::class, 'public']);

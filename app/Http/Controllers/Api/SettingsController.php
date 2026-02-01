@@ -7,6 +7,10 @@ use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use App\Services\WhatsAppService;
+
 
 class SettingsController extends Controller
 {
@@ -24,7 +28,7 @@ class SettingsController extends Controller
     {
         try {
             $settings = $this->settingsService->getAllWithMetadata();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $settings
@@ -45,7 +49,7 @@ class SettingsController extends Controller
     {
         try {
             $settings = $this->settingsService->getPublic();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $settings
@@ -66,7 +70,7 @@ class SettingsController extends Controller
     {
         try {
             $settings = $this->settingsService->getByGroup($group);
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $settings
@@ -87,14 +91,14 @@ class SettingsController extends Controller
     {
         try {
             $value = $this->settingsService->get($key);
-            
+
             if ($value === null) {
                 return response()->json([
                     'success' => false,
                     'message' => "Setting '{$key}' not found"
                 ], 404);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -119,10 +123,10 @@ class SettingsController extends Controller
         try {
             // Get current settings to know which keys are valid and their types
             $currentSettings = $this->settingsService->getAll();
-            
+
             // Build validation rules based on current setting types
             $rules = ['settings' => 'required|array'];
-            
+
             foreach ($currentSettings as $key => $value) {
                 if (is_bool($value)) {
                     $rules["settings.{$key}"] = 'nullable|boolean';
@@ -146,7 +150,7 @@ class SettingsController extends Controller
             }
 
             $result = $this->settingsService->updateMultiple($request->input('settings'));
-            
+
             if ($result['success']) {
                 return response()->json([
                     'success' => true,
@@ -189,7 +193,7 @@ class SettingsController extends Controller
             }
 
             $success = $this->settingsService->set($key, $request->input('value'));
-            
+
             if ($success) {
                 return response()->json([
                     'success' => true,
@@ -221,7 +225,7 @@ class SettingsController extends Controller
     {
         try {
             $this->settingsService->clearCache();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Settings cache cleared successfully'
@@ -242,7 +246,7 @@ class SettingsController extends Controller
     {
         try {
             $companyInfo = $this->settingsService->getCompanyInfo();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $companyInfo
@@ -263,7 +267,7 @@ class SettingsController extends Controller
     {
         try {
             $appBranding = $this->settingsService->getAppBranding();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $appBranding
@@ -284,7 +288,7 @@ class SettingsController extends Controller
     {
         try {
             $posConfig = $this->settingsService->getPosConfig();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $posConfig
@@ -305,7 +309,7 @@ class SettingsController extends Controller
     {
         try {
             $whatsappConfig = $this->settingsService->getWhatsAppConfig();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $whatsappConfig
@@ -326,7 +330,7 @@ class SettingsController extends Controller
     {
         try {
             $themeConfig = $this->settingsService->getThemeConfig();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $themeConfig
@@ -336,6 +340,136 @@ class SettingsController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch theme configuration',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Legacy index method to support old API consumers.
+     */
+    public function indexLegacy(Request $request)
+    {
+        $settings = $this->settingsService->getAll();
+        return response()->json(['data' => $settings]);
+    }
+
+    /**
+     * Legacy update method to support old API consumers (flat key-value structure).
+     */
+    public function updateLegacy(Request $request)
+    {
+        try {
+            $currentSettings = $this->settingsService->getAll();
+            $rules = [];
+            foreach ($currentSettings as $key => $value) {
+                $rule = ['nullable', 'string', 'max:255'];
+                if (is_int($value)) {
+                    $rule = ['nullable', 'integer', 'min:0'];
+                } elseif (is_bool($value)) {
+                    $rule = ['nullable', 'boolean'];
+                } elseif ($key === 'company_email') {
+                    $rule = ['nullable', 'email', 'max:255'];
+                }
+                $rules[$key] = $rule;
+            }
+
+            $validatedData = $request->validate($rules);
+            $result = $this->settingsService->updateMultiple($validatedData);
+
+            if ($result['success']) {
+                return response()->json([
+                    'message' => 'Settings updated successfully.',
+                    'data' => $result['updated']
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Some settings failed to update.',
+                    'errors' => $result['errors'],
+                    'updated' => $result['updated']
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to update database settings: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to update settings in database.'], 500);
+        }
+    }
+
+    public function uploadLogo(Request $request)
+    {
+        $request->validate([
+            'logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        try {
+            $oldLogoUrl = $this->settingsService->get('company_logo_url');
+            if ($oldLogoUrl) {
+                $oldPath = str_replace(asset('storage/'), '', $oldLogoUrl);
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+
+            $path = $request->file('logo')->store('logos', 'public');
+            $logoUrl = asset('storage/' . $path);
+
+            $this->settingsService->set('company_logo_url', $logoUrl);
+
+            return response()->json([
+                'message' => 'Logo uploaded successfully.',
+                'logo_url' => $logoUrl
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to upload logo: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to upload logo.'], 500);
+        }
+    }
+
+    public function deleteLogo()
+    {
+        try {
+            $logoUrl = $this->settingsService->get('company_logo_url');
+            if ($logoUrl) {
+                $path = str_replace(asset('storage/'), '', $logoUrl);
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            $this->settingsService->set('company_logo_url', null);
+
+            return response()->json([
+                'message' => 'Logo deleted successfully.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to delete logo: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to delete logo.'], 500);
+        }
+    }
+
+    public function sendTestWhatsapp(Request $request, WhatsAppService $whatsAppService)
+    {
+        $validated = $request->validate([
+            'test_phone_number' => 'required|string|regex:/^[0-9]+$/|min:7',
+        ]);
+
+        if (!$whatsAppService->isConfigured()) {
+            return response()->json([
+                'message' => 'WhatsApp API is not configured or is disabled in settings. Please save your credentials first.'
+            ], 400);
+        }
+
+        $result = $whatsAppService->sendTestMessage($validated['test_phone_number']);
+
+        if ($result['status'] === 'success') {
+            return response()->json([
+                'message' => 'Test message sent successfully!',
+                'response' => $result['data']
+            ]);
+        } else {
+            return response()->json([
+                'message' => 'Failed to send test message.',
+                'details' => $result['message'] ?? 'An unknown error occurred.',
+                'api_response' => $result['data'] ?? null
             ], 500);
         }
     }

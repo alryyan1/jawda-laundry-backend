@@ -18,12 +18,12 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'username' => $this->username,
-            'role' => $this->role, // Primary display role if you keep it
+            'user_type' => $this->user_type,
             'avatar_url' => $this->avatar_url,
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
-            'roles' => $this->roles ? $this->roles->pluck('name') : [], // Safe check for roles
-            'permissions' => $this->resource->getAllPermissions() ? $this->resource->getAllPermissions()->pluck('name') : [], // Access model via resource property
+            'roles' => [], // Deprecated
+            'permissions' => [], // Deprecated
         ];
     }
 }

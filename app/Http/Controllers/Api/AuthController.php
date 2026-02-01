@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
-use Spatie\Permission\Models\Role; // Import the Role model
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -36,30 +35,17 @@ class AuthController extends Controller
                 'username' => $validatedData['username'],
                 'email' => $validatedData['email'] ?? null, // Save email if provided
                 'password' => Hash::make($validatedData['password']),
+                'user_type' => 'staff', // Default to staff on public registration
             ]);
-
-            // Assign a default role to the newly registered user.
-            // Ensure this role exists from your PermissionSeeder.
-            $defaultRole = 'receptionist';
-            if (Role::where('name', $defaultRole)->exists()) {
-                $user->assignRole($defaultRole);
-            } else {
-                // Log a warning if the default role doesn't exist, but don't fail the registration.
-                Log::warning("Default role '{$defaultRole}' not found for new user registration: {$user->email}");
-            }
 
             // Create a token for the new user
             $token = $user->createToken('api-token-for-' . $user->username)->plainTextToken;
-
-            // Eager load roles and permissions to include them in the response
-            $user->load(['roles', 'permissions']);
 
             return response()->json([
                 'message' => 'User registered successfully.',
                 'user' => new UserResource($user),
                 'token' => $token,
             ], 201);
-
         } catch (\Exception $e) {
             Log::error("User registration failed: " . $e->getMessage());
             return response()->json(['message' => 'Registration failed. Please try again later.'], 500);
@@ -90,7 +76,7 @@ class AuthController extends Controller
         // $user->tokens()->delete(); // Optional: log out from other devices
         $token = $user->createToken('api-token-for-' . $user->username)->plainTextToken;
 
-        $user->load(['roles', 'permissions']);
+        // $user->load(['roles', 'permissions']); // Roles removed
 
         return response()->json([
             'message' => 'Login successful.',
@@ -124,7 +110,7 @@ class AuthController extends Controller
     {
         // Eager load roles and permissions every time user data is fetched
         $user = $request->user();
-        $user->load(['roles', 'permissions']);
+        // $user->load(['roles', 'permissions']); // Roles removed
 
         return new UserResource($user);
     }
