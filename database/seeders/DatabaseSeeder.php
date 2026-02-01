@@ -21,20 +21,8 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             UserSeeder::class,
-            CustomerTypeSeeder::class,      // Before CustomerSeeder
-            CustomerSeeder::class,
-            RestaurantTableSeeder::class,
             PermissionSeeder::class,
-            NavigationItemSeeder::class,
-            UserNavigationPermissionSeeder::class, // Set up navigation permissions for existing users
-            // Product categories and types (must come before laundry seeder)
-            ProductCategoriesTableSeeder::class,
-            ProductTypesTableSeeder::class,
             SettingsSeeder::class,
-            // Laundry seeders (creates service offerings)
-            \Database\Seeders\Laundry\LaundrySeeder::class,
-            // SupplierSeeder::class,
-            // Add PricingRuleSeeder if you create one
         ]);
     }
 }

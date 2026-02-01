@@ -142,16 +142,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
   // Restaurant Table Management
-  Route::apiResource('restaurant-tables', RestaurantTableController::class);
-  Route::get('/restaurant-tables/available', [RestaurantTableController::class, 'available']);
-  Route::patch('/restaurant-tables/{restaurantTable}/status', [RestaurantTableController::class, 'updateStatus']);
-
-  // Dining Table Management (moved to public for testing)
-  Route::patch('/dining-tables/{diningTable}/status', [DiningTableController::class, 'updateStatus']);
-
-  // Table Reservation Management
-  Route::apiResource('table-reservations', TableReservationController::class);
-  Route::post('/table-reservations/{tableReservation}/assign-order', [TableReservationController::class, 'assignOrder']);
 
   // This defines GET /product-types/{product_type}/predefined-sizes
 
@@ -162,6 +152,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/dashboard/orders-trend', [DashboardController::class, 'ordersTrend']);
   Route::get('/dashboard/order-items-trend', [DashboardController::class, 'orderItemsTrend']);
   Route::get('/dashboard/revenue-breakdown', [DashboardController::class, 'revenueBreakdown']);
+  Route::get('/dashboard/todays-deliveries', [DashboardController::class, 'todaysDeliveries']);
 
   Route::get('/reports/cost-summary', [ReportController::class, 'costSummary']);
   Route::get('/reports/orders/export-csv', [OrderController::class, 'exportCsv']);

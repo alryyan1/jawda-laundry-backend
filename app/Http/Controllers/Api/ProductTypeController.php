@@ -17,18 +17,18 @@ use Illuminate\Validation\Rule;
 
 class ProductTypeController extends Controller
 {
-   /**
+    /**
      * Display a listing of the resource.
      * Supports pagination, filtering, and now includes the count of service offerings.
      */
     public function index(Request $request)
     {
         // Add withCount('serviceOfferings') to the query
-        $query = ProductType::with(['category', 'serviceOfferings' => function($query) {
-            $query->orderBy('id', 'asc');
+        $query = ProductType::with(['category', 'serviceOfferings' => function ($query) {
+            $query->orderBy('id', 'asc')->with('serviceAction');
         }])
-                              ->withCount('serviceOfferings') // <-- ADD THIS LINE
-                              ->orderBy('id','desc');
+            ->withCount('serviceOfferings') // <-- ADD THIS LINE
+            ->orderBy('id', 'desc');
 
         if ($request->filled('product_category_id')) {
             $query->where('product_category_id', $request->product_category_id);
@@ -36,11 +36,11 @@ class ProductTypeController extends Controller
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhereHas('category', function($cq) use ($searchTerm) {
-                      $cq->where('name', 'LIKE', "%{$searchTerm}%");
-                  });
+                    ->orWhereHas('category', function ($cq) use ($searchTerm) {
+                        $cq->where('name', 'LIKE', "%{$searchTerm}%");
+                    });
             });
         }
 
@@ -48,15 +48,15 @@ class ProductTypeController extends Controller
         return ProductTypeResource::collection($productTypes);
     }
 
-   /**
+    /**
      * Fetch all active product types, optionally filtered by category and search term,
      * for select dropdowns or selection panels.
      */
     public function allForSelect(Request $request)
     {
         $query = ProductType::with('category:id,name')
-                              ->withCount('serviceOfferings') // <-- ADD THIS LINE
-                              ->orderBy('name');
+            ->withCount('serviceOfferings') // <-- ADD THIS LINE
+            ->orderBy('name');
 
         // Filter by category if provided
         if ($request->filled('product_category_id')) {
@@ -69,7 +69,7 @@ class ProductTypeController extends Controller
             $query->where(function ($q) use ($searchTerm) {
                 // Search by name OR by ID
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('id', $searchTerm); // Allows searching by exact ID
+                    ->orWhere('id', $searchTerm); // Allows searching by exact ID
             });
         }
 
@@ -115,7 +115,7 @@ class ProductTypeController extends Controller
             if (isset($validatedData['is_dimension_based'])) {
                 $validatedData['is_dimension_based'] = filter_var($validatedData['is_dimension_based'], FILTER_VALIDATE_BOOLEAN);
             }
-            
+
             $productType = ProductType::create($validatedData);
             $productType->load('category');
             return new ProductTypeResource($productType);
@@ -188,7 +188,7 @@ class ProductTypeController extends Controller
             if (isset($validatedData['is_dimension_based'])) {
                 $validatedData['is_dimension_based'] = filter_var($validatedData['is_dimension_based'], FILTER_VALIDATE_BOOLEAN);
             }
-            
+
             $productType->update($validatedData);
             $productType->load('category');
             return new ProductTypeResource($productType);
@@ -221,14 +221,14 @@ class ProductTypeController extends Controller
             return response()->json(['message' => 'Failed to delete product type.'], 500);
         }
     }
- 
+
     public function createAllOfferings(ProductType $productType)
     {
         // Authorization check removed
 
         // Find which Service Actions already have an offering for this Product Type
         $existingActionIds = ServiceOffering::where('product_type_id', $productType->id)
-                                            ->pluck('service_action_id');
+            ->pluck('service_action_id');
 
         // Find all Service Actions that DON'T have an offering yet
         $missingActions = ServiceAction::whereNotIn('id', $existingActionIds)->get();
@@ -255,8 +255,8 @@ class ProductTypeController extends Controller
 
         // Fetch all offerings for this product type to return the complete, updated list
         $allOfferings = ServiceOffering::where('product_type_id', $productType->id)
-                                       ->with(['serviceAction', 'productType'])
-                                       ->get();
+            ->with(['serviceAction', 'productType'])
+            ->get();
 
         return ServiceOfferingResource::collection($allOfferings);
     }
@@ -265,13 +265,13 @@ class ProductTypeController extends Controller
     {
         // Find ServiceAction IDs that have an active ServiceOffering for the given ProductType
         $serviceActionIds = ServiceOffering::where('product_type_id', $productType->id)
-                                           ->where('is_active', true)
-                                           ->pluck('service_action_id')
-                                           ->unique();
+            ->where('is_active', true)
+            ->pluck('service_action_id')
+            ->unique();
 
         $serviceActions = ServiceAction::whereIn('id', $serviceActionIds)
-                                      ->orderBy('name')
-                                      ->get();
+            ->orderBy('name')
+            ->get();
 
         return ServiceActionResource::collection($serviceActions);
     }

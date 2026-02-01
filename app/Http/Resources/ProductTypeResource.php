@@ -23,6 +23,7 @@ class ProductTypeResource extends JsonResource
             'category' => new ProductCategoryResource($this->whenLoaded('category')),
 
             'service_offerings_count' => $this->serviceOfferings()->where('is_active', true)->count(),
+            'service_offerings' => ServiceOfferingResource::collection($this->whenLoaded('serviceOfferings')),
             'first_service_offering' => $this->serviceOfferings()->where('is_active', true)->first(),
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,

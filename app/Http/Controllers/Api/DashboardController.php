@@ -19,21 +19,25 @@ class DashboardController extends Controller
         $processingOrders = Order::where('status', 'processing')->count();
         $deliveredOrders = Order::where('status', 'delivered')->count();
         $completedTodayOrders = Order::where('status', 'completed')
-                                    ->whereDate('updated_at', Carbon::today()) // Assuming updated_at reflects completion time
-                                    ->count();
+            ->whereDate('updated_at', Carbon::today()) // Assuming updated_at reflects completion time
+            ->count();
         $cancelledOrders = Order::where('status', 'cancelled')->count();
+        $readyForPickupOrders = Order::where('status', 'completed')
+            ->whereNull('delivered_date')
+            ->count();
         $totalActiveCustomers = Customer::count(); // Define "active" if needed, e.g., with recent orders
 
         // Example: Revenue this month (sum of total_amount for completed orders)
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
         $monthlyRevenue = Order::where('status', 'completed')
-                              ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
-                              ->sum('total_amount');
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
+            ->sum('total_amount');
 
         return response()->json([
             'pendingOrders' => $pendingOrders,
             'processingOrders' => $processingOrders,
+            'readyForPickupOrders' => $readyForPickupOrders,
             'deliveredOrders' => $deliveredOrders,
             'completedTodayOrders' => $completedTodayOrders,
             'cancelledOrders' => $cancelledOrders,
@@ -111,7 +115,7 @@ class DashboardController extends Controller
 
         return response()->json(['data' => $dates->values()]);
     }
-     /**
+    /**
      * Provides a summary of statistics for the current day,
      * scoped to the currently authenticated user if they are not an admin.
      */
@@ -144,12 +148,12 @@ class DashboardController extends Controller
 
         if (!$user->hasRole('admin')) {
             // Scope payments to those recorded by the current user OR for orders created by them
-            $paymentsQuery->where(function($q) use ($user) {
+            $paymentsQuery->where(function ($q) use ($user) {
                 $q->where('payments.user_id', $user->id)
-                  ->orWhere('orders.user_id', $user->id);
+                    ->orWhere('orders.user_id', $user->id);
             });
         }
-        
+
         $paymentBreakdown = (clone $paymentsQuery)
             ->select('method', DB::raw('SUM(amount) as total'))
             ->groupBy('method')
@@ -176,5 +180,35 @@ class DashboardController extends Controller
                 ]
             ]
         ]);
+    }
+
+    public function todaysDeliveries(Request $request)
+    {
+        $today = Carbon::today();
+
+        // Fetch orders where pickup_date is today
+        $orders = Order::whereDate('delivered_date', $today)
+            ->with(['customer', 'items.serviceOffering.productType'])
+            ->orderBy('id', 'desc')
+            ->get();
+
+        // Transform data for frontend
+        $data = $orders->map(function ($order) {
+            // Get unique product images from items
+            $itemImages = $order->items->map(function ($item) {
+                $url = $item->serviceOffering->productType->image_url ?? null;
+                return $url ? asset('storage/' . $url) : null;
+            })->filter()->unique()->values()->take(4); // Take first 4 unique images
+
+            return [
+                'id' => $order->id,
+                'order_number' => $order->daily_order_number ? 'ORD-' . $order->daily_order_number : 'ORD-' . $order->id,
+                'customer_name' => $order->customer->name,
+                'item_images' => $itemImages,
+                'items_count' => $order->items->count(),
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 }
