@@ -17,6 +17,7 @@ use App\Services\WhatsAppService;
 use App\Actions\NotifyCustomerForOrderStatus;
 use App\Events\OrderCreated;
 use App\Events\OrderUpdated;
+use App\Events\PrintJobCreated;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -577,6 +578,12 @@ class OrderController extends Controller
             // Broadcast the order updated event
             event(new OrderUpdated($order, ['received' => true, 'received_at' => $order->received_at]));
             Log::info('Order marked as received', ['order_id' => $order->id]);
+
+            // Trigger print job event for automatic printing
+            event(new PrintJobCreated([
+                'order_id' => $order->id,
+            ]));
+            Log::info('PrintJobCreated event fired', ['order_id' => $order->id]);
 
             // Auto-send receive order message if enabled
             $this->sendReceiveOrderMessage($order);

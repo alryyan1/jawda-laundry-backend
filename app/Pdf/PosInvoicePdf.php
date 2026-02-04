@@ -40,39 +40,16 @@ class PosInvoicePdf extends TCPDF
         }
 
         try {
-            // Get the current Y position
-            $currentY = $this->GetY();
-
-            // Calculate logo dimensions (max width 20mm for POS receipt)
-            $maxWidth = 20;
-            $maxHeight = 15;
-
-            // Get image dimensions
-            $imageInfo = getimagesize($logoUrl);
-            if (!$imageInfo) {
-                return false;
-            }
-
-            $imageWidth = $imageInfo[0];
-            $imageHeight = $imageInfo[1];
-
-            // Calculate scaling to fit within max dimensions while maintaining aspect ratio
-            $scaleX = $maxWidth / $imageWidth;
-            $scaleY = $maxHeight / $imageHeight;
-            $scale = min($scaleX, $scaleY);
-
-            $scaledWidth = $imageWidth * $scale;
-            $scaledHeight = $imageHeight * $scale;
-
             // Center the logo horizontally
-            $x = ($this->GetPageWidth() - $scaledWidth) / 2;
+            $logoWidth = 20;
+            $logoHeight = 20;
+            $x = ($this->GetPageWidth() - $logoWidth) / 2;
 
-            // Add the logo
-            //increase the width of the image to 30
-            $this->Image($logoUrl, 15, 0, 50, 35);
+            // Add the logo centered
+            $this->Image($logoUrl, $x, $this->GetY(), $logoWidth, $logoHeight);
 
             // Move Y position down to account for logo
-            $this->SetY(25);
+            $this->SetY($this->GetY() + $logoHeight + 2);
 
             return true;
         } catch (Exception $e) {
@@ -151,6 +128,46 @@ class PosInvoicePdf extends TCPDF
             'thank_you' => [
                 'en' => 'We work for the comfort of our customers',
                 'ar' => 'نعـمل من أجل راحـــة عمالئـنا'
+            ],
+            'order_invoice' => [
+                'en' => 'Order Invoice',
+                'ar' => 'فاتورة الطلب'
+            ],
+            'invoice_to' => [
+                'en' => 'Invoice To',
+                'ar' => 'فاتورة إلى'
+            ],
+            'service_name' => [
+                'en' => 'Service Name',
+                'ar' => 'اسم الخدمة'
+            ],
+            'rate' => [
+                'en' => 'Rate',
+                'ar' => 'السعر'
+            ],
+            'vat_tax' => [
+                'en' => 'VAT: TAX',
+                'ar' => 'ضريبة القيمة المضافة: الضريبة'
+            ],
+            'addon' => [
+                'en' => 'Addon',
+                'ar' => 'إضافة'
+            ],
+            'discount' => [
+                'en' => 'Discount',
+                'ar' => 'خصم'
+            ],
+            'tax' => [
+                'en' => 'Tax',
+                'ar' => 'الضريبة'
+            ],
+            'gross_total' => [
+                'en' => 'Gross Total',
+                'ar' => 'المجموع الإجمالي'
+            ],
+            'delivery_date' => [
+                'en' => 'Delivery Date',
+                'ar' => 'تاريخ التسليم'
             ]
         ];
     }
@@ -204,61 +221,174 @@ class PosInvoicePdf extends TCPDF
     public function calculateTotalHeight(): float
     {
         $totalHeight = 0;
+        $pageWidth = 72; // Match the page width used in generate()
+        $wServiceName = 34; // Service name column width
 
-        // Header section height
-        $totalHeight += 20; // Company header with logo
-        $totalHeight += 10; // Order details section
-        $totalHeight += 8;  // Items table header
-        $totalHeight += 2;  // Header line
+        // --- Header Section ---
+        // Logo (if exists: 20mm + 2mm spacing, if not: 2mm)
+        $logoUrl = $this->settings['company_logo_url'] ?? null;
+        if ($logoUrl) {
+            $totalHeight += 20; // Logo height
+            $totalHeight += 2; // Spacing after logo
+        } else {
+            $totalHeight += 2; // Spacing if no logo
+        }
 
-        // Items section height
+        // Company Name (5mm + 1mm spacing)
+        $totalHeight += 5;
+        $totalHeight += 1;
+
+        // Company Address (4mm)
+        $totalHeight += 4;
+
+        // Phone Number (4mm)
+        $totalHeight += 4;
+
+        // Separator dash (4mm)
+        $totalHeight += 4;
+
+        // Spacing (2mm)
+        $totalHeight += 2;
+
+        // Order Invoice Black Bar Header (8mm + 2mm spacing)
+        $totalHeight += 8;
+        $totalHeight += 2;
+
+        // --- Order Details Section ---
+        // Order No row (5mm)
+        $totalHeight += 5;
+        
+        // Date row (5mm)
+        $totalHeight += 5;
+        
+        // Delivery Date row (5mm)
+        $totalHeight += 5;
+
+        // Spacing after order details (2mm)
+        $totalHeight += 2;
+
+        // --- Invoice To Section ---
+        $customerName = $this->order->customer->name ?? '';
+        $customerPhone = $this->order->customer->phone ?? '';
+        $invoiceToText = ($this->translations['invoice_to']['en'] ?? 'Invoice To') . ': ' . $customerName . ' ' . $customerPhone;
+        $invoiceToHeight = $this->calculateTextHeight($pageWidth, $invoiceToText, 5);
+        $totalHeight += $invoiceToHeight;
+
+        // Spacing after Invoice To (2mm)
+        $totalHeight += 2;
+
+        // --- Items Table Header ---
+        // Table header (6mm + 1mm spacing)
+        $totalHeight += 6;
+        $totalHeight += 1;
+
+        // --- Items Section ---
         $groupedItems = $this->groupItemsByCategory();
+
         foreach ($groupedItems as $categoryId => $categoryData) {
             $category = \App\Models\ProductCategory::find($categoryId);
             $hasSequence = $category && $category->sequence_enabled && $category->sequence_prefix;
 
-            // Category division line (if sequence enabled)
+            // Sequence Header (if enabled: 1mm Ln + 6mm Cell)
             if ($hasSequence) {
-                $totalHeight += 2; // Line height
+                $sequence = $this->getCategorySequence($categoryId);
+                if ($sequence) {
+                    $totalHeight += 1; // Ln(1)
+                    $totalHeight += 6; // Cell height
+                }
             }
-
-            // Category header with sequence
-            $categoryHeaderHeight = $this->calculateCategoryHeaderHeight($categoryId, $categoryData['name'], $hasSequence);
-            $totalHeight += $categoryHeaderHeight;
-            $totalHeight += 1; // Spacing after category name
 
             // Items in this category
+            $itemIndex = 0;
             foreach ($categoryData['items'] as $item) {
-                // Calculate combined text height (product name + display name)
+                // Dotted line separator (before each item except the first one in each category)
+                if ($itemIndex > 0) {
+                    $totalHeight += 1; // Ln(1) before dotted line
+                    $totalHeight += 1; // Ln(1) after dotted line
+                }
+
+                // Prepare Service Name: "{productType name} - {display_name}"
                 $productName = $item->serviceOffering->productType->name ?? '';
-                $displayName = $item->serviceOffering->display_name ?? '';
-                $combinedText = $productName . ' - ' . $displayName;
-                $itemNameHeight = $this->calculateTextHeight(35, $combinedText, 4);
-                $totalHeight += max(4, $itemNameHeight); // Minimum 4mm height per item
-            }
+                $displayName = $item->serviceOffering->productType->name ?? '';
+                $serviceName = $productName . ($displayName ? ' - ' . $displayName : '');
 
-            // Spacing between categories (except for the last category)
-            if ($categoryId !== array_key_last($groupedItems)) {
-                $totalHeight += 2;
+                // Prepare Description: "[{serviceAction name} {serviceAction description}]"
+                $serviceAction = $item->serviceOffering->serviceAction ?? null;
+                $serviceActionName = $serviceAction ? ($serviceAction->name ?? '') : '';
+                $serviceActionDesc = $serviceAction ? ($serviceAction->description ?? '') : '';
+                $description = '[' . $serviceActionName;
+                if ($serviceActionDesc) {
+                    $description .= ' ' . $serviceActionDesc;
+                }
+                $description .= ']';
+
+                // Combine service name and description
+                $itemText = $serviceName . "\n" . $description;
+
+                // Calculate actual height for this item (using lineHeight = 4)
+                $this->SetFont($this->font, '', 9);
+                $itemHeight = $this->getStringHeight($wServiceName, $itemText);
+                $totalHeight += max(8, $itemHeight); // Minimum 8mm (2 lines × 4mm)
+
+                // Add spacing if multi-line (1mm)
+                $nbLines = $this->getNumLines($itemText, $wServiceName);
+                if ($nbLines > 2) {
+                    $totalHeight += 1;
+                }
+
+                $itemIndex++;
             }
         }
 
-        // Summary section height
-        $totalHeight += 2;  // Line before summary
-        $totalHeight += 6;  // Subtotal
-        $totalHeight += 8;  // Total
-        $totalHeight += 6;  // Amount paid
-        $totalHeight += 6;  // Amount due
-        $totalHeight += 5;  // Spacing
+        // --- Summary Section ---
+        // Spacing before summary (2mm)
+        $totalHeight += 2;
 
-        // Notes section height (if exists)
+        // Line (no height, just draws line)
+        // Spacing after line (2mm)
+        $totalHeight += 2;
+
+        // VAT: TAX label (4mm + 1mm spacing)
+        $totalHeight += 4;
+        $totalHeight += 1;
+
+        // Sub Total row (5mm)
+        $totalHeight += 5;
+
+        // Addon row (5mm)
+        $totalHeight += 5;
+
+        // Discount row (5mm)
+        $totalHeight += 5;
+
+        // Tax (0%) row (5mm)
+        $totalHeight += 5;
+
+        // Gross Total row (5mm)
+        $totalHeight += 5;
+
+        // Paid Amount row (5mm)
+        $totalHeight += 5;
+
+        // Spacing after summary (4mm)
+        $totalHeight += 4;
+
+        // --- Footer Section ---
+        // Notes section (if exists)
         if ($this->order->notes) {
-            $notesHeight = $this->calculateTextHeight(72, $this->getBilingualText('notes') . ": " . $this->order->notes, 4);
+            $notesText = $this->getBilingualText('notes') . ": " . $this->order->notes;
+            $this->SetFont($this->font, 'I', 8);
+            $notesHeight = $this->getStringHeight($pageWidth, $notesText);
             $totalHeight += $notesHeight;
+            $totalHeight += 2; // Spacing after notes
         }
 
-        // Footer height
-        $totalHeight += 15; // Thank you message
+        // Thank you message (4mm + 2mm spacing)
+        $this->SetFont($this->font, 'I', 8);
+        $thankYouText = $this->getBilingualText('thank_you');
+        $thankYouHeight = $this->getStringHeight($pageWidth, $thankYouText);
+        $totalHeight += $thankYouHeight;
+        $totalHeight += 2;
 
         return $totalHeight;
     }
@@ -424,14 +554,31 @@ class PosInvoicePdf extends TCPDF
             $this->Ln(2);
         }
 
-        // Company Info - Centered
-        $this->SetFont($this->font, '', 9);
-        $this->MultiCell(0, 4, $this->getBilingualText('company_address'), 0, 'C');
-        $this->Cell(0, 4, $this->settings['general_company_phone'], 0, 1, 'C');
-        $this->Ln(3);
+        // Company Name - Below logo
+        $companyName = $this->settings['general_company_name'] ?? 'H2O';
+        $this->SetFont($this->font, 'B', 10);
+        $this->Cell(0, 5, $companyName, 0, 1, 'C');
+        $this->Ln(1);
 
-        // --- Divider ---
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+        // Company Address - Single line (Arabic address)
+        $address = $this->settings['general_company_address_ar'] ?? $this->settings['general_company_address'] ?? '';
+        $this->SetFont($this->font, '', 8);
+        $this->Cell(0, 4, $address, 0, 1, 'C');
+
+        // Phone Number
+        $phone = $this->settings['general_company_phone'] ?? '';
+        $this->Cell(0, 4, $phone, 0, 1, 'C');
+
+        // Separator dash
+        $this->Cell(0, 4, '-', 0, 1, 'C');
+        $this->Ln(2);
+
+        // --- Order Invoice Black Bar Header ---
+        $this->SetFillColor(0, 0, 0); // Black background
+        $this->SetTextColor(255, 255, 255); // White text
+        $this->SetFont($this->font, 'B', 10);
+        $this->Cell(0, 8, $this->translations['order_invoice']['en'] ?? 'Order Invoice', 0, 1, 'C', true);
+        $this->SetTextColor(0, 0, 0); // Reset to black text
         $this->Ln(2);
 
         // --- Order Meta Data (Grid Layout) ---
@@ -445,39 +592,45 @@ class PosInvoicePdf extends TCPDF
             $this->Cell($pageWidth - 25, 5, $value, 0, 1, 'R');
         };
 
-        $printMetaRow($this->getBilingualText('order'), '#' . $this->order->id);
-        $printMetaRow($this->getBilingualText('date'), $this->order->order_date->format('d/m/Y h:i A'));
-        $printMetaRow($this->getBilingualText('customer'), $this->order->customer->name);
-
-        if ($this->order->user) {
-            $printMetaRow($this->getBilingualText('cashier'), $this->order->user->name);
-        }
-
-        // --- Category Sequences (if any) ---
-        if ($this->order->category_sequences && !empty($this->order->category_sequences)) {
-            $this->Ln(1);
-            $this->SetFont($this->font, 'B', 10);
-            $this->MultiCell(0, 5, 'Seq: ' . $this->order->getCategorySequencesString(), 0, 'C');
-        }
+        // Order No format: ORD-{id}
+        $orderNo = 'ORD-' . $this->order->id;
+        $printMetaRow($this->translations['order']['en'] ?? 'Order #', $orderNo);
+        
+        // Order Date format: d/m/Y
+        $orderDate = $this->order->order_date->format('d/m/Y');
+        $printMetaRow($this->translations['date']['en'] ?? 'Date', $orderDate);
+        
+        // Delivery Date
+        $deliveryDateText = $this->order->delivered_date 
+            ? $this->order->delivered_date->format('d/m/Y')
+            : $this->order->order_date->format('d/m/Y') . ' (Pending)';
+        $printMetaRow($this->translations['delivery_date']['en'] ?? 'Delivery Date', $deliveryDateText);
 
         $this->Ln(2);
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+
+        // --- Invoice To Section ---
+        $customerName = $this->order->customer->name ?? '';
+        $customerPhone = $this->order->customer->phone ?? '';
+        $invoiceToText = ($this->translations['invoice_to']['en'] ?? 'Invoice To') . ': ' . $customerName . ' ' . $customerPhone;
+        $this->SetFont($this->font, '', 9);
+        $this->Cell(0, 5, $invoiceToText, 0, 1, 'L');
         $this->Ln(2);
 
-        // --- Items Table Header ---
-        // Widths: Item(34), Qty(8), Price(13), Total(17) = 72mm
-        $wItem = 34;
+        // --- Items Table Header (Black Background with White Text) ---
+        // Widths: Service Name(34), Rate(13), QTY(8), Total(17) = 72mm
+        $wServiceName = 34;
+        $wRate = 13;
         $wQty = 8;
-        $wPrice = 13;
         $wTotal = 17;
 
+        $this->SetFillColor(0, 0, 0); // Black background
+        $this->SetTextColor(255, 255, 255); // White text
         $this->SetFont($this->font, 'B', 9);
-        $this->Cell($wItem, 6, $this->getBilingualText('item'), 0, 0, 'L');
-        $this->Cell($wQty, 6, 'Qty', 0, 0, 'C');
-        $this->Cell($wPrice, 6, 'Price', 0, 0, 'R');
-        $this->Cell($wTotal, 6, 'Total', 0, 1, 'R');
-
-        $this->Line($this->GetX(), $this->GetY(), $this->GetX() + $pageWidth, $this->GetY());
+        $this->Cell($wServiceName, 6, $this->translations['service_name']['en'] ?? 'Service Name', 0, 0, 'L', true);
+        $this->Cell($wRate, 6, $this->translations['rate']['en'] ?? 'Rate', 0, 0, 'C', true);
+        $this->Cell($wQty, 6, 'QTY', 0, 0, 'C', true);
+        $this->Cell($wTotal, 6, $this->translations['total']['en'] ?? 'Total', 0, 1, 'R', true);
+        $this->SetTextColor(0, 0, 0); // Reset to black text
         $this->Ln(1);
 
         // --- Items Body ---
@@ -499,15 +652,49 @@ class PosInvoicePdf extends TCPDF
                 }
             }
 
+            $itemIndex = 0;
             foreach ($categoryData['items'] as $item) {
-                // Prepare Item Name
-                $productName = $item->serviceOffering->productType->name ?? '';
-                $displayName = $item->serviceOffering->display_name ?? '';
-                $itemText = $productName . ($displayName ? ' / ' . $displayName : '');
+                // Add dotted line separator before each item (except the first one)
+                if ($itemIndex > 0) {
+                    $this->Ln(1);
+                    $currentY = $this->GetY();
+                    // Draw dotted line across the full width
+                    $this->SetLineWidth(0.1);
+                    $this->SetDrawColorArray([150, 150, 150]); // Light gray for dotted line
+                    // Draw dotted line using small dashes
+                    $dashLength = 1;
+                    $gapLength = 1;
+                    $x = $this->GetX();
+                    $endX = $x + $pageWidth;
+                    while ($x < $endX) {
+                        $this->Line($x, $currentY, min($x + $dashLength, $endX), $currentY);
+                        $x += $dashLength + $gapLength;
+                    }
+                    $this->SetDrawColorArray([100, 100, 100]); // Reset to original line color (dark gray)
+                    $this->Ln(1);
+                }
 
-                // Calculate Height required for this Item Name
-                $nbLines = $this->getNumLines($itemText, $wItem);
-                $lineHeight = 5;
+                // Prepare Service Name: "{productType name} - {display_name}"
+                $productName = $item->serviceOffering->productType->name ?? '';
+                $displayName = $item->serviceOffering->productType->name ?? '';
+                $serviceName = $productName . ($displayName ? ' - ' . $displayName : '');
+
+                // Prepare Description: "[{serviceAction name} {serviceAction description}]"
+                $serviceAction = $item->serviceOffering->serviceAction ?? null;
+                $serviceActionName = $serviceAction ? ($serviceAction->name ?? '') : '';
+                $serviceActionDesc = $serviceAction ? ($serviceAction->description ?? '') : '';
+                $description = '[' . $serviceActionName;
+                if ($serviceActionDesc) {
+                    $description .= ' ' . $serviceActionDesc;
+                }
+                $description .= ']';
+
+                // Combine service name and description
+                $itemText = $serviceName . "\n" . $description;
+
+                // Calculate Height required for this Item
+                $nbLines = $this->getNumLines($itemText, $wServiceName);
+                $lineHeight = 4;
                 $rowHeight = $nbLines * $lineHeight;
 
                 // Check for page break (simple check)
@@ -519,22 +706,28 @@ class PosInvoicePdf extends TCPDF
                 $startX = $this->GetX();
                 $startY = $this->GetY();
 
-                // Print Name (MultiCell)
-                $this->MultiCell($wItem, $lineHeight, $itemText, 0, 'L', false, 1);
+                // Print Service Name and Description (MultiCell)
+                $this->MultiCell($wServiceName, $lineHeight, $itemText, 0, 'L', false, 1);
                 $endY = $this->GetY(); // Capture Y after name
 
                 // Print Numbers (Single Line, aligned to top of row)
                 // Reset to top of row
-                $this->SetXY($startX + $wItem, $startY);
+                $this->SetXY($startX + $wServiceName, $startY);
 
+                // Format currency values
+                $rate =  number_format($item->calculated_price_per_unit_item, 2);
+                $total =  number_format($item->sub_total, 2);
+
+                $this->Cell($wRate, $lineHeight, $rate, 0, 0, 'R');
                 $this->Cell($wQty, $lineHeight, $item->quantity, 0, 0, 'C');
-                $this->Cell($wPrice, $lineHeight, number_format($item->calculated_price_per_unit_item, 3), 0, 0, 'R');
-                $this->Cell($wTotal, $lineHeight, number_format($item->sub_total, 3), 0, 0, 'R');
+                $this->Cell($wTotal, $lineHeight, $total, 0, 0, 'R');
 
                 // Move to end of row (max Y)
                 $this->SetY($endY);
                 // Add tiny buffer if multiple lines
                 if ($nbLines > 1) $this->Ln(1);
+                
+                $itemIndex++;
             }
 
             // tiny separation between categories if needed
@@ -554,18 +747,34 @@ class PosInvoicePdf extends TCPDF
             $this->Cell(30, 5, $value, 0, 1, 'R');
         };
 
-        $printSummaryRow($this->getBilingualText('subtotal'), number_format($this->order->calculated_total_amount, 3));
-
+        // VAT: TAX label on the right
+        $this->SetFont($this->font, '', 8);
+        $this->Cell(0, 4, $this->getBilingualText('vat_tax'), 0, 1, 'R');
         $this->Ln(1);
-        $printSummaryRow($this->getBilingualText('total'), $this->currencySymbol . ' ' . number_format($this->order->calculated_total_amount, 3), true, 12);
-        $this->Ln(1);
 
-        $printSummaryRow($this->getBilingualText('amount_paid'), number_format($this->order->paid_amount, 3));
+        // Sub Total
+        $subTotal = $this->currencySymbol . ' ' . number_format((float)$this->order->calculated_total_amount, 2);
+        $printSummaryRow($this->getBilingualText('subtotal'), $subTotal);
 
-        $dueAmount = $this->order->calculated_total_amount - $this->order->paid_amount;
-        if ($dueAmount > 0) {
-            $printSummaryRow($this->getBilingualText('amount_due'), number_format($dueAmount, 3), true, 10);
-        }
+        // Addon (default 0.00)
+        $addon = $this->currencySymbol . ' ' . number_format(0.00, 2);
+        $printSummaryRow($this->getBilingualText('addon'), $addon);
+
+        // Discount (default 0.00)
+        $discount = $this->currencySymbol . ' ' . number_format(0.00, 2);
+        $printSummaryRow($this->getBilingualText('discount'), $discount);
+
+        // Tax (0%) (default 0.00)
+        $tax = $this->currencySymbol . ' ' . number_format(0.00, 2);
+        $printSummaryRow($this->getBilingualText('tax') . ' (0%):', $tax);
+
+        // Gross Total
+        $grossTotal = $this->currencySymbol . ' ' . number_format((float)$this->order->calculated_total_amount, 2);
+        $printSummaryRow($this->getBilingualText('gross_total'), $grossTotal, true, 10);
+
+        // Paid Amount
+        $paidAmount = $this->currencySymbol . ' ' . number_format((float)($this->order->paid_amount ?? 0), 2);
+        $printSummaryRow($this->getBilingualText('amount_paid'), $paidAmount);
 
         $this->Ln(4);
 

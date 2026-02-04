@@ -1,13 +1,22 @@
 {
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build"
-    },
-    "devDependencies": {
-        "axios": "^1.6.4",
-        "laravel-vite-plugin": "^1.0.0",
-        "vite": "^5.0.0"
-    }
+  "name": "jawda-laundry-print-agent",
+  "version": "1.0.0",
+  "description": "Print agent for automatically printing POS invoices via Pusher events",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "keywords": [
+    "printing",
+    "pusher",
+    "pos"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "pdf-to-printer": "^5.6.0",
+    "pusher-js": "^8.4.0"
+  }
 }
