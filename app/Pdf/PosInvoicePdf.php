@@ -674,10 +674,9 @@ class PosInvoicePdf extends TCPDF
                     $this->Ln(1);
                 }
 
-                // Prepare Service Name: "{productType name} - {display_name}"
+                // Prepare Service Name: "{productType name}"
                 $productName = $item->serviceOffering->productType->name ?? '';
-                $displayName = $item->serviceOffering->productType->name ?? '';
-                $serviceName = $productName . ($displayName ? ' - ' . $displayName : '');
+                $serviceName = $productName;
 
                 // Prepare Description: "[{serviceAction name} {serviceAction description}]"
                 $serviceAction = $item->serviceOffering->serviceAction ?? null;
@@ -747,26 +746,23 @@ class PosInvoicePdf extends TCPDF
             $this->Cell(30, 5, $value, 0, 1, 'R');
         };
 
-        // VAT: TAX label on the right
+        // Calculate totals: total items count and total quantity
+        $totalItemsCount = $this->order->items->count();
+        $totalQuantity = $this->order->items->sum('quantity');
+
+        // Display Items and Quantity totals
         $this->SetFont($this->font, '', 8);
-        $this->Cell(0, 4, $this->getBilingualText('vat_tax'), 0, 1, 'R');
+        $itemsLabelEn = ($this->translations['item']['en'] ?? 'Item') . 's';
+        $itemsLabelAr = ($this->translations['item']['ar'] ?? 'العنصر');
+        $itemsLabel = $itemsLabelEn . ' / ' . $itemsLabelAr;
+        $quantityLabel = $this->getBilingualText('quantity');
+        $printSummaryRow($itemsLabel, (string)$totalItemsCount, false, 8);
+        $printSummaryRow($quantityLabel, (string)$totalQuantity, false, 8);
         $this->Ln(1);
 
         // Sub Total
         $subTotal = $this->currencySymbol . ' ' . number_format((float)$this->order->calculated_total_amount, 2);
         $printSummaryRow($this->getBilingualText('subtotal'), $subTotal);
-
-        // Addon (default 0.00)
-        $addon = $this->currencySymbol . ' ' . number_format(0.00, 2);
-        $printSummaryRow($this->getBilingualText('addon'), $addon);
-
-        // Discount (default 0.00)
-        $discount = $this->currencySymbol . ' ' . number_format(0.00, 2);
-        $printSummaryRow($this->getBilingualText('discount'), $discount);
-
-        // Tax (0%) (default 0.00)
-        $tax = $this->currencySymbol . ' ' . number_format(0.00, 2);
-        $printSummaryRow($this->getBilingualText('tax') . ' (0%):', $tax);
 
         // Gross Total
         $grossTotal = $this->currencySymbol . ' ' . number_format((float)$this->order->calculated_total_amount, 2);
@@ -781,12 +777,12 @@ class PosInvoicePdf extends TCPDF
         // --- Footer Note ---
         if ($this->order->notes) {
             $this->SetFont($this->font, 'I', 8);
-            $this->MultiCell(0, 4, $this->getBilingualText('notes') . ": " . $this->order->notes, 0, 'L');
+            $this->MultiCell(0, 4, ($this->translations['notes']['en'] ?? 'Notes') . ": " . $this->order->notes, 0, 'L');
             $this->Ln(2);
         }
 
         $this->SetFont($this->font, 'I', 8);
-        $this->MultiCell(0, 4, $this->getBilingualText('thank_you'), 0, 'C');
+        $this->MultiCell(0, 4, $this->translations['thank_you']['en'] ?? 'We work for the comfort of our customers', 0, 'C');
         $this->Ln(2);
     }
 }

@@ -222,7 +222,7 @@ class ReportController extends Controller
 
     
     /**
-     * Generates a daily revenue and order count report for a specific month.
+     * Generates a daily income report with payment method breakdowns for a specific month.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
@@ -239,43 +239,72 @@ class ReportController extends Controller
         $startDate = Carbon::create($year, $month, 1)->startOfDay();
         $endDate = $startDate->copy()->endOfMonth();
 
-        // Query to get aggregated data for completed orders, grouped by date
-        $dailyData = Order::where('status', 'completed')
-            ->whereBetween('updated_at', [$startDate, $endDate]) // Use updated_at for completion date
+        // Query payments table to get payment method breakdowns by date
+        $paymentData = DB::table('payments')
+            ->join('orders', 'payments.order_id', '=', 'orders.id')
+            ->where('payments.type', 'payment') // Only count payments, not refunds
+            ->whereBetween(DB::raw('DATE(payments.payment_date)'), [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d')
+            ])
             ->select(
-                DB::raw('DATE(updated_at) as date'),
-                DB::raw('COUNT(*) as order_count'),
-                DB::raw('SUM(total_amount) as daily_revenue')
+                DB::raw('DATE(payments.payment_date) as date'),
+                DB::raw('SUM(CASE WHEN payments.method = "cash" THEN payments.amount ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN payments.method = "visa" THEN payments.amount ELSE 0 END) as total_visa'),
+                DB::raw('SUM(CASE WHEN payments.method = "bank_transfer" THEN payments.amount ELSE 0 END) as total_bank_transfer'),
+                DB::raw('SUM(payments.amount) as total_income'),
+                DB::raw('COUNT(DISTINCT payments.order_id) as order_count')
             )
             ->groupBy('date')
             ->orderBy('date', 'asc')
             ->get()
-            ->keyBy('date'); // Key by date for easy lookup
+            ->keyBy('date');
 
         // --- Create a full calendar for the month ---
         $reportData = [];
         $totalDaysInMonth = $startDate->daysInMonth;
-        $totalMonthRevenue = 0;
+        $totalMonthIncome = 0;
+        $totalMonthCash = 0;
+        $totalMonthVisa = 0;
+        $totalMonthBankTransfer = 0;
         $totalMonthOrders = 0;
 
         for ($day = 1; $day <= $totalDaysInMonth; $day++) {
             $currentDate = Carbon::create($year, $month, $day)->format('Y-m-d');
             
-            if (isset($dailyData[$currentDate])) {
-                $dayData = $dailyData[$currentDate];
+            if (isset($paymentData[$currentDate])) {
+                $dayData = $paymentData[$currentDate];
+                $totalIncome = (float) $dayData->total_income;
+                $totalCash = (float) $dayData->total_cash;
+                $totalVisa = (float) $dayData->total_visa;
+                $totalBankTransfer = (float) $dayData->total_bank_transfer;
+                $orderCount = (int) $dayData->order_count;
+
                 $reportData[] = [
                     'date' => $dayData->date,
-                    'order_count' => (int) $dayData->order_count,
-                    'daily_revenue' => (float) $dayData->daily_revenue,
+                    'order_count' => $orderCount,
+                    'daily_revenue' => $totalIncome, // Keep for backward compatibility
+                    'total_income' => $totalIncome,
+                    'total_cash' => $totalCash,
+                    'total_visa' => $totalVisa,
+                    'total_bank_transfer' => $totalBankTransfer,
                 ];
-                $totalMonthRevenue += $dayData->daily_revenue;
-                $totalMonthOrders += $dayData->order_count;
+
+                $totalMonthIncome += $totalIncome;
+                $totalMonthCash += $totalCash;
+                $totalMonthVisa += $totalVisa;
+                $totalMonthBankTransfer += $totalBankTransfer;
+                $totalMonthOrders += $orderCount;
             } else {
-                // Add an entry with 0 values for days with no sales
+                // Add an entry with 0 values for days with no payments
                 $reportData[] = [
                     'date' => $currentDate,
                     'order_count' => 0,
                     'daily_revenue' => 0,
+                    'total_income' => 0,
+                    'total_cash' => 0,
+                    'total_visa' => 0,
+                    'total_bank_transfer' => 0,
                 ];
             }
         }
@@ -288,9 +317,13 @@ class ReportController extends Controller
                     'month_name' => $startDate->format('F Y'),
                 ],
                 'summary' => [
-                    'total_revenue' => (float) $totalMonthRevenue,
+                    'total_revenue' => (float) $totalMonthIncome, // Keep for backward compatibility
+                    'total_income' => (float) $totalMonthIncome,
+                    'total_cash' => (float) $totalMonthCash,
+                    'total_visa' => (float) $totalMonthVisa,
+                    'total_bank_transfer' => (float) $totalMonthBankTransfer,
                     'total_orders' => (int) $totalMonthOrders,
-                    'average_daily_revenue' => $totalDaysInMonth > 0 ? (float)($totalMonthRevenue / $totalDaysInMonth) : 0,
+                    'average_daily_revenue' => $totalDaysInMonth > 0 ? (float)($totalMonthIncome / $totalDaysInMonth) : 0,
                 ],
                 'daily_data' => $reportData,
             ]

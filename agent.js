@@ -6,13 +6,14 @@ const axios = require('axios');
 const Pusher = require('pusher-js');
 const { print } = require('pdf-to-printer');
 
-const PUSHER_KEY = process.env.PUSHER_KEY;
-const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER;
-const API_BASE = process.env.API_BASE || 'http://localhost:8000/api';
+// Support both PUSHER_KEY and PUSHER_APP_KEY (for Laravel .env compatibility)
+const PUSHER_KEY = process.env.PUSHER_KEY || process.env.PUSHER_APP_KEY;
+const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || process.env.PUSHER_APP_CLUSTER;
+const API_BASE = process.env.API_BASE || 'http://127.0.0.1/jawda-laundry-backend/public/api';
 const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
 
 if (!PUSHER_KEY || !PUSHER_CLUSTER) {
-  console.error('Missing PUSHER_KEY or PUSHER_CLUSTER in .env');
+  console.error('Missing PUSHER_KEY/PUSHER_APP_KEY or PUSHER_CLUSTER/PUSHER_APP_CLUSTER in .env');
   process.exit(1);
 }
 

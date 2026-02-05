@@ -73,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/orders/{order}/payment', [OrderController::class, 'recordPayment']);
   Route::get('/orders/statistics', [OrderController::class, 'statistics']);
   Route::post('/orders/{order}/mark-received', [OrderController::class, 'markOrderReceived']);
+  Route::post('/orders/{order}/trigger-print-job', [OrderController::class, 'triggerPrintJob']);
   Route::patch('/order-items/{orderItem}/dimensions', [OrderController::class, 'updateOrderItemDimensions']);
   Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateOrderItemQuantity']);
 

@@ -190,6 +190,12 @@ class OrderController extends Controller
             event(new OrderCreated($order));
             Log::info('OrderCreated event fired', ['order_id' => $order->id]);
 
+            // Trigger print job event for automatic printing when order is created
+            event(new PrintJobCreated([
+                'order_id' => $order->id,
+            ]));
+            Log::info('PrintJobCreated event fired on checkout', ['order_id' => $order->id]);
+
             // Return order with warnings if any
             $response = new OrderResource($order);
             if (!empty($warnings)) {
@@ -271,6 +277,10 @@ class OrderController extends Controller
             $order->order_complete = true;
             $order->completed_at = now();
             Log::info('Setting order_complete to true for order:', ['order_id' => $order->id]);
+        } elseif ($newStatus === 'delivered') {
+            // Always set delivered_date to current date when marking as delivered
+            $order->delivered_date = $validatedData['delivered_date'] ?? now();
+            Log::info('Setting delivered_date for order:', ['order_id' => $order->id, 'delivered_date' => $order->delivered_date]);
         } elseif ($newStatus === 'cancelled') {
             $order->order_complete = false;
             Log::info('Setting order_complete to false for cancelled order:', ['order_id' => $order->id]);
@@ -455,10 +465,8 @@ class OrderController extends Controller
                     $order->order_complete = true;
                     if (!$order->completed_at) $order->completed_at = now();
                 } elseif ($newStatus === 'delivered') {
-                    // Set delivered_date to current date if not provided
-                    if (!$order->delivered_date) {
+                    // Always set delivered_date to current date when marking as delivered
                         $order->delivered_date = $validated['delivered_date'] ?? now();
-                    }
                 } elseif ($newStatus === 'cancelled') {
                     $order->order_complete = false;
                 }
@@ -1013,6 +1021,23 @@ class OrderController extends Controller
             $pdf->Output('receipt-' . $order->id . '.pdf', 'I');
             exit;
         }
+    }
+
+    /**
+     * Trigger a print job for the order invoice
+     */
+    public function triggerPrintJob(Order $order)
+    {
+        // Trigger print job event for automatic printing
+        event(new PrintJobCreated([
+            'order_id' => $order->id,
+        ]));
+        Log::info('PrintJobCreated event fired via API', ['order_id' => $order->id]);
+
+        return response()->json([
+            'message' => 'Print job triggered successfully.',
+            'order_id' => $order->id
+        ]);
     }
 
     /**
