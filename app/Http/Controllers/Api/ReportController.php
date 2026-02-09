@@ -222,22 +222,38 @@ class ReportController extends Controller
 
     
     /**
-     * Generates a daily income report with payment method breakdowns for a specific month.
+     * Generates a daily income report with payment method breakdowns.
+     * Accepts either (month + year) or (date_from + date_to) for the range.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function dailyRevenueReport(Request $request)
     {
-        $validated = $request->validate([
-            'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2020|max:' . date('Y'),
-        ]);
+        $hasDateRange = $request->filled('date_from') && $request->filled('date_to');
+        $hasMonthYear = $request->filled('month') && $request->filled('year');
 
-        $year = $validated['year'];
-        $month = $validated['month'];
-        $startDate = Carbon::create($year, $month, 1)->startOfDay();
-        $endDate = $startDate->copy()->endOfMonth();
+        if ($hasDateRange) {
+            $validated = $request->validate([
+                'date_from' => 'required|date_format:Y-m-d',
+                'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            ]);
+            $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+            $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+        } elseif ($hasMonthYear) {
+            $validated = $request->validate([
+                'month' => 'required|integer|min:1|max:12',
+                'year' => 'required|integer|min:2020|max:' . date('Y'),
+            ]);
+            $year = $validated['year'];
+            $month = $validated['month'];
+            $startDate = Carbon::create($year, $month, 1)->startOfDay();
+            $endDate = $startDate->copy()->endOfMonth();
+        } else {
+            return response()->json([
+                'message' => 'Either (month and year) or (date_from and date_to) are required.',
+            ], 422);
+        }
 
         // Query payments table to get payment method breakdowns by date
         $paymentData = DB::table('payments')
@@ -260,74 +276,100 @@ class ReportController extends Controller
             ->get()
             ->keyBy('date');
 
-        // --- Create a full calendar for the month ---
         $reportData = [];
-        $totalDaysInMonth = $startDate->daysInMonth;
-        $totalMonthIncome = 0;
-        $totalMonthCash = 0;
-        $totalMonthVisa = 0;
-        $totalMonthBankTransfer = 0;
-        $totalMonthOrders = 0;
+        $totalIncome = 0;
+        $totalCash = 0;
+        $totalVisa = 0;
+        $totalBankTransfer = 0;
+        $totalOrders = 0;
+        $daysInRange = $startDate->diffInDays($endDate) + 1;
 
-        for ($day = 1; $day <= $totalDaysInMonth; $day++) {
-            $currentDate = Carbon::create($year, $month, $day)->format('Y-m-d');
-            
-            if (isset($paymentData[$currentDate])) {
-                $dayData = $paymentData[$currentDate];
-                $totalIncome = (float) $dayData->total_income;
-                $totalCash = (float) $dayData->total_cash;
-                $totalVisa = (float) $dayData->total_visa;
-                $totalBankTransfer = (float) $dayData->total_bank_transfer;
-                $orderCount = (int) $dayData->order_count;
-
-                $reportData[] = [
-                    'date' => $dayData->date,
-                    'order_count' => $orderCount,
-                    'daily_revenue' => $totalIncome, // Keep for backward compatibility
-                    'total_income' => $totalIncome,
-                    'total_cash' => $totalCash,
-                    'total_visa' => $totalVisa,
-                    'total_bank_transfer' => $totalBankTransfer,
-                ];
-
-                $totalMonthIncome += $totalIncome;
-                $totalMonthCash += $totalCash;
-                $totalMonthVisa += $totalVisa;
-                $totalMonthBankTransfer += $totalBankTransfer;
-                $totalMonthOrders += $orderCount;
-            } else {
-                // Add an entry with 0 values for days with no payments
-                $reportData[] = [
-                    'date' => $currentDate,
-                    'order_count' => 0,
-                    'daily_revenue' => 0,
-                    'total_income' => 0,
-                    'total_cash' => 0,
-                    'total_visa' => 0,
-                    'total_bank_transfer' => 0,
-                ];
+        if ($hasMonthYear) {
+            // Full calendar for the month: one row per day
+            $year = $validated['year'];
+            $month = $validated['month'];
+            $totalDaysInMonth = $startDate->daysInMonth;
+            for ($day = 1; $day <= $totalDaysInMonth; $day++) {
+                $currentDate = Carbon::create($year, $month, $day)->format('Y-m-d');
+                $reportData[] = $this->dailyRevenueRow($currentDate, $paymentData, $totalIncome, $totalCash, $totalVisa, $totalBankTransfer, $totalOrders);
             }
+            $daysForAverage = $totalDaysInMonth;
+        } else {
+            // Date range: one row per day in range
+            for ($d = $startDate->copy(); $d->lte($endDate); $d->addDay()) {
+                $currentDate = $d->format('Y-m-d');
+                $reportData[] = $this->dailyRevenueRow($currentDate, $paymentData, $totalIncome, $totalCash, $totalVisa, $totalBankTransfer, $totalOrders);
+            }
+            $daysForAverage = $daysInRange;
         }
+
+        $reportDetails = $hasMonthYear
+            ? [
+                'month' => (int) $month,
+                'year' => (int) $year,
+                'month_name' => $startDate->format('F Y'),
+            ]
+            : [
+                'date_from' => $startDate->format('Y-m-d'),
+                'date_to' => $endDate->format('Y-m-d'),
+                'month' => (int) $startDate->month,
+                'year' => (int) $startDate->year,
+                'month_name' => $startDate->format('F Y'),
+            ];
 
         return response()->json([
             'data' => [
-                'report_details' => [
-                    'month' => $month,
-                    'year' => $year,
-                    'month_name' => $startDate->format('F Y'),
-                ],
+                'report_details' => $reportDetails,
                 'summary' => [
-                    'total_revenue' => (float) $totalMonthIncome, // Keep for backward compatibility
-                    'total_income' => (float) $totalMonthIncome,
-                    'total_cash' => (float) $totalMonthCash,
-                    'total_visa' => (float) $totalMonthVisa,
-                    'total_bank_transfer' => (float) $totalMonthBankTransfer,
-                    'total_orders' => (int) $totalMonthOrders,
-                    'average_daily_revenue' => $totalDaysInMonth > 0 ? (float)($totalMonthIncome / $totalDaysInMonth) : 0,
+                    'total_revenue' => (float) $totalIncome,
+                    'total_income' => (float) $totalIncome,
+                    'total_cash' => (float) $totalCash,
+                    'total_visa' => (float) $totalVisa,
+                    'total_bank_transfer' => (float) $totalBankTransfer,
+                    'total_orders' => (int) $totalOrders,
+                    'average_daily_revenue' => $daysForAverage > 0 ? (float)($totalIncome / $daysForAverage) : 0,
                 ],
                 'daily_data' => $reportData,
             ]
         ]);
+    }
+
+    /**
+     * Build one daily revenue row and accumulate totals.
+     */
+    private function dailyRevenueRow(string $currentDate, $paymentData, &$totalIncome, &$totalCash, &$totalVisa, &$totalBankTransfer, &$totalOrders): array
+    {
+        if (isset($paymentData[$currentDate])) {
+            $dayData = $paymentData[$currentDate];
+            $income = (float) $dayData->total_income;
+            $cash = (float) $dayData->total_cash;
+            $visa = (float) $dayData->total_visa;
+            $bank = (float) $dayData->total_bank_transfer;
+            $orderCount = (int) $dayData->order_count;
+            $totalIncome += $income;
+            $totalCash += $cash;
+            $totalVisa += $visa;
+            $totalBankTransfer += $bank;
+            $totalOrders += $orderCount;
+            return [
+                'date' => $dayData->date,
+                'order_count' => $orderCount,
+                'daily_revenue' => $income,
+                'total_income' => $income,
+                'total_cash' => $cash,
+                'total_visa' => $visa,
+                'total_bank_transfer' => $bank,
+            ];
+        }
+        return [
+            'date' => $currentDate,
+            'order_count' => 0,
+            'daily_revenue' => 0,
+            'total_income' => 0,
+            'total_cash' => 0,
+            'total_visa' => 0,
+            'total_bank_transfer' => 0,
+        ];
     }
 
 

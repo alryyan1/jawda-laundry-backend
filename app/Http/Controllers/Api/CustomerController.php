@@ -207,19 +207,24 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
-        // Optional: Business logic before deletion
-        // For example, prevent deletion if the customer has active/unpaid orders.
-        // This is a design decision. For now, we'll allow deletion.
-        // if ($customer->orders()->whereNotIn('status', ['completed', 'cancelled'])->exists()) {
-        //     return response()->json(['message' => 'Cannot delete customer with active orders. Please resolve orders first.'], 409); // 409 Conflict
-        // }
+        // Check if customer has any orders
+        $orderCount = $customer->orders()->count();
+        if ($orderCount > 0) {
+            return response()->json([
+                'message' => "Cannot delete customer. This customer has {$orderCount} order(s) associated with them. Please delete or reassign the orders first."
+            ], 409); // 409 Conflict
+        }
 
         try {
-            $customer->delete(); // This will perform a soft delete if the Customer model uses the SoftDeletes trait
+            $customer->delete();
             return response()->json(['message' => 'Customer deleted successfully.'], 200);
         } catch (\Exception $e) {
             Log::error("Error deleting customer {$customer->id}: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to delete customer. Please try again.'], 500);
+            Log::error("Exception trace: " . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'Failed to delete customer. Please try again.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

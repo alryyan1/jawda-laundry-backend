@@ -51,14 +51,33 @@ class PaymentController extends Controller
             'payment_date' => 'required|date_format:Y-m-d',
             'transaction_id' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:1000',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $paymentType = $validated['type'] ?? 'payment';
         $paymentAmount = (float) $validated['amount'];
 
         // --- Business Logic Checks ---
-        // First recalculate the order total to ensure it's accurate
+        // First recalculate the order total from items to get the original total (before discount)
         $order->recalculateTotalAmount();
+        $originalTotal = (float) $order->total_amount;
+
+        // Apply discount percentage if provided
+        if (isset($validated['discount_percentage']) && $validated['discount_percentage'] !== null) {
+            $discountPercentage = (float) $validated['discount_percentage'];
+            
+            // Apply discount to the original total
+            if ($discountPercentage > 0) {
+                $order->discount_percentage = $discountPercentage;
+                $order->total_amount = $originalTotal * (1 - ($discountPercentage / 100));
+            } else {
+                // If discount is 0, clear discount and use original total
+                $order->discount_percentage = null;
+                $order->total_amount = $originalTotal;
+            }
+            $order->saveQuietly();
+        }
+        // If discount_percentage is not provided in request, keep existing discount (if any)
 
         if ($paymentType === 'payment' && ($order->paid_amount + $paymentAmount) > $order->total_amount) {
             return response()->json(['message' => 'Payment amount exceeds the amount due.'], 422);

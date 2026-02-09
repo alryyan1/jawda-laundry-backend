@@ -59,6 +59,7 @@ class OrderController extends Controller
         $validationRules = [
             'notes' => 'nullable|string|max:2000',
             'due_date' => 'nullable|date_format:Y-m-d',
+            'expected_delivery_date' => 'nullable|date_format:Y-m-d',
             'order_type' => 'sometimes|in:in_house,take_away,delivery',
         ];
 
@@ -168,6 +169,9 @@ class OrderController extends Controller
                 'notes' => $validatedData['notes'] ?? null,
                 'due_date' => $validatedData['due_date'] ?? null,
                 'order_date' => now(),
+                'expected_delivery_date' => isset($validatedData['expected_delivery_date']) 
+                    ? Carbon::parse($validatedData['expected_delivery_date'])->startOfDay() 
+                    : Carbon::tomorrow()->startOfDay(), // Set default expected_delivery_date to next day
             ]);
 
             $order->items()->createMany($orderItemsToCreate);
@@ -690,13 +694,26 @@ class OrderController extends Controller
      */
     public function destroy(Order $order)
     {
-        // Orders are usually cancelled via status change, not deleted.
-        // Using soft-deletes on the Order model is recommended.
-        if ($order->status !== 'cancelled') {
-            return response()->json(['message' => 'Only cancelled orders can be deleted.'], 400);
+        try {
+            // Delete related payments first (due to foreign key constraints)
+            $order->payments()->delete();
+            
+            // Delete order items
+            $order->items()->delete();
+            
+            // Delete the order (soft delete if SoftDeletes trait is used)
+            $order->delete();
+            
+            Log::info('Order deleted', ['order_id' => $order->id]);
+            
+            return response()->json(['message' => 'Order deleted successfully.'], 200);
+        } catch (\Exception $e) {
+            Log::error("Error deleting order {$order->id}: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete order. Please try again.',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        $order->delete(); // This will soft delete if the trait is used on the model.
-        return response()->noContent();
     }
 
     /**

@@ -26,6 +26,7 @@ class Order extends Model
         'order_complete',       // Track if order is completed
         'order_type', // New field for dine-in/take-away/delivery
         'total_amount',
+        'discount_percentage',  // Discount percentage applied to the order
         'paid_amount',
         'payment_method',       // Ensure this is here
         'payment_status',       // Ensure this is here
@@ -35,6 +36,7 @@ class Order extends Model
         'due_date',
         'pickup_date',
         'delivered_date',       // Date when order was delivered
+        'expected_delivery_date', // Date when order is expected to be delivered
         'completed_at',         // Date when order was completed
         'delivery_address',     // Ensure this is here if used
         'whatsapp_text_sent',
@@ -51,11 +53,13 @@ class Order extends Model
      */
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'discount_percentage' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'order_date' => 'datetime',
         'due_date' => 'datetime',
         'pickup_date' => 'datetime',
         'delivered_date' => 'datetime',
+        'expected_delivery_date' => 'datetime',
         'completed_at' => 'datetime',
         'order_complete' => 'boolean',
         'whatsapp_text_sent' => 'boolean',
@@ -113,12 +117,29 @@ class Order extends Model
     }
 
     /**
-     * Calculate the remaining amount due for the order.
+     * Calculate the remaining amount due for the order (after discount).
      * Accessor: $order->amount_due
+     * Amount to pay = total_amount with discount applied; fully paid when paid_amount >= amount to pay.
      */
     public function getAmountDueAttribute(): float
     {
-        return (float) $this->total_amount - (float) $this->paid_amount;
+        $totalToPay = $this->getTotalAmountAfterDiscountAttribute();
+        $due = (float) $totalToPay - (float) $this->paid_amount;
+        return max(0, round($due, 2));
+    }
+
+    /**
+     * Total amount the customer has to pay (after discount).
+     * Accessor: $order->total_amount_after_discount
+     */
+    public function getTotalAmountAfterDiscountAttribute(): float
+    {
+        $total = (float) $this->total_amount;
+        $discountPct = $this->discount_percentage !== null ? (float) $this->discount_percentage : 0;
+        if ($discountPct > 0) {
+            return round($total * (1 - ($discountPct / 100)), 2);
+        }
+        return $total;
     }
 
     /**

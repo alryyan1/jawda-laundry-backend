@@ -126,7 +126,7 @@ class PosInvoicePdf extends TCPDF
                 'ar' => 'الفئة'
             ],
             'thank_you' => [
-                'en' => 'We work for the comfort of our customers',
+                'en' => 'Thank you , Come back soon',
                 'ar' => 'نعـمل من أجل راحـــة عمالئـنا'
             ],
             'order_invoice' => [
@@ -577,7 +577,8 @@ class PosInvoicePdf extends TCPDF
         $this->SetFillColor(0, 0, 0); // Black background
         $this->SetTextColor(255, 255, 255); // White text
         $this->SetFont($this->font, 'B', 10);
-        $this->Cell(0, 8, $this->translations['order_invoice']['en'] ?? 'Order Invoice', 0, 1, 'C', true);
+        $this->Cell(50, 8, $this->translations['order_invoice']['en'] ?? 'Order Invoice', 0, 0, 'R', true);
+        $this->Cell(22, 8, $this->order->id, 0, 1, 'R', true);
         $this->SetTextColor(0, 0, 0); // Reset to black text
         $this->Ln(2);
 
@@ -600,9 +601,9 @@ class PosInvoicePdf extends TCPDF
         $orderDate = $this->order->order_date->format('d/m/Y');
         $printMetaRow($this->translations['date']['en'] ?? 'Date', $orderDate);
         
-        // Delivery Date
-        $deliveryDateText = $this->order->delivered_date 
-            ? $this->order->delivered_date->format('d/m/Y')
+        // Expected Delivery Date
+        $deliveryDateText = $this->order->expected_delivery_date 
+            ? $this->order->expected_delivery_date->format('d/m/Y')
             : $this->order->order_date->format('d/m/Y') . ' (Pending)';
         $printMetaRow($this->translations['delivery_date']['en'] ?? 'Delivery Date', $deliveryDateText);
 
@@ -611,9 +612,10 @@ class PosInvoicePdf extends TCPDF
         // --- Invoice To Section ---
         $customerName = $this->order->customer->name ?? '';
         $customerPhone = $this->order->customer->phone ?? '';
-        $invoiceToText = ($this->translations['invoice_to']['en'] ?? 'Invoice To') . ': ' . $customerName . ' ' . $customerPhone;
-        $this->SetFont($this->font, '', 9);
-        $this->Cell(0, 5, $invoiceToText, 0, 1, 'L');
+        $invoiceToText =  $customerName . ' ' . $customerPhone;
+        $this->SetFont($this->font, '', 12);
+        $this->Cell(0, 5, 'Invoice To:', 0, 0, 'L');
+        $this->Cell(0, 5, $invoiceToText, 0, 1, 'R');
         $this->Ln(2);
 
         // --- Items Table Header (Black Background with White Text) ---
@@ -782,7 +784,7 @@ class PosInvoicePdf extends TCPDF
         }
 
         $this->SetFont($this->font, 'I', 8);
-        $this->MultiCell(0, 4, $this->translations['thank_you']['en'] ?? 'We work for the comfort of our customers', 0, 'C');
+        $this->MultiCell(0, 4, $this->translations['thank_you']['en'] ?? 'Thank you , Come back soon', 0, 'C');
         $this->Ln(2);
     }
 }

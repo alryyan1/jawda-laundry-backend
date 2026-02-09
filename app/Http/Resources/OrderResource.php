@@ -26,6 +26,7 @@ class OrderResource extends JsonResource
             'order_complete' => $this->order_complete,
             'order_type' => $this->order_type,
             'total_amount' => (float) $this->total_amount,
+            'discount_percentage' => $this->discount_percentage !== null ? (float) $this->discount_percentage : null,
             'paid_amount' => (float) $this->paid_amount,
             'amount_due' => (float) $this->amount_due, // Accessor defined in Order model
             'payment_method' => $this->payment_method,
@@ -37,6 +38,7 @@ class OrderResource extends JsonResource
             'due_date' => $this->due_date ? $this->due_date->toIso8601String() : null,
             'pickup_date' => $this->pickup_date ? $this->pickup_date->toIso8601String() : null,
             'delivered_date' => $this->delivered_date ? $this->delivered_date->toIso8601String() : null,
+            'expected_delivery_date' => $this->expected_delivery_date ? $this->expected_delivery_date->toIso8601String() : null,
             'completed_at' => $this->completed_at ? $this->completed_at->toIso8601String() : null,
             'delivery_address' => $this->delivery_address,
             'items' => OrderItemResource::collection($this->whenLoaded('items')), // Collection of OrderItemResource
