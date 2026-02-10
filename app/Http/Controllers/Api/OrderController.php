@@ -81,6 +81,7 @@ class OrderController extends Controller
             $validationRules['items.*.length_meters'] = 'nullable|numeric|min:0';
             $validationRules['items.*.width_meters'] = 'nullable|numeric|min:0';
             $validationRules['items.*.notes'] = 'nullable|string|max:1000';
+            $validationRules['items.*.calculated_price_per_unit_item'] = 'nullable|numeric|min:0';
         }
 
         $validatedData = $request->validate($validationRules);
@@ -136,25 +137,48 @@ class OrderController extends Controller
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
 
-                    $priceDetails = $this->pricingService->calculatePrice(
-                        $serviceOffering,
-                        $customer,
-                        $itemData['quantity'],
-                        $itemData['length_meters'] ?? null,
-                        $itemData['width_meters'] ?? null
-                    );
+                    $quantity = (int) $itemData['quantity'];
+                    $lengthMeters = isset($itemData['length_meters']) ? (float) $itemData['length_meters'] : null;
+                    $widthMeters = isset($itemData['width_meters']) ? (float) $itemData['width_meters'] : null;
 
-                    $orderItemsToCreate[] = [
-                        'service_offering_id' => $serviceOffering->id,
-                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
-                        'quantity' => $itemData['quantity'],
-                        'length_meters' => $itemData['length_meters'] ?? null,
-                        'width_meters' => $itemData['width_meters'] ?? null,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
-                        'notes' => $itemData['notes'] ?? null,
-                    ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    if (isset($itemData['calculated_price_per_unit_item']) && $itemData['calculated_price_per_unit_item'] !== null && $itemData['calculated_price_per_unit_item'] !== '') {
+                        $unitPrice = (float) $itemData['calculated_price_per_unit_item'];
+                        if ($serviceOffering->productType && $serviceOffering->productType->is_dimension_based && $lengthMeters !== null && $widthMeters !== null) {
+                            $subTotal = round($lengthMeters * $widthMeters * $quantity * $unitPrice, 2);
+                        } else {
+                            $subTotal = round($quantity * $unitPrice, 2);
+                        }
+                        $orderItemsToCreate[] = [
+                            'service_offering_id' => $serviceOffering->id,
+                            'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                            'quantity' => $quantity,
+                            'length_meters' => $lengthMeters,
+                            'width_meters' => $widthMeters,
+                            'calculated_price_per_unit_item' => $unitPrice,
+                            'sub_total' => $subTotal,
+                            'notes' => $itemData['notes'] ?? null,
+                        ];
+                        $orderTotalAmount += $subTotal;
+                    } else {
+                        $priceDetails = $this->pricingService->calculatePrice(
+                            $serviceOffering,
+                            $customer,
+                            $quantity,
+                            $lengthMeters,
+                            $widthMeters
+                        );
+                        $orderItemsToCreate[] = [
+                            'service_offering_id' => $serviceOffering->id,
+                            'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                            'quantity' => $quantity,
+                            'length_meters' => $lengthMeters,
+                            'width_meters' => $widthMeters,
+                            'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
+                            'sub_total' => $priceDetails['sub_total'],
+                            'notes' => $itemData['notes'] ?? null,
+                        ];
+                        $orderTotalAmount += $priceDetails['sub_total'];
+                    }
                 }
             }
 
@@ -259,6 +283,7 @@ class OrderController extends Controller
             'items.*.length_meters' => 'nullable|numeric|min:0',
             'items.*.width_meters' => 'nullable|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:1000',
+            'items.*.calculated_price_per_unit_item' => 'nullable|numeric|min:0',
         ]);
 
         $oldStatus = $order->status;
@@ -339,25 +364,48 @@ class OrderController extends Controller
                         throw new \Exception("Service offering not found for ID: " . $itemData['service_offering_id']);
                     }
 
-                    $priceDetails = $this->pricingService->calculatePrice(
-                        $serviceOffering,
-                        $customer,
-                        $itemData['quantity'],
-                        $itemData['length_meters'] ?? null,
-                        $itemData['width_meters'] ?? null
-                    );
+                    $quantity = (int) $itemData['quantity'];
+                    $lengthMeters = isset($itemData['length_meters']) ? (float) $itemData['length_meters'] : null;
+                    $widthMeters = isset($itemData['width_meters']) ? (float) $itemData['width_meters'] : null;
 
-                    $orderItemsToCreate[] = [
-                        'service_offering_id' => $serviceOffering->id,
-                        'product_description_custom' => $itemData['product_description_custom'] ?? null,
-                        'quantity' => $itemData['quantity'],
-                        'length_meters' => $itemData['length_meters'] ?? null,
-                        'width_meters' => $itemData['width_meters'] ?? null,
-                        'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
-                        'sub_total' => $priceDetails['sub_total'],
-                        'notes' => $itemData['notes'] ?? null,
-                    ];
-                    $orderTotalAmount += $priceDetails['sub_total'];
+                    if (isset($itemData['calculated_price_per_unit_item']) && $itemData['calculated_price_per_unit_item'] !== null && $itemData['calculated_price_per_unit_item'] !== '') {
+                        $unitPrice = (float) $itemData['calculated_price_per_unit_item'];
+                        if ($serviceOffering->productType && $serviceOffering->productType->is_dimension_based && $lengthMeters !== null && $widthMeters !== null) {
+                            $subTotal = round($lengthMeters * $widthMeters * $quantity * $unitPrice, 2);
+                        } else {
+                            $subTotal = round($quantity * $unitPrice, 2);
+                        }
+                        $orderItemsToCreate[] = [
+                            'service_offering_id' => $serviceOffering->id,
+                            'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                            'quantity' => $quantity,
+                            'length_meters' => $lengthMeters,
+                            'width_meters' => $widthMeters,
+                            'calculated_price_per_unit_item' => $unitPrice,
+                            'sub_total' => $subTotal,
+                            'notes' => $itemData['notes'] ?? null,
+                        ];
+                        $orderTotalAmount += $subTotal;
+                    } else {
+                        $priceDetails = $this->pricingService->calculatePrice(
+                            $serviceOffering,
+                            $customer,
+                            $quantity,
+                            $lengthMeters,
+                            $widthMeters
+                        );
+                        $orderItemsToCreate[] = [
+                            'service_offering_id' => $serviceOffering->id,
+                            'product_description_custom' => $itemData['product_description_custom'] ?? null,
+                            'quantity' => $quantity,
+                            'length_meters' => $lengthMeters,
+                            'width_meters' => $widthMeters,
+                            'calculated_price_per_unit_item' => $priceDetails['calculated_price_per_unit_item'],
+                            'sub_total' => $priceDetails['sub_total'],
+                            'notes' => $itemData['notes'] ?? null,
+                        ];
+                        $orderTotalAmount += $priceDetails['sub_total'];
+                    }
                 }
 
                 // Delete existing items and create new ones
@@ -557,10 +605,11 @@ class OrderController extends Controller
             $order->received = true;
             $order->received_at = now();
 
-            // Always recalculate total amount from order items with their current quantities, widths, and lengths
-            $order->recalculateTotalAmountWithItemRecalculation();
+            // Sync order total from existing items' sub_totals (do NOT overwrite item prices -
+            // they may have been set by POS with custom calculated_price_per_unit_item)
+            $order->recalculateTotalAmount();
 
-            Log::info('Recalculated total amount from order items:', [
+            Log::info('Synced order total from order items:', [
                 'order_id' => $order->id,
                 'new_total_amount' => $order->total_amount,
                 'items_processed' => $order->items()->count(),
@@ -577,7 +626,7 @@ class OrderController extends Controller
                 'received_at' => $order->received_at,
             ]);
 
-            $order->logActivity("Order marked as received. Total amount recalculated: " . $order->total_amount);
+            $order->logActivity("Order marked as received. Total: " . $order->total_amount);
 
             DB::commit();
 

@@ -13,10 +13,12 @@ class ProductType extends Model
         'description',
         'is_dimension_based', // Changed from base_measurement_unit
         'image_url',
+        'disabled',
     ];
 
     protected $casts = [
         'is_dimension_based' => 'boolean', // Add this cast
+        'disabled' => 'boolean',
     ];
     public function category()
     {

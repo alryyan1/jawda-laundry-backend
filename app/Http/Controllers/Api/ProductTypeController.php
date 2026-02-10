@@ -158,8 +158,8 @@ class ProductTypeController extends Controller
             'product_category_id' => 'sometimes|required|integer|exists:product_categories,id',
             'description' => 'sometimes|nullable|string|max:1000',
             'is_dimension_based' => 'sometimes|nullable|in:true,false,1,0,"true","false","1","0"',
+            'disabled' => 'sometimes|boolean',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            // 'is_active' => 'sometimes|boolean',
         ], [
             'name.unique' => 'This product type name already exists within the selected category.'
         ]);
@@ -187,6 +187,10 @@ class ProductTypeController extends Controller
             // Ensure is_dimension_based is properly converted to boolean
             if (isset($validatedData['is_dimension_based'])) {
                 $validatedData['is_dimension_based'] = filter_var($validatedData['is_dimension_based'], FILTER_VALIDATE_BOOLEAN);
+            }
+            // Ensure disabled is boolean when present (e.g. from form "1"/"0")
+            if (array_key_exists('disabled', $validatedData)) {
+                $validatedData['disabled'] = filter_var($validatedData['disabled'], FILTER_VALIDATE_BOOLEAN);
             }
 
             $productType->update($validatedData);
